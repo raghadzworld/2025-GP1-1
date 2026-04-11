@@ -22,7 +22,11 @@ class _NavItem {
   final String label;
   final String selectedIcon;
   final String unselectedIcon;
-  const _NavItem({required this.label, required this.selectedIcon, required this.unselectedIcon});
+  const _NavItem({
+    required this.label, 
+    required this.selectedIcon, 
+    required this.unselectedIcon
+  });
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -33,18 +37,14 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 3; // Home
+  int _currentIndex = 0; 
 
+  // تحديث المسارات بناءً على الصور الجديدة في الـ Assets
   final List<_NavItem> _navItems = const [
     _NavItem(
-      label: 'الملف',
-      selectedIcon: 'assets/images/icon_SlectedProfile.png',
-      unselectedIcon: 'assets/images/icon_NotSProfile.png',
-    ),
-    _NavItem(
-      label: 'طوارئ',
-      selectedIcon: 'assets/images/icon_SlectedEme.png',
-      unselectedIcon: 'assets/images/icon_NotSEme.png',
+      label: 'المنزل',
+      selectedIcon: 'assets/images/icon_SlectedHome.png',
+      unselectedIcon: 'assets/images/icon_NotSHome.png',
     ),
     _NavItem(
       label: 'الساعة',
@@ -52,19 +52,30 @@ class _MainScreenState extends State<MainScreen> {
       unselectedIcon: 'assets/images/icon_NotSWatch.png',
     ),
     _NavItem(
-      label: 'المنزل',
-      selectedIcon: 'assets/images/icon_SlectedHome.png',
-      unselectedIcon: 'assets/images/icon_NotSHome.png',
+      label: 'طوارئ',
+      selectedIcon: 'assets/images/icon_SlectedEme.png',
+      unselectedIcon: 'assets/images/icon_NotSEme.png',
+    ),
+    _NavItem(
+      label: 'الملف',
+      selectedIcon: 'assets/images/icon_SlectedProfile.png',
+      unselectedIcon: 'assets/images/icon_NotSProfile.png',
     ),
   ];
 
-  // Map index to page widget
   Widget _buildPage(int index) {
     switch (index) {
-      case 0: return const ProfileScreen();
-      case 1: return const EmergencyScreen();
-      case 2: return const WatchScreen();
-      case 3: return const HomeScreen();
+      case 0: 
+        return HomeScreen(
+          onMoreInfoPressed: () {
+            setState(() {
+              _currentIndex = 1; 
+            });
+          },
+        );
+      case 1: return const WatchScreen();
+      case 2: return const EmergencyScreen();
+      case 3: return const ProfileScreen();
       default: return const HomeScreen();
     }
   }
@@ -75,32 +86,34 @@ class _MainScreenState extends State<MainScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
-        // ── Pages ──
         body: IndexedStack(
           index: _currentIndex,
           children: List.generate(4, (i) => _buildPage(i)),
         ),
-        // ── Nav Bar ──
-        bottomNavigationBar: _buildNavBar(),
+        bottomNavigationBar: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+          child: _buildNavBar(),
+        ),
       ),
     );
   }
 
   Widget _buildNavBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: const Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+        borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(_navItems.length, (index) {
           final isSelected = index == _currentIndex;
           final item = _navItems[index];
@@ -108,9 +121,9 @@ class _MainScreenState extends State<MainScreen> {
           return GestureDetector(
             onTap: () => setState(() => _currentIndex = index),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFFE8F1FB) : Colors.transparent,
                 borderRadius: BorderRadius.circular(30),
@@ -123,15 +136,19 @@ class _MainScreenState extends State<MainScreen> {
                     width: 24,
                     height: 24,
                     fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      index == 0 ? Icons.home : index == 1 ? Icons.watch_later : index == 2 ? Icons.notifications_active : Icons.person,
+                      color: isSelected ? const Color(0xFF1773CF) : Colors.grey,
+                    ),
                   ),
                   if (isSelected) ...[
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(
                       item.label,
                       style: const TextStyle(
                         color: Color(0xFF1773CF),
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
                   ],

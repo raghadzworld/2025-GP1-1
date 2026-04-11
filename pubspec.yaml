@@ -52,19 +52,14 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
+  
   assets:
-    - assets/images/icon_signLan.png
-    - assets/images/icon_GCato.png
-    - assets/images/icon_GReco.png
-    - assets/images/icon_GCom.png
-    - assets/images/icon_Ycato.png
-    - assets/images/icon_YReco.png
-    - assets/images/icon_YCom.png
-    - assets/images/icon_YRima.png
+    - assets/images/
+
   fonts:
     - family: IBMPlexSansArabic
       fonts:
-        - asset: assets/fonts/IBMPlexSansArabic-Light.ttf
+        - asset: assets/fonts/IBMPlexSansArabic-Light.ttf # تأكد من اسم الملف هنا
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

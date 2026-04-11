@@ -12,7 +12,6 @@ class NabeehColors {
   static const cardBorder = Color(0xFFA4ACB0);
 }
 
-// ─── Shared gradient (used in cards, alarm, logo) ─────────────────────────────
 const _kBlueGradient = LinearGradient(
   colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
   stops: [0.09, 0.30, 1.0],
@@ -20,20 +19,25 @@ const _kBlueGradient = LinearGradient(
   end: Alignment.bottomCenter,
 );
 
-// ─── Home Screen ──────────────────────────────────────────────────────────────
-class HomeScreen extends StatefulWidget {
+/*
   const HomeScreen({super.key});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}*/
+
+class HomeScreen extends StatefulWidget {
+  // إضافة هذا السطر لاستقبال وظيفة التنقل من الصفحة الرئيسية
+  final VoidCallback? onMoreInfoPressed; 
+  
+  const HomeScreen({super.key, this.onMoreInfoPressed});
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedFeature = 0; // 0=المجموعات
+  int _selectedFeature = 0;
 
-  // Scroll order (LTR PageView):
-  // page 0 = المجموعات الصوتية  ← shown first / default
-  // page 1 = تسجيل الصوت        ← scroll right once
-  // page 2 = التواصل             ← scroll right twice
   final List<Map<String, String>> _features = [
     {
       'title': 'المجموعات\nالصوتية',
@@ -57,37 +61,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Material(
-        color: NabeehColors.background,
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 12),
-                    _buildWatchCard(),
-                    const SizedBox(height: 14),
-                    _buildFeaturesSection(),
-                    const SizedBox(height: 12),
-                    _buildAlarmCard(),
-                    const SizedBox(height: 12),
-                  ],
-                ),
+    return Material(
+      color: NabeehColors.background,
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 12),
+                  _buildWatchCard(),
+                  const SizedBox(height: 14),
+                  _buildFeaturesSection(),
+                  const SizedBox(height: 12),
+                  _buildAlarmCard(),
+                  const SizedBox(height: 12),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -132,7 +132,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Watch Card ────────────────────────────────────────────────────────────
   Widget _buildWatchCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -142,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: NabeehColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -167,12 +166,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 46,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color.fromARGB(255, 241, 241, 241), Color.fromARGB(255, 243, 243, 243)],
+                    colors: [Color(0xFFF1F1F1), Color(0xFFF3F3F3)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color.fromARGB(255, 159, 159, 159)),
+                  border: Border.all(color: const Color(0xFF9F9F9F)),
                 ),
                 child: const Icon(
                   Icons.watch_rounded,
@@ -209,16 +208,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
           GestureDetector(
-            onTap: () { /* TODO: go to watch page */ },
+            // استدعاء الوظيفة عند الضغط
+            onTap: widget.onMoreInfoPressed, 
             child: const Center(
               child: Text(
                 'للمزيد من المعلومات',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: NabeehColors.darkBlue,
+                  color: Color(0xFF21277B),
                   decoration: TextDecoration.underline,
-                  decorationColor: NabeehColors.darkBlue,
                 ),
               ),
             ),
@@ -228,72 +227,81 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Features Section ──────────────────────────────────────────────────────
-  Widget _buildFeaturesSection() {
+Widget _buildFeaturesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         const Align(
           alignment: Alignment.centerRight,
-          child: Text(
-            'كيف يمكنني مساعدتك ؟',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: NabeehColors.darkBlue,
+          child: Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: Text(
+              'كيف يمكنني مساعدتك ؟',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: NabeehColors.darkBlue,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        Transform.translate(
-          offset: const Offset(80, 0),
-          child: SizedBox(
-            width: 350,
-            height: 250,
-            child: PageView.builder(
-              controller: PageController(
-                viewportFraction: 0.65,
-                initialPage: 0,
-              ),
-              scrollDirection: Axis.horizontal,
-              onPageChanged: (pageIndex) {
-                setState(() => _selectedFeature = pageIndex);
-              },
-              itemCount: _features.length,
-              itemBuilder: (context, index) {
-                final isSelected = index == _selectedFeature;
-                final f = _features[index];
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 260,
+          child: PageView.builder(
+            padEnds: false, // الحفاظ على البداية من الحافة اليمنى
+            controller: PageController(viewportFraction: 0.58),
+            // نتحقق من أن المؤشر لا يتجاوز عدد العناصر الحقيقية
+            onPageChanged: (i) {
+              if (i < _features.length) {
+                setState(() => _selectedFeature = i);
+              }
+            },
+            // إضافة 1 لعدد العناصر للسماح بمساحة تمرير إضافية
+            itemCount: _features.length + 1,
+            itemBuilder: (context, index) {
+              // إذا وصلنا للعنصر الإضافي، نرجع مساحة فارغة
+              if (index == _features.length) {
+                return SizedBox(width: MediaQuery.of(context).size.width * 0.4);
+              }
 
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    gradient: isSelected ? _kBlueGradient : null,
-                    color: isSelected ? null : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: NabeehColors.cardBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                            alpha: isSelected ? 0.22 : 0.07),
-                        blurRadius: isSelected ? 14 : 6,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+              final isSelected = index == _selectedFeature;
+              final f = _features[index];
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.only(left: 15, bottom: 10),
+                decoration: BoxDecoration(
+                  gradient: isSelected ? _kBlueGradient : null,
+                  color: isSelected ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isSelected 
+                        ? Colors.transparent 
+                        : NabeehColors.cardBorder.withValues(alpha: 0.5),
                   ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: 14,
-                        right: 14,
-                        child: Image.asset(
-                          isSelected ? f['iconSelected']! : f['iconUnselected']!,
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.contain,
-                        ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isSelected ? 0.15 : 0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 20,
+                      right: 20,
+                      child: Image.asset(
+                        isSelected ? f['iconSelected']! : f['iconUnselected']!,
+                        width: 42,
+                        height: 42,
+                        fit: BoxFit.contain,
                       ),
-                      Center(
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
                           f['title']!,
                           textAlign: TextAlign.center,
@@ -301,79 +309,63 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: isSelected ? Colors.white : NabeehColors.gray,
-                            height: 1.4,
+                            height: 1.3,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  // ── Alarm Card ────────────────────────────────────────────────────────────
   Widget _buildAlarmCard() {
-    return GestureDetector(
-      onTap: () { /* TODO: go to alarm page */ },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-            stops: [0.09, 0.30, 1.0],
-            begin: Alignment.centerRight,
-            end: Alignment.centerLeft,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: _kBlueGradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: NabeehColors.darkNavy.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: NabeehColors.darkNavy.withValues(alpha: 0.3),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Image.asset(
-                  'assets/images/icon_YRima.png',
-                  width: 28,
-                  height: 28,
-                  fit: BoxFit.contain,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Image.asset('assets/images/icon_YRima.png', width: 28),
+              const SizedBox(width: 10),
+              const Text(
+                'المنبّه',
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold, 
+                  color: NabeehColors.yellow
                 ),
-                const SizedBox(width: 10),
-                const Text(
-                  'المنبّه',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: NabeehColors.yellow,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'ابدأ يومك بطريقة مختلفة، تنبيه لطيف بالاهتزاز يمنحك استيقاظاً مريحاً بلا إزعاج',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.white,
-                fontWeight: FontWeight.w300,
-                height: 1.6,
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'ابدأ يومك بطريقة مختلفة، تنبيه لطيف بالاهتزاز يمنحك استيقاظاً مريحاً بلا إزعاج',
+            style: TextStyle(
+              fontSize: 15, 
+              color: Colors.white, 
+              height: 1.6,
+              fontWeight: FontWeight.w400
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
