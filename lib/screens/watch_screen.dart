@@ -103,7 +103,10 @@ class _WatchScreenState extends State<WatchScreen> {
           ),
           const Spacer(),
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+              onTap: () {
+    // العودة إلى MainScreen (الشاشة الرئيسية مع شريط التنقل)
+    Navigator.pushReplacementNamed(context, '/main');
+  },
             child: Container(
               width: 52,
               height: 52,
