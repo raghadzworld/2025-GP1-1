@@ -39,25 +39,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedFeature = 0;
 
   final List<Map<String, String>> _features = [
-    {
-      'title': 'المجموعات\nالصوتية',
-      'iconSelected':   'assets/images/icon_Ycato.png',
-      'iconUnselected': 'assets/images/icon_GCato.png',
-      'route': '/sound-groups',
-    },
-    {
-      'title': 'تسجيل\nالصوت',
-      'iconSelected':   'assets/images/icon_YReco.png',
-      'iconUnselected': 'assets/images/icon_GReco.png',
-      'route': '/sound-recording',
-    },
-    {
-      'title': 'التواصل',
-      'iconSelected':   'assets/images/icon_YCom.png',
-      'iconUnselected': 'assets/images/icon_GCom.png',
-      'route': '/communication',
-    },
-  ];
+  {
+    'title': 'المجموعات\nالصوتية',
+    'iconSelected':   'assets/images/icon_Ycato.png',
+    'iconUnselected': 'assets/images/icon_GCato.png',
+    'route': '/categories',          // ← شاشة فئات الأصوات
+  },
+  {
+    'title': 'تسجيل\nالصوت',
+    'iconSelected':   'assets/images/icon_YReco.png',
+    'iconUnselected': 'assets/images/icon_GReco.png',
+    'route': '/stt-tts',             // ← شاشة التواصل
+  },
+  {
+    'title': 'التواصل',
+    'iconSelected':   'assets/images/icon_YCom.png',
+    'iconUnselected': 'assets/images/icon_GCom.png',
+    'route': '/stt-tts',             // ← نفس شاشة التواصل
+  },
+];
 
   @override
   Widget build(BuildContext context) {
@@ -265,56 +265,64 @@ Widget _buildFeaturesSection() {
                 return SizedBox(width: MediaQuery.of(context).size.width * 0.4);
               }
 
-              final isSelected = index == _selectedFeature;
+                 final isSelected = index == _selectedFeature;
               final f = _features[index];
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.only(left: 15, bottom: 10),
-                decoration: BoxDecoration(
-                  gradient: isSelected ? _kBlueGradient : null,
-                  color: isSelected ? null : Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: isSelected 
-                        ? Colors.transparent 
-                        : NabeehColors.cardBorder.withValues(alpha: 0.5),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isSelected ? 0.15 : 0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
+              return GestureDetector(
+                onTap: () {
+                  final route = f['route'];
+                  if (route != null) {
+                    Navigator.pushNamed(context, route);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(left: 15, bottom: 10),
+                  decoration: BoxDecoration(
+                    gradient: isSelected ? _kBlueGradient : null,
+                    color: isSelected ? null : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isSelected 
+                          ? Colors.transparent 
+                          : NabeehColors.cardBorder.withValues(alpha: 0.5),
                     ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 20,
-                      right: 20,
-                      child: Image.asset(
-                        isSelected ? f['iconSelected']! : f['iconUnselected']!,
-                        width: 42,
-                        height: 42,
-                        fit: BoxFit.contain,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isSelected ? 0.15 : 0.05),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
                       ),
-                    ),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          f['title']!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : NabeehColors.gray,
-                            height: 1.3,
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: 20,
+                        right: 20,
+                        child: Image.asset(
+                          isSelected ? f['iconSelected']! : f['iconUnselected']!,
+                          width: 42,
+                          height: 42,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            f['title']!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : NabeehColors.gray,
+                              height: 1.3,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
