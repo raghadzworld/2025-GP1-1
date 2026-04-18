@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'emergency_screen.dart';
+import 'watch_screen.dart';   // تأكدي من اسم الملف
 
 // ─── Placeholder screens ──────────────────────────────────────────────────────
-class WatchScreen extends StatelessWidget {
-  const WatchScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const Center(
-        child: Text('صفحة الساعة', style: TextStyle(fontSize: 20)));
-}
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -76,6 +71,7 @@ class _MainScreenState extends State<MainScreen> {
       case 1: return const WatchScreen();
       case 2: return const EmergencyScreen();
       case 3: return const ProfileScreen();
+      
       default: return const HomeScreen();
     }
   }
