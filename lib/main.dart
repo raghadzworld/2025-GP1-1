@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'screens/main_screen.dart';
+import 'screens/categories_screen.dart';
+import 'screens/add_edit_category_screen.dart';
+import 'screens/stt_tts_screen.dart';
 
 void main() {
   runApp(const NabeehApp());
@@ -10,6 +13,11 @@ class AppRoutes {
   static const login = '/login';
   static const home = '/home';
   static const main = '/main';
+  
+  // مسارات شاشاتكِ الجديدة
+  static const categories = '/categories';
+  static const addCategory = '/add-category';
+  static const sttTts = '/stt-tts';
 }
 
 class NabeehApp extends StatelessWidget {
@@ -22,10 +30,30 @@ class NabeehApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       initialRoute: AppRoutes.splash,
-      routes: {
-        AppRoutes.splash: (_) => const SplashScreen(),
-        AppRoutes.login: (_) => const LoginScreen(),
-        AppRoutes.main:  (_) => const MainScreen(),
+        onGenerateRoute: (settings) {
+        // مسار إضافة/تعديل الفئة (يحتاج arguments)
+        if (settings.name == AppRoutes.addCategory) {
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => AddEditCategoryScreen(category: args),
+          );
+        }
+        
+        // باقي المسارات
+        switch (settings.name) {
+          case AppRoutes.splash:
+            return MaterialPageRoute(builder: (_) => const SplashScreen());
+          case AppRoutes.login:
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+          case AppRoutes.main:
+            return MaterialPageRoute(builder: (_) => const MainScreen());
+          case AppRoutes.categories:
+            return MaterialPageRoute(builder: (_) => const CategoriesScreen());
+          case AppRoutes.sttTts:
+            return MaterialPageRoute(builder: (_) => const SttTtsScreen());
+          default:
+            return MaterialPageRoute(builder: (_) => const SplashScreen());
+        }
       },
     );
   }
