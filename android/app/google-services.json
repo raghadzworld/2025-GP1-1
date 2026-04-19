@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "303653682889",
+    "project_id": "nabeeh-3d93d",
+    "storage_bucket": "nabeeh-3d93d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:303653682889:android:0324147f9901d1c52ad718",
+        "android_client_info": {
+          "package_name": "com.example.nabbeh"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "303653682889-hd0rn5kiducimgjd77hthg044lc1haoo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nabbeh",
+            "certificate_hash": "0ad98eabfd3d842185e67ff29bf2feaacb592b83"
+          }
+        },
+        {
+          "client_id": "303653682889-iqq9mpbs3b0082c73jhv57ckecqlh6bl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_9QdsTLUeKKwXWFccOJi3qjowCmhQ_D0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "303653682889-iqq9mpbs3b0082c73jhv57ckecqlh6bl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

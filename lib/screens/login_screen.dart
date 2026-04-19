@@ -590,8 +590,7 @@ class _LoginTopWavePainter extends CustomPainter {
     // انحنِ للأسفل في المنتصف ثم ارجع للأعلى في اليمين
     path.cubicTo(
       size.width * 0.25,
-      size.height * 0.00
-      1, // نقطة تحكم 1 — تنزل كثيراً
+      size.height * 0.001, // نقطة تحكم 1 — تنزل كثيراً
       size.width * 0.75,
       size.height * 1.8, // نقطة تحكم 2 — تبقى تحت
       size.width,
