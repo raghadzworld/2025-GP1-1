@@ -45,7 +45,11 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     with SingleTickerProviderStateMixin {
   bool _numbersExpanded = false;
   final List<EmergencyContact> _contacts = [
-    EmergencyContact(name: 'محمد العويس', email: 'mo@example.com', relation: 'أخ'),
+    EmergencyContact(
+      name: 'محمد العويس',
+      email: 'mo@example.com',
+      relation: 'أخ',
+    ),
   ];
 
   // SOS state
@@ -177,12 +181,12 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               _buildFormField(label: 'الاسم:', controller: nameCtrl),
               const SizedBox(height: 20),
               _buildFormField(
-                  label: 'الايميل:',
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress),
+                label: 'الايميل:',
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+              ),
               const SizedBox(height: 20),
-              _buildFormField(
-                  label: 'جهة القرابة:', controller: relationCtrl),
+              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
               const SizedBox(height: 32),
               // Add button
               OutlinedButton(
@@ -191,26 +195,35 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                       emailCtrl.text.isNotEmpty &&
                       relationCtrl.text.isNotEmpty) {
                     setState(() {
-                      _contacts.add(EmergencyContact(
-                        name: nameCtrl.text.trim(),
-                        email: emailCtrl.text.trim(),
-                        relation: relationCtrl.text.trim(),
-                      ));
+                      _contacts.add(
+                        EmergencyContact(
+                          name: nameCtrl.text.trim(),
+                          email: emailCtrl.text.trim(),
+                          relation: relationCtrl.text.trim(),
+                        ),
+                      );
                     });
                     Navigator.pop(ctx);
                   }
                 },
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: NabeehColors.lightBlue, width: 1.2),
+                  side: const BorderSide(
+                    color: NabeehColors.lightBlue,
+                    width: 1.2,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('إضافة',
-                    style: TextStyle(
-                        color: NabeehColors.lightBlue,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'إضافة',
+                  style: TextStyle(
+                    color: NabeehColors.lightBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               // Back button
@@ -220,13 +233,17 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                   minimumSize: const Size(double.infinity, 52),
                   side: const BorderSide(color: Colors.redAccent, width: 1.2),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('تراجع',
-                    style: TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'تراجع',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -243,11 +260,14 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: NabeehColors.darkBlue)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: NabeehColors.darkBlue,
+          ),
+        ),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
@@ -260,11 +280,12 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               borderSide: BorderSide(color: NabeehColors.cardBorder),
             ),
             focusedBorder: const UnderlineInputBorder(
-              borderSide:
-                  BorderSide(color: NabeehColors.lightBlue, width: 2),
+              borderSide: BorderSide(color: NabeehColors.lightBlue, width: 2),
             ),
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 0,
+            ),
           ),
         ),
       ],
@@ -283,7 +304,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 20),
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -299,11 +322,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                     ),
                     const SizedBox(height: 16),
                     ..._contacts.map((c) => _buildContactTile(c)),
-                    if (_contacts.length < 2)
-                      _buildAddContactButton(),
+                    if (_contacts.length < 2) _buildAddContactButton(),
                     const SizedBox(height: 40),
                     const Text(
-                      'هل انت في حالة خطر ؟',
+                      'هل أنت في حالة خطر ؟',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -387,11 +409,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         children: [
           // Header row (tap to expand)
           GestureDetector(
-            onTap: () =>
-                setState(() => _numbersExpanded = !_numbersExpanded),
+            onTap: () => setState(() => _numbersExpanded = !_numbersExpanded),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
                   // Siren icon on the right (in RTL)
@@ -446,41 +466,49 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             secondChild: Column(
               children: [
                 const Divider(height: 1, color: NabeehColors.cardBorder),
-                ..._emergencyNumbers.map((item) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Name on the left
-                          Text(
-                            item['name']!,
+                ..._emergencyNumbers.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Name on the left
+                        Text(
+                          item['name']!,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: NabeehColors.darkBlue,
+                          ),
+                        ),
+                        // Number badge on the right
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: NabeehColors.lightBlueBg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: NabeehColors.cardBorder.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Text(
+                            item['number']!,
                             style: const TextStyle(
-                              fontSize: 15,
-                              color: NabeehColors.darkBlue,
+                              color: NabeehColors.lightBlue,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
                           ),
-                          // Number badge on the right
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: NabeehColors.lightBlueBg,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: NabeehColors.cardBorder.withOpacity(0.5)),
-                            ),
-                            child: Text(
-                              item['number']!,
-                              style: const TextStyle(
-                                color: NabeehColors.lightBlue,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -515,8 +543,11 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               color: NabeehColors.lightBlueBg,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_rounded,
-                color: NabeehColors.lightBlue, size: 24),
+            child: const Icon(
+              Icons.person_rounded,
+              color: NabeehColors.lightBlue,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 12),
           // Info on the left (in RTL)
@@ -536,7 +567,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 Text(
                   'جهة القرابة : ${contact.relation}',
                   style: const TextStyle(
-                      fontSize: 13, color: NabeehColors.gray),
+                    fontSize: 13,
+                    color: NabeehColors.gray,
+                  ),
                 ),
               ],
             ),
@@ -552,8 +585,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       onTap: _showAddContactSheet,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -652,7 +684,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                             const Text(
                               'اضغط للإلغاء',
                               style: TextStyle(
-                                  color: Colors.white70, fontSize: 12),
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         )
