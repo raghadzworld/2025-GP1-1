@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'nabeeh_colors.dart';
 
 class ProfileInfoScreen extends StatelessWidget {
   final VoidCallback onEdit;
@@ -7,59 +7,93 @@ class ProfileInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Top gradient background
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.blue.shade100, Colors.white],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            // Top gradient background
+            Container(
+              height: 200,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFB8D4F0), Colors.white],
+                ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 60),
-                _buildHeader(), // Reem Al-Owais (Left) + Profile Image (Right)
-                const SizedBox(height: 50),
-                _buildInfoRow(Icons.email, 'الايميل', 'Reem@gmile.com'),
-                _buildInfoRow(Icons.phone, 'رقم الهاتف', '050 123 4567'),
-                const Spacer(),
-                _buildCommandButtons(),
-                const SizedBox(height: 100),
-              ],
+            SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 30),
+                  _buildHeader(context),
+                  const SizedBox(height: 40),
+                  _buildInfoRow(Icons.email, 'الايميل', 'Reem@gmail.com'),
+                  _buildInfoRow(Icons.phone_android, 'رقم الهاتف', '050 123 4567'),
+                  const Spacer(),
+                  _buildCommandButtons(context),
+                  const SizedBox(height: 40), 
+                ],
+              ),
             ),
-          ),
-          _buildBottomNavBar(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Text(
-          'ريم العويس',
-          style: GoogleFonts.notoSansArabic(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF1A1A40),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCommandButtons() {
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Right Side: Name (Aligned to the side as requested)
+          const Text(
+            'ريم العويس',
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 32, // Increased size slightly to match the side-alignment aesthetic
+              fontWeight: FontWeight.bold,
+              color: NabeehColors.darkBlue,
+            ),
+          ),
+
+          // Left Side: Blue Icon
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommandButtons(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
@@ -69,100 +103,41 @@ class ProfileInfoScreen extends StatelessWidget {
             icon: const Icon(Icons.edit, color: Colors.white),
             label: const Text(
               'تعديل الملف الشخصي',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 18, 
+                fontWeight: FontWeight.bold, 
+                color: Colors.white
+              ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: NabeehColors.dark,
               minimumSize: const Size(double.infinity, 60),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
           const SizedBox(height: 15),
           OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.logout, color: Colors.grey),
+            onPressed: () {
+              Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+            },
+            icon: const Icon(Icons.logout, color: NabeehColors.dark), 
             label: const Text(
               'تسجيل الخروج',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 18, 
+                fontWeight: FontWeight.bold,
+                color: NabeehColors.dark 
+              ),
             ),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 60),
-              side: BorderSide(color: Colors.grey.shade200),
+              side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavBar() {
-    return Positioned(
-      bottom: 30,
-      left: 20,
-      right: 20,
-      child: Container(
-        height: 75,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(37.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            )
-          ],
-          border: Border.all(color: Colors.grey.shade100),
-        ),
-        child: Row(
-          children: [
-            // 4. Home Icon
-            IconButton(
-              onPressed: () {},
-              icon: Image.asset('assets/images/home.png', width: 24, height: 24),
-            ),
-            const Spacer(),
-            
-            // 3. Watch/Bracelet Icon
-            IconButton(
-              onPressed: () {},
-              icon: Image.asset('assets/images/bracelet.png', width: 24, height: 24),
-            ),
-            const Spacer(),
-            
-            // 2. SOS Icon
-            IconButton(
-              onPressed: () {},
-              icon: Image.asset('assets/images/sos.png', width: 24, height: 24),
-            ),
-            const Spacer(),
-            
-            // 1. Profile Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.person, color: Colors.blue, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'الملف الشخصي',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -173,18 +148,26 @@ class ProfileInfoScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          Text(
+            label, 
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              color: Colors.grey, 
+              fontSize: 14
+            )
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(icon, color: Colors.blue, size: 22),
+              Icon(icon, color: const Color(0xFF1773CF), size: 22),
               const SizedBox(width: 15),
               Text(
                 value,
                 style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A40),
+                  color: NabeehColors.darkBlue,
                 ),
               ),
             ],
