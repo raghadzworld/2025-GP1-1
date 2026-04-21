@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'listening_screen.dart'; 
+import 'reminders_screen.dart'; 
+import 'stt_tts_screen.dart'; // 👇 Added import for the Communication screen
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -19,12 +22,6 @@ const _kBlueGradient = LinearGradient(
   end: Alignment.bottomCenter,
 );
 
-/*
-  const HomeScreen({super.key});
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}*/
-
 class HomeScreen extends StatefulWidget {
   // إضافة هذا السطر لاستقبال وظيفة التنقل من الصفحة الرئيسية
   final VoidCallback? onMoreInfoPressed; 
@@ -39,25 +36,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedFeature = 0;
 
   final List<Map<String, String>> _features = [
-  {
-    'title': 'المجموعات\nالصوتية',
-    'iconSelected':   'assets/images/icon_Ycato.png',
-    'iconUnselected': 'assets/images/icon_GCato.png',
-    'route': '/categories',          // ← شاشة فئات الأصوات
-  },
-  {
-    'title': 'تسجيل\nالصوت',
-    'iconSelected':   'assets/images/icon_YReco.png',
-    'iconUnselected': 'assets/images/icon_GReco.png',
-    'route': '/stt-tts',             // ← شاشة التواصل
-  },
-  {
-    'title': 'التواصل',
-    'iconSelected':   'assets/images/icon_YCom.png',
-    'iconUnselected': 'assets/images/icon_GCom.png',
-    'route': '/stt-tts',             // ← نفس شاشة التواصل
-  },
-];
+    {
+      'title': 'المجموعات\nالصوتية',
+      'iconSelected':   'assets/images/icon_Ycato.png',
+      'iconUnselected': 'assets/images/icon_GCato.png',
+      'route': '/categories',          
+    },
+    {
+      'title': 'تسجيل\nالصوت',
+      'iconSelected':   'assets/images/icon_YReco.png',
+      'iconUnselected': 'assets/images/icon_GReco.png',
+      'route': 'custom_listening', // Connects to ListeningScreen
+    },
+    {
+      'title': 'التواصل',
+      'iconSelected':   'assets/images/icon_YCom.png',
+      'iconUnselected': 'assets/images/icon_GCom.png',
+      'route': 'custom_communication', // 👇 Updated to intercept custom route
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 14),
                   _buildFeaturesSection(),
                   const SizedBox(height: 12),
-                  _buildAlarmCard(),
+                  _buildAlarmCard(), 
                   const SizedBox(height: 12),
                 ],
               ),
@@ -208,7 +205,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
           GestureDetector(
-            // استدعاء الوظيفة عند الضغط
             onTap: widget.onMoreInfoPressed, 
             child: const Center(
               child: Text(
@@ -227,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-Widget _buildFeaturesSection() {
+  Widget _buildFeaturesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -249,28 +245,39 @@ Widget _buildFeaturesSection() {
         SizedBox(
           height: 260,
           child: PageView.builder(
-            padEnds: false, // الحفاظ على البداية من الحافة اليمنى
+            padEnds: false, 
             controller: PageController(viewportFraction: 0.58),
-            // نتحقق من أن المؤشر لا يتجاوز عدد العناصر الحقيقية
             onPageChanged: (i) {
               if (i < _features.length) {
                 setState(() => _selectedFeature = i);
               }
             },
-            // إضافة 1 لعدد العناصر للسماح بمساحة تمرير إضافية
             itemCount: _features.length + 1,
             itemBuilder: (context, index) {
-              // إذا وصلنا للعنصر الإضافي، نرجع مساحة فارغة
               if (index == _features.length) {
                 return SizedBox(width: MediaQuery.of(context).size.width * 0.4);
               }
 
-                 final isSelected = index == _selectedFeature;
+              final isSelected = index == _selectedFeature;
               final f = _features[index];
               return GestureDetector(
                 onTap: () {
                   final route = f['route'];
-                  if (route != null) {
+                  
+                  // 👇 Custom routing for Listening and STT/TTS Screens
+                  if (route == 'custom_listening') {
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(builder: (context) => const ListeningScreen())
+                    );
+                  } 
+                  else if (route == 'custom_communication') {
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(builder: (context) => const SttTtsScreen())
+                    );
+                  }
+                  else if (route != null) {
                     Navigator.pushNamed(context, route);
                   }
                 },
@@ -333,47 +340,57 @@ Widget _buildFeaturesSection() {
   }
 
   Widget _buildAlarmCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: _kBlueGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: NabeehColors.darkNavy.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Image.asset('assets/images/icon_YRima.png', width: 28),
-              const SizedBox(width: 10),
-              const Text(
-                'المنبّه',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold, 
-                  color: NabeehColors.yellow
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'ابدأ يومك بطريقة مختلفة، تنبيه لطيف بالاهتزاز يمنحك استيقاظاً مريحاً بلا إزعاج',
-            style: TextStyle(
-              fontSize: 15, 
-              color: Colors.white, 
-              height: 1.6,
-              fontWeight: FontWeight.w400
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (context) => const RemindersScreen())
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: _kBlueGradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: NabeehColors.darkNavy.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Image.asset('assets/images/icon_YRima.png', width: 28),
+                const SizedBox(width: 10),
+                const Text(
+                  'المنبّه',
+                  style: TextStyle(
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold, 
+                    color: NabeehColors.yellow
+                  ),
+                ),
+                const Spacer(), 
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'ابدأ يومك بطريقة مختلفة، تنبيه لطيف بالاهتزاز يمنحك استيقاظاً مريحاً بلا إزعاج',
+              style: TextStyle(
+                fontSize: 15, 
+                color: Colors.white, 
+                height: 1.6,
+                fontWeight: FontWeight.w400
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
