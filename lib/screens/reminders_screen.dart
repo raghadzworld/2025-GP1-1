@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'add_reminder_screen.dart';
-import 'listening_screen.dart';
+import 'nabeeh_colors.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -11,7 +11,6 @@ class RemindersScreen extends StatefulWidget {
 }
 
 class _RemindersScreenState extends State<RemindersScreen> {
-  // Dummy data
   List<Map<String, dynamic>> alarms = [
     {
       'time': '07:00',
@@ -29,196 +28,256 @@ class _RemindersScreenState extends State<RemindersScreen> {
     },
   ];
 
-  @override
+@override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: NabeehColors.background,
         body: Stack(
           children: [
+            // 👇 Background gradient
+            Container(
+              height: 250,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFB8D4F0), Colors.white],
+                ),
+              ),
+            ),
             SafeArea(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'المنبهات',
-                          style: GoogleFonts.notoSansArabic(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF1A1A40),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add, color: Colors.blue, size: 32),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const AddReminderScreen()),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(thickness: 1, color: Color(0xFFEEEEEE)),
+                  const SizedBox(height: 20),
+                  _buildHeader(),
+                  const SizedBox(height: 40),
                   Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.only(top: 10, bottom: 120),
-                      itemCount: alarms.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        thickness: 1,
-                        color: Color(0xFFEEEEEE),
-                        indent: 20,
-                        endIndent: 20,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          ...alarms.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final alarm = entry.value;
+                            return _buildAlarmCard(alarm, index);
+                          }),
+                          const SizedBox(height: 8),
+                          _buildAddButton(),
+                          const SizedBox(height: 40),
+                        ],
                       ),
-                      itemBuilder: (context, index) {
-                        final alarm = alarms[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                                    textBaseline: TextBaseline.alphabetic,
-                                    children: [
-                                      Text(
-                                        alarm['time'],
-                                        style: GoogleFonts.notoSansArabic(
-                                          fontSize: 48,
-                                          fontWeight: FontWeight.w300,
-                                          color: alarm['isActive'] ? const Color(0xFF1A1A40) : Colors.grey,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        alarm['period'],
-                                        style: GoogleFonts.notoSansArabic(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w500,
-                                          color: alarm['isActive'] ? const Color(0xFF1A1A40) : Colors.grey,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    '${alarm['label']}، ${alarm['days']}',
-                                    style: GoogleFonts.notoSansArabic(
-                                      fontSize: 14,
-                                      color: alarm['isActive'] ? Colors.grey.shade700 : Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Switch(
-                                value: alarm['isActive'],
-                                activeThumbColor: Colors.blue,
-                                onChanged: (val) {
-                                  setState(() {
-                                    alarms[index]['isActive'] = val;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        );
-                      },
                     ),
                   ),
                 ],
               ),
             ),
-            _buildBottomNavBar(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Positioned(
-      bottom: 30,
-      left: 20,
-      right: 20,
-      child: Container(
-        height: 75,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(37.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(20), // 0.08 opacity
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            )
-          ],
-          border: Border.all(color: Colors.grey.shade100),
-        ),
-        child: Row(
-          children: [
-            // 4. Home Icon (Active state)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(25),
+                shape: BoxShape.circle,
+                color: NabeehColors.background,
+                border: Border.all(color: NabeehColors.dark, width: 1.5),
               ),
-              child: Row(
+              child: const Directionality(
+                textDirection: TextDirection.ltr,
+                child: Icon(Icons.arrow_forward_ios_rounded, color: NabeehColors.dark, size: 18),
+              ),
+            ),
+          ),
+          const Column(
+            children: [
+              Text(
+                'إدارة أوقاتك',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.slate400,
+                  letterSpacing: 2,
+                  fontFamily: 'IBMPlexSansArabic',
+                ),
+              ),
+              Text(
+                'المنبهات',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.dark,
+                  letterSpacing: -1,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: NabeehColors.background,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlarmCard(Map<String, dynamic> alarm, int index) {
+    final bool isActive = alarm['isActive'];
+    final bool isAm = alarm['period'] == 'ص';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isActive ? NabeehColors.background : NabeehColors.slate50,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: isActive ? NabeehColors.lightBlue : NabeehColors.slate100,
+          width: isActive ? 2 : 1,
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: NabeehColors.lightBlue.withOpacity(0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                )
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    'assets/images/home.png',
-                    width: 20,
-                    height: 20,
-                    color: Colors.blue,
-                    colorBlendMode: BlendMode.srcIn,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'الرئيسية',
+                  Text(
+                    alarm['time'],
                     style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: isActive ? NabeehColors.darkBlue : NabeehColors.slate400,
+                      letterSpacing: -2,
+                      height: 1.1,
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    isAm ? LucideIcons.sun : LucideIcons.moon,
+                    size: 28,
+                    color: isActive ? (isAm ? NabeehColors.yellow : NabeehColors.darkBlue) : NabeehColors.slate300,
                   ),
                 ],
               ),
+              Switch(
+                value: isActive,
+                activeColor: NabeehColors.background,
+                activeTrackColor: NabeehColors.lightBlue,
+                inactiveThumbColor: NabeehColors.slate400,
+                inactiveTrackColor: NabeehColors.slate200,
+                trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                onChanged: (val) {
+                  setState(() {
+                    alarms[index]['isActive'] = val;
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isActive ? NabeehColors.lightBlue.withOpacity(0.05) : NabeehColors.slate100,
+              borderRadius: BorderRadius.circular(16),
             ),
-            const Spacer(),
-            
-            // 3. Watch/Bracelet Icon
-            IconButton(
-              onPressed: () {},
-              icon: Image.asset('assets/images/bracelet.png', width: 24, height: 24),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.bellRing, size: 14, color: isActive ? NabeehColors.lightBlue : NabeehColors.slate500),
+                const SizedBox(width: 8),
+                Text(
+                  '${alarm['label']} • ${alarm['days']}',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: isActive ? NabeehColors.lightBlue : NabeehColors.slate500,
+                  ),
+                ),
+              ],
             ),
-            const Spacer(),
-            
-            // 2. SOS Icon
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ListeningScreen()),
-                );
-              },
-              icon: Image.asset('assets/images/sos.png', width: 24, height: 24),
-            ),
-            const Spacer(),
-            
-            // 1. Profile Icon (Inactive state)
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.person_outline, color: Colors.grey, size: 28),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddButton() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const AddReminderScreen()));
+      },
+      child: Container(
+        width: double.infinity,
+        height: 80,
+        decoration: BoxDecoration(
+          border: Border.all(color: NabeehColors.darkBlue, width: 2),
+          borderRadius: BorderRadius.circular(32),
+          color: Colors.transparent,
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.plus, color: NabeehColors.darkBlue),
+            const SizedBox(width: 8),
+            Text(
+              'إضافة منبه جديد',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                color: NabeehColors.darkBlue,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                fontSize: 14,
+              ),
             ),
           ],
         ),
