@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'emergency_screen.dart';
-import 'watch_screen.dart';   // تأكدي من اسم الملف
+import 'watch_screen.dart';   
 
-// ─── Placeholder screens ──────────────────────────────────────────────────────
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const Center(
-        child: Text('صفحة الملف', style: TextStyle(fontSize: 20)));
-}
+// 👇 استيراد شاشات الملف الشخصي هنا
+import 'profile_info_screen.dart';
+import 'edit_profile_screen.dart';
 
 // ─── Nav Item Model ───────────────────────────────────────────────────────────
 class _NavItem {
@@ -70,7 +65,22 @@ class _MainScreenState extends State<MainScreen> {
         );
       case 1: return const WatchScreen();
       case 2: return const EmergencyScreen();
-      case 3: return const ProfileScreen();
+      
+      // 👇 تم ربط شاشة الملف الشخصي هنا
+      case 3: 
+        return ProfileInfoScreen(
+          onEdit: () {
+            // الانتقال إلى شاشة تعديل الملف عند الضغط على الزر
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EditProfileScreen(
+                  onBack: () => Navigator.pop(context),
+                ),
+              ),
+            );
+          },
+        );
       
       default: return const HomeScreen();
     }
@@ -142,6 +152,7 @@ class _MainScreenState extends State<MainScreen> {
                     Text(
                       item.label,
                       style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic', // تأكدت من إضافة الخط هنا أيضاً ليتناسب مع تصميمك
                         color: Color(0xFF1773CF),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
