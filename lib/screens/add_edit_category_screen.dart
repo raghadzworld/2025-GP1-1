@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../widgets/custom_widgets.dart';
-import 'Nabeeh_Colors.dart';
+import 'nabeeh_colors.dart';
 
 class AddEditCategoryScreen extends StatefulWidget {
   final Map<String, dynamic>? category;
@@ -15,24 +15,14 @@ class AddEditCategoryScreen extends StatefulWidget {
 class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   late TextEditingController _nameController;
   late TextEditingController _descController;
-  String selectedIcon = 'Home';
   List<Map<String, dynamic>> selectedSounds = [];
-
-  final List<Map<String, dynamic>> availableIcons = [
-    {'name': 'Home', 'icon': LucideIcons.home},
-    {'name': 'Work', 'icon': LucideIcons.briefcase},
-    {'name': 'Outdoor', 'icon': LucideIcons.trees},
-    {'name': 'Travel', 'icon': LucideIcons.car},
-    {'name': 'Explore', 'icon': LucideIcons.compass},
-    {'name': 'School', 'icon': LucideIcons.graduationCap},
-  ];
 
   final List<String> availableSounds = [
     'الآذان',
     'إنذار الحريق',
     'بكاء طفل',
     'طرق على الباب',
-    'بوق سيارة'
+    'جرس الباب '
   ];
 
   bool get isEditing => widget.category != null;
@@ -48,9 +38,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     if (cat != null) {
       _nameController = TextEditingController(text: cat['name'] ?? '');
       _descController = TextEditingController(text: cat['desc'] ?? '');
-      selectedIcon = cat['iconName'] ?? 'Home';
-      
-      // Deep copy the sounds list with vibration levels
       if (cat['sounds'] != null) {
         selectedSounds = List<Map<String, dynamic>>.from(
           (cat['sounds'] as List).map((s) => Map<String, dynamic>.from(s))
@@ -61,7 +48,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     } else {
       _nameController = TextEditingController();
       _descController = TextEditingController();
-      selectedIcon = 'Home';
       selectedSounds = [];
     }
   }
@@ -100,7 +86,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       Navigator.pop(context, {
         'name': _nameController.text.trim(),
         'desc': _descController.text.trim(),
-        'iconName': selectedIcon,
         'sounds': selectedSounds,
       });
     }
@@ -109,28 +94,30 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   Future<void> _handleDelete() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('حذف الفئة', textDirection: TextDirection.rtl),
-        content: const Text(
-          'هل أنت متأكد من حذف هذه الفئة؟ لا يمكن التراجع عن هذا الإجراء.',
-          textDirection: TextDirection.rtl,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء', style: TextStyle(color: NabeehColors.slate400)),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('حذف الفئة'),
+          content: const Text(
+            'هل أنت متأكد من حذف هذه الفئة؟ لا يمكن التراجع عن هذا الإجراء.',
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء', style: TextStyle(color: NabeehColors.slate400)),
             ),
-            child: const Text('حذف'),
-          ),
-        ],
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('حذف'),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -141,75 +128,123 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          const SizedBox(height: 64),
-          _buildHeader(),
-          const SizedBox(height: 24),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildNameInput(),
-                  const SizedBox(height: 24),
-                  _buildDescriptionInput(),
-                  const SizedBox(height: 32),
-                  _buildIconSelection(),
-                  const SizedBox(height: 40),
-                  _buildSoundsSelection(),
-                ],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            _buildHeader(context),
+            Expanded(
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      _buildNameInput(),
+                      const SizedBox(height: 24),
+                      _buildDescriptionInput(),
+                      const SizedBox(height: 40),
+                      _buildSoundsSelection(),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-          _buildBottomActions(),
-        ],
+            _buildBottomActions(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+  // ─── Custom Header matching EditProfileScreen / HomeScreen ─────────────────
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'تخصيص الفئة',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.slate400,
-                  letterSpacing: 2,
+          // Right side: Back button (white circle, border)
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(
+                  color: NabeehColors.dark,
+                  width: 1.5,
                 ),
               ),
-              Text(
+              child: const Directionality(
+                textDirection: TextDirection.ltr,
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: NabeehColors.dark,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+
+          // Center: Title – flexible
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
                 isEditing ? 'تعديل الفئة' : 'إضافة فئة',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 30,
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 26,
                   fontWeight: FontWeight.w900,
                   color: NabeehColors.dark,
                   letterSpacing: -1,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
+            ),
           ),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: NabeehColors.slate100),
+
+          // Left side: Blue gradient sign language icon
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              child: const Icon(LucideIcons.arrowLeft, color: NabeehColors.slate400),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ],
@@ -277,64 +312,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           ),
           maxLines: 2,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIconSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'اختر أيقونة',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: NabeehColors.slate400,
-            letterSpacing: 2,
-          ),
-        ),
-        const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 6,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-          ),
-          itemCount: availableIcons.length,
-          itemBuilder: (context, index) {
-            final item = availableIcons[index];
-            final isSelected = item['name'] == selectedIcon;
-            return GestureDetector(
-              onTap: () => setState(() => selectedIcon = item['name']),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected ? NabeehColors.accent : NabeehColors.background,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? Colors.white : Colors.transparent,
-                    width: 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: NabeehColors.accent.withValues(alpha: 0.4),
-                            blurRadius: 20,
-                          )
-                        ]
-                      : null,
-                ),
-                child: Icon(
-                  item['icon'],
-                  color: isSelected ? NabeehColors.dark : NabeehColors.slate300,
-                  size: 24,
-                ),
-              ),
-            );
-          },
         ),
       ],
     );
@@ -426,13 +403,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   Widget _buildVibrationSelector(String soundName, int soundIdx) {
     final levels = ['ضعيف', 'متوسط', 'قوي'];
     final currentLevel = selectedSounds[soundIdx]['vibration'];
-    // Fix: In RTL, "قوي" should be on the left, "ضعيف" on the right visually
-    // We'll keep the logical order left-to-right as weak to strong,
-    // but visually we reverse the display order for RTL.
     final displayLevels = levels.reversed.toList(); // ['قوي', 'متوسط', 'ضعيف']
     final currentIndex = levels.indexOf(currentLevel);
-    // Map logical index (0=weak,1=medium,2=strong) to visual position (0=right,1=center,2=left)
-    final visualIndex = 2 - currentIndex; // Because strong should be on left
+    final visualIndex = 2 - currentIndex;
 
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -487,22 +460,20 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Base line
                     Container(
                       height: 2,
                       color: NabeehColors.slate100,
                       margin: EdgeInsets.symmetric(horizontal: constraints.maxWidth / 6),
                     ),
-                    // Ticks at positions: left (strong), center (medium), right (weak)
                     ...displayLevels.asMap().entries.map((entry) {
                       final idx = entry.key;
                       double leftPosition;
                       if (idx == 0) {
-                        leftPosition = 0; // Left (strong)
+                        leftPosition = 0;
                       } else if (idx == 1) {
-                        leftPosition = constraints.maxWidth / 2 - 1; // Center (medium)
+                        leftPosition = constraints.maxWidth / 2 - 1;
                       } else {
-                        leftPosition = constraints.maxWidth - 2; // Right (weak)
+                        leftPosition = constraints.maxWidth - 2;
                       }
                       return Positioned(
                         left: leftPosition,
@@ -513,15 +484,14 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                         ),
                       );
                     }),
-                    // Thumb positioned based on visual index
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeOutCubic,
                       left: visualIndex == 0
-                          ? 0 // Strong (left)
+                          ? 0
                           : visualIndex == 1
-                              ? constraints.maxWidth / 2 - 16 // Medium (center)
-                              : constraints.maxWidth - 32, // Weak (right)
+                              ? constraints.maxWidth / 2 - 16
+                              : constraints.maxWidth - 32,
                       child: Container(
                         width: 32,
                         height: 32,
@@ -556,11 +526,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                         ),
                       ),
                     ),
-                    // Tap areas mapped to logical levels
                     Row(
                       children: displayLevels.map((displayLevel) {
-                        // displayLevel order: 'قوي', 'متوسط', 'ضعيف'
-                        // We need to map tap to the logical level
                         return Expanded(
                           child: GestureDetector(
                             onTap: () {
@@ -587,7 +554,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               );
             },
           ),
-          // Labels under ruler (display order: strong on left, weak on right)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -612,7 +578,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
   Widget _buildBottomActions() {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: NabeehColors.background,
         border: Border(top: BorderSide(color: NabeehColors.slate100)),
