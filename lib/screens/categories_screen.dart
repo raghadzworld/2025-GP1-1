@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+
+
 import '../widgets/custom_widgets.dart';
-import 'Nabeeh_Colors.dart';
+import 'nabeeh_colors.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -11,7 +12,6 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  // Local state for demonstration (will be replaced by Provider later)
   late List<Map<String, dynamic>> _categories;
 
   @override
@@ -24,7 +24,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         'iconName': 'Home',
         'active': true,
         'sounds': [
-          {'name': 'الآذان', 'vibration': 'قوي'},
+          {'name': 'الأذان', 'vibration': 'قوي'},
           {'name': 'بكاء طفل', 'vibration': 'متوسط'},
           {'name': 'طرق على الباب', 'vibration': 'ضعيف'},
         ],
@@ -42,21 +42,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     ];
   }
 
-  IconData _getIconFromName(String name) {
-    switch (name) {
-      case 'Home':
-        return LucideIcons.home;
-      case 'Work':
-        return LucideIcons.briefcase;
-      case 'Outdoor':
-        return LucideIcons.trees;
-      case 'Travel':
-        return LucideIcons.car;
-      default:
-        return LucideIcons.home;
-    }
-  }
-
   void _setActiveCategory(int index) {
     setState(() {
       for (int i = 0; i < _categories.length; i++) {
@@ -65,39 +50,46 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     });
   }
 
-Future<void> _navigateToAddEdit({Map<String, dynamic>? category, int? index}) async {
-  final result = await Navigator.pushNamed(
-    context,
-    '/add-category',
-    arguments: category,
-  );
-  
-  if (result == 'DELETE') {
-    // Category was deleted
-    if (index != null) {
+  Future<void> _navigateToAddEdit({
+    Map<String, dynamic>? category,
+    int? index,
+  }) async {
+    final result = await Navigator.pushNamed(
+      context,
+      '/add-category',
+      arguments: category,
+    );
+
+    if (result == 'DELETE') {
+      if (index != null) {
+        setState(() {
+          _categories.removeAt(index);
+          if (_categories.isNotEmpty &&
+              !_categories.any((c) => c['active'] == true)) {
+            _categories[0]['active'] = true;
+          }
+        });
+      }
+      return;
+    }
+
+    if (result != null && result is Map<String, dynamic>) {
+      final updatedCategory = Map<String, dynamic>.from(result);
       setState(() {
-        _categories.removeAt(index);
-        if (_categories.isNotEmpty && !_categories.any((c) => c['active'] == true)) {
-          _categories[0]['active'] = true;
+        if (index != null) {
+          updatedCategory['active'] = _categories[index]['active'] ?? false;
+          _categories[index] = updatedCategory;
+        } else {
+          updatedCategory['active'] = false;
+          _categories.add(updatedCategory);
         }
       });
     }
-  } else if (result != null && result is Map<String, dynamic>) {
-    setState(() {
-      if (index != null) {
-        _categories[index] = result;
-      } else {
-        result['active'] = false;
-        _categories.add(result);
-      }
-    });
   }
-}
 
   void _deleteCategory(int index) {
     setState(() {
       _categories.removeAt(index);
-      // If the active one was deleted, activate the first remaining if any
       if (_categories.isNotEmpty && !_categories.any((c) => c['active'] == true)) {
         _categories[0]['active'] = true;
       }
@@ -106,290 +98,341 @@ Future<void> _navigateToAddEdit({Map<String, dynamic>? category, int? index}) as
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
           children: [
-            const SizedBox(height: 64),
-
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'تخصيص البيئة',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: NabeehColors.slate400,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      Text(
-                        'فئات الأصوات',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                          color: NabeehColors.dark,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: NabeehColors.slate100),
-                        boxShadow: [
-                          BoxShadow(
-                            color: NabeehColors.dark.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(LucideIcons.arrowLeft, color: NabeehColors.slate400),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Category List
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  ..._categories.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final cat = entry.value;
-                    return Column(
+            _buildHeader(context),
+            Expanded(
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
                       children: [
-                        _buildCategoryCard(
-                          context,
-                          iconName: cat['iconName'],
-                          name: cat['name'],
-                          desc: cat['desc'],
-                          count: (cat['sounds'] as List).length,
-                          active: cat['active'] ?? false,
-                          sounds: List<Map<String, dynamic>>.from(cat['sounds']),
-                          onEdit: () => _navigateToAddEdit(category: cat, index: index),
-                          onDelete: () => _deleteCategory(index),
-                          onActivate: () => _setActiveCategory(index),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    );
-                  }),
-                  const SizedBox(height: 4),
+                        const SizedBox(height: 4),
+                        ..._categories.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final cat = entry.value;
+                          return Column(
+                            children: [
+                              _buildCategoryCard(
+                                name: cat['name'] as String,
+                                desc: cat['desc'] as String,
+                                count: (cat['sounds'] as List).length,
+                                active: cat['active'] as bool? ?? false,
+                                sounds: List<Map<String, dynamic>>.from(cat['sounds'] as List),
+                                onEdit: () => _navigateToAddEdit(category: cat, index: index),
+                                onDelete: () => _deleteCategory(index),
+                                onActivate: () => _setActiveCategory(index),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          );
+                        }),
+                        GestureDetector(
+                          onTap: () => _navigateToAddEdit(),
+                          child: BentoCard(
+                              color: NabeehColors.blue, // 👈 أضف هذا
 
-                  GestureDetector(
-                    onTap: () => _navigateToAddEdit(),
-                    child: Container(
-                      width: double.infinity,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: NabeehColors.slate200, width: 2),
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(LucideIcons.plus, color: NabeehColors.slate400),
-                          SizedBox(width: 8),
-                          Text(
-                            'إضافة فئة جديدة',
-                            style: TextStyle(
-                              color: NabeehColors.slate400,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              fontSize: 12,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                            border: Border.all(color: NabeehColors.slate100),
+                            child: const Center(
+                              child: Text(
+                                'إضافة مجموعة جديدة',
+                                style: TextStyle(
+                                  color: NabeehColors.background,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-
-            const SizedBox(height: 60),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCategoryCard(
-    BuildContext context, {
-    required String iconName,
-    required String name,
-    required String desc,
-    required int count,
-    required bool active,
-    required List<Map<String, dynamic>> sounds,
-    required VoidCallback onEdit,
-    required VoidCallback onDelete,
-    required VoidCallback onActivate,
-  }) {
-    return BentoCard(
-      border: active ? Border.all(color: NabeehColors.accent, width: 2) : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ─── Custom Header (unchanged) ───────────────────────────────────────────────
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: active ? NabeehColors.accent : NabeehColors.slate50,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: active
-                          ? [
-                              BoxShadow(
-                                color: NabeehColors.accent.withValues(alpha: 0.2),
-                                blurRadius: 10,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Icon(
-                      _getIconFromName(iconName),
-                      color: active ? NabeehColors.dark : NabeehColors.slate400,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        '$count أصوات مراقبة',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: NabeehColors.slate400,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: active ? NabeehColors.accent.withValues(alpha: 0.2) : NabeehColors.slate100,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  active ? 'نشط' : 'غير نشط',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: active ? NabeehColors.accent : NabeehColors.slate400,
-                  ),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(
+                  color: NabeehColors.dark,
+                  width: 1.5,
                 ),
               ),
-            ],
+              child: const Directionality(
+                textDirection: TextDirection.ltr,
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: NabeehColors.dark,
+                  size: 18,
+                ),
+              ),
+            ),
           ),
-
-          const SizedBox(height: 24),
-
-          Wrap(
-            textDirection: TextDirection.rtl,
-            spacing: 8,
-            runSpacing: 8,
-            children: sounds.map((s) => _buildSoundChip(s['name'], vibration: s['vibration'])).toList(),
-          ),
-
-          const SizedBox(height: 24),
-          const Divider(color: NabeehColors.slate50),
-          const SizedBox(height: 24),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  _buildActionButton(context, LucideIcons.edit2, onTap: onEdit),
-                  const SizedBox(width: 8),
-                  _buildActionButton(context, LucideIcons.trash2, isDanger: true, onTap: onDelete),
-                ],
-              ),
-
-                          if (!active)
-                Flexible(                                          // ✅ هذا هو التغيير الوحيد
-                  child: ElevatedButton(
-                    onPressed: onActivate,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: NabeehColors.dark,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    child: const Text(
-                      'تفعيل الفئة',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
-                    ),
-                  ),
-                )
-              else
-                const Row(
-                  children: [
-                    Icon(LucideIcons.checkCircle2, color: NabeehColors.accent, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      'مفعل حالياً',
-                      style: TextStyle(
-                        color: NabeehColors.accent,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'المجموعات الصوتية',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.dark,
+                  letterSpacing: -1,
                 ),
-            ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSoundChip(String label, {required String vibration}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildCategoryCard({
+  required String name,
+  required String desc,
+  required int count,
+  required bool active,
+  required List<Map<String, dynamic>> sounds,
+  required VoidCallback onEdit,
+  required VoidCallback onDelete,
+  required VoidCallback onActivate,
+}) {
+  const Color activeBorderColor = Color(0xFF1773CF);
+
+  return BentoCard(
+    border: active ? Border.all(color: activeBorderColor, width: 2) : null,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,  // ← THIS FIXES THE LAYOUT
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: NabeehColors.slate50,
-            border: Border.all(color: NabeehColors.slate100),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: NabeehColors.dark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$count أصوات مراقبة',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: NabeehColors.slate400,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    desc,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: NabeehColors.slate500,
+                      fontWeight: FontWeight.w600,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: active
+                    ? const Color(0xFFFFD350).withValues(alpha: 0.2)
+                    : NabeehColors.slate100,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                active ? 'نشط' : 'غير نشط',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: active ? NabeehColors.accent : NabeehColors.slate400,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Wrap(
+          textDirection: TextDirection.rtl,
+          spacing: 8,
+          runSpacing: 8,
+          children: sounds
+              .map((sound) => _buildSoundChip(
+                    sound['name'] as String,
+                    vibration: sound['vibration'] as String,
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 24),
+        const Divider(color: NabeehColors.slate50),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            TextButton(
+              onPressed: onEdit,
+              style: TextButton.styleFrom(
+                 foregroundColor: NabeehColors.blue ,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'تعديل',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 8),
+           TextButton(
+  onPressed: onDelete,
+  style: TextButton.styleFrom(
+    backgroundColor: Colors.red.withValues(alpha: 0.08),
+    foregroundColor: Colors.red,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    ),
+  ),
+              child: const Text(
+                'حذف',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const Spacer(),
+            if (!active)
+              Flexible(
+  child: ElevatedButton(
+    onPressed: onActivate,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: NabeehColors.dark,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // ← قللنا البادينق
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      elevation: 0,
+    ),
+    child: const FittedBox( // ← هذا أهم سطر
+      fit: BoxFit.scaleDown,
+      child: Text(
+        'تفعيل المجموعة',
+        maxLines: 1, // ← يمنع النزول لسطر ثاني
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+    ),
+  ),
+)
+            else
+              const Text(
+                'مفعل حالياً',
+                style: TextStyle(
+                  color: NabeehColors.accent,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 10,
+                ),
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _buildSoundChip(String label, {required String vibration}) {
+    // Removed the activity icon
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: NabeehColors.slate50,
+        border: Border.all(color: NabeehColors.slate100),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
             label,
             style: const TextStyle(
               fontSize: 10,
@@ -397,46 +440,17 @@ Future<void> _navigateToAddEdit({Map<String, dynamic>? category, int? index}) as
               color: NabeehColors.slate400,
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            const Icon(LucideIcons.activity, size: 8, color: NabeehColors.accent),
-            const SizedBox(width: 4),
-            Text(
-              'اهتزاز $vibration',
-              style: const TextStyle(
-                fontSize: 8,
-                color: NabeehColors.slate300,
-                fontWeight: FontWeight.w900,
-              ),
+          const SizedBox(height: 4),
+          Text(
+            'اهتزاز $vibration',
+            style: const TextStyle(
+              fontSize: 8,
+              color: NabeehColors.slate300,
+              fontWeight: FontWeight.w900,
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton(BuildContext context, IconData icon, {bool isDanger = false, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: isDanger ? const Color(0xFFFEF2F2) : NabeehColors.slate50,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          icon,
-          color: isDanger ? Colors.red.shade400 : NabeehColors.slate400,
-          size: 16,
-        ),
+          ),
+        ],
       ),
     );
   }
-
-
-
-  
 }
