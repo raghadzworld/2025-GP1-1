@@ -136,26 +136,30 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             ],
                           );
                         }),
-                        GestureDetector(
-                          onTap: () => _navigateToAddEdit(),
-                          child: BentoCard(
-                              color: NabeehColors.blue, // 👈 أضف هذا
-
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                            border: Border.all(color: NabeehColors.slate100),
-                            child: const Center(
-                              child: Text(
-                                'إضافة مجموعة جديدة',
-                                style: TextStyle(
-                                  color: NabeehColors.background,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                      ElevatedButton(
+  onPressed: () => _navigateToAddEdit(),
+  style: ElevatedButton.styleFrom(
+    backgroundColor: NabeehColors.blue, // لون الإضافة يمكن تغييره حسب رغبتك
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18), // نفس تدوير أزرار التفعيل
+    ),
+    elevation: 0,
+    minimumSize: const Size(double.infinity, 48), // يجعل الزر بعرض كامل
+  ),
+  child: const FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Text(
+      'إضافة مجموعة جديدة',
+      maxLines: 1,
+      style: TextStyle(
+        fontWeight: FontWeight.w900,
+        fontSize: 12,
+      ),
+    ),
+  ),
+),
                         const SizedBox(height: 24),
                       ],
                     ),
