@@ -6,7 +6,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'Nabeeh_Colors.dart';
+import '../widgets/custom_widgets.dart';
+// Removed NabeehScreenScaffold import – now using a custom header
+import 'nabeeh_colors.dart';
 
 class SttTtsScreen extends StatefulWidget {
   const SttTtsScreen({super.key});
@@ -15,7 +17,8 @@ class SttTtsScreen extends StatefulWidget {
   State<SttTtsScreen> createState() => _SttTtsScreenState();
 }
 
-class _SttTtsScreenState extends State<SttTtsScreen> {
+class _SttTtsScreenState extends State<SttTtsScreen>
+    with SingleTickerProviderStateMixin {
   bool _isSttMode = true;
   bool _isRecording = false;
   bool _isSpeaking = false;
@@ -28,11 +31,16 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
 
   FlutterSoundRecorder? _recorder;
   StreamSubscription<RecordingDisposition>? _recorderSubscription;
+  late AnimationController _waveController;
 
   @override
   void initState() {
     super.initState();
     _ttsController = TextEditingController();
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
     _initRecorder();
   }
 
@@ -48,6 +56,7 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
     _recorder?.closeRecorder();
     _textFocusNode.dispose();
     _ttsController.dispose();
+    _waveController.dispose();
     super.dispose();
   }
 
@@ -169,66 +178,170 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          const SizedBox(height: 64),
-          _buildHeader(context),
-          const SizedBox(height: 32),
-          _buildModeSwitcher(),
-          const SizedBox(height: 24),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: _isSttMode ? _buildSttView() : _buildTtsView(),
+    // ─── Directionality set to RTL for Arabic layout ────────────────────────
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            _buildHeader(context),      // Custom header matching EditProfileScreen
+            Expanded(
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic', // Consistent Arabic font
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      BentoCard(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'وضع الاستخدام',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: NabeehColors.slate400,
+                                    letterSpacing: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'اختر طريقة التفاعل',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    color: NabeehColors.dark,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'التسجيل الصوتي أو الكتابة ثم النطق',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    color: NabeehColors.slate500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            _buildModeSwitcher(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: 250.ms,
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          child: _isSttMode
+                              ? KeyedSubtree(
+                                  key: const ValueKey('stt'),
+                                  child: _buildSttView(),
+                                )
+                              : KeyedSubtree(
+                                  key: const ValueKey('tts'),
+                                  child: _buildTtsView(),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  // ─── Custom Header matching EditProfileScreen style ──────────────────────
   Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+    return Container(
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'المساعد الذكي',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.slate400,
-                  letterSpacing: 2,
-                ),
-              ),
-              Text(
-                'التواصل',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.dark,
-                  letterSpacing: -1,
-                ),
-              ),
-            ],
-          ),
+          // Right side: Back button (matching EditProfileScreen)
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 56,
-              height: 56,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: NabeehColors.slate100),
+                border: Border.all(
+                  color: NabeehColors.dark,
+                  width: 1.5,
+                ),
               ),
-              child: const Icon(LucideIcons.arrowLeft, color: NabeehColors.slate400),
+              // Forcing LTR so the arrow points right (suitable for RTL layout)
+              child: const Directionality(
+                textDirection: TextDirection.ltr,
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: NabeehColors.dark,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+
+          // Center: Title (matching EditProfileScreen)
+          const Text(
+            'التواصل',
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: NabeehColors.dark,
+              letterSpacing: -1,
+            ),
+          ),
+
+          // Left side: Blue gradient sign language icon
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ],
@@ -236,13 +349,16 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
     );
   }
 
+  // (The rest of the widget methods remain unchanged, only styling is consistent)
+
   Widget _buildModeSwitcher() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.zero,
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: NabeehColors.slate100.withValues(alpha: 0.5),
+          color: NabeehColors.slate50,
+          border: Border.all(color: NabeehColors.slate100),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Row(
@@ -281,11 +397,17 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
         decoration: BoxDecoration(
           color: isSelected ? NabeehColors.accent : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? NabeehColors.accent.withValues(alpha: 0.4)
+                : Colors.transparent,
+          ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
                     color: NabeehColors.accent.withValues(alpha: 0.3),
-                    blurRadius: 8,
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
                 ]
               : null,
@@ -294,8 +416,8 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
           child: Text(
             title,
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
               color: isSelected ? NabeehColors.dark : NabeehColors.slate400,
             ),
           ),
@@ -308,15 +430,13 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
     return Column(
       children: [
         Expanded(
-          child: Container(
-            width: double.infinity,
+          child: BentoCard(
             padding: const EdgeInsets.all(32),
-            decoration: _mainCardDecoration(),
             child: Stack(
               children: [
                 Positioned(
                   top: 0,
-                  left: 0,
+                  right: 0,
                   child: _buildStatusBadge(
                     isActive: _isRecording,
                     activeText: 'جاري الاستماع...',
@@ -328,19 +448,15 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _isRecording
-                                ? _buildMicWithRipples()
-                                : _buildVisualizer(
-                                    icon: LucideIcons.mic,
-                                    isActive: false,
-                                  ),
+                            _buildMicWithRipples(),
                             const SizedBox(height: 32),
                             Text(
                               _isRecording ? 'ابدأ التحدث الآن...' : 'اضغط على المايك للبدء',
                               style: const TextStyle(
-                                color: NabeehColors.slate200,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                color: NabeehColors.slate500,
+                                fontWeight: FontWeight.w400,
+                                fontSize: 15,
+                                height: 1.5,
                               ),
                             ),
                           ],
@@ -350,13 +466,18 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 40),
+                          if (_isRecording) ...[
+                            _buildRecordingWaveform(),
+                            const SizedBox(height: 24),
+                          ],
                           Text(
                             _getHeadingFromText(_textContent),
                             style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
                               color: NabeehColors.dark,
                               letterSpacing: -0.5,
+                              height: 1.2,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -371,8 +492,8 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                                 child: const Text(
                                   'نص',
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w400,
                                     color: NabeehColors.slate400,
                                     letterSpacing: 1,
                                   ),
@@ -391,9 +512,9 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                               Text(
                                 _textContent.split(' ').take(3).join(' '),
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: NabeehColors.slate400,
-                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w400,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -411,8 +532,8 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                                   const Text(
                                     'النص الكامل',
                                     style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
                                       color: NabeehColors.slate400,
                                       letterSpacing: 2,
                                     ),
@@ -421,8 +542,8 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                                   Text(
                                     _textContent,
                                     style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400,
                                       color: NabeehColors.dark,
                                       height: 1.6,
                                     ),
@@ -458,12 +579,39 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 32),
-        _buildActionButton(
-          icon: LucideIcons.mic,
-          color: _isRecording ? Colors.red : NabeehColors.dark,
-          onTap: _toggleRecording,
-        ),
+        const SizedBox(height: 24),
+       GestureDetector(
+  onTap: _toggleRecording,
+  child: AnimatedContainer(
+    duration: const Duration(milliseconds: 300),
+    width: 120,
+    height: 120,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: _isRecording
+          ? NabeehColors.lightBlue.withValues(alpha: 0.1)
+          : NabeehColors.slate200.withValues(alpha: 0.5),
+      boxShadow: _isRecording
+          ? [
+              BoxShadow(
+                color: NabeehColors.lightBlue.withValues(alpha: 0.2),
+                blurRadius: 40,
+                spreadRadius: 10,
+              ),
+            ]
+          : [],
+    ),
+    child: Center(
+      child: Icon(
+        _isRecording ? LucideIcons.mic : LucideIcons.micOff,
+        size: 50,
+        color: _isRecording
+            ? NabeehColors.lightBlue
+            : NabeehColors.slate400,
+      ),
+    ),
+  ),
+),
       ],
     );
   }
@@ -472,10 +620,8 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
     return Column(
       children: [
         Expanded(
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(32),
-            decoration: _mainCardDecoration(),
+          child: BentoCard(
+            padding: const EdgeInsets.all(28),
             child: Column(
               children: [
                 Expanded(
@@ -489,14 +635,19 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                     onChanged: (value) => setState(() => _textContent = value),
                     decoration: const InputDecoration(
                       hintText: 'اكتب ما تريد قوله هنا...',
-                      hintStyle: TextStyle(color: NabeehColors.slate200),
+                      hintStyle: TextStyle(
+                        color: NabeehColors.slate300,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
                       border: InputBorder.none,
                     ),
+                    cursorColor: NabeehColors.blue,
                     style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
                       color: NabeehColors.dark,
-                      height: 1.5,
+                      height: 1.6,
                     ),
                   ),
                 ),
@@ -512,7 +663,7 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                     ].map((phrase) => _buildPhrase(phrase)).toList(),
                   ),
                 const SizedBox(height: 24),
-                const Divider(color: NabeehColors.slate50),
+                const Divider(color: NabeehColors.slate100),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -527,9 +678,10 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
                     Text(
                       '${_textContent.length} حرف',
                       style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: NabeehColors.slate200,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: NabeehColors.slate400,
+                        letterSpacing: 1,
                       ),
                     ),
                   ],
@@ -538,7 +690,7 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         _buildVisualizer(
           icon: LucideIcons.volume2,
           isActive: _isSpeaking,
@@ -551,24 +703,20 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: NabeehColors.dark,
             foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            minimumSize: const Size(double.infinity, 56),
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            elevation: 10,
+            shadowColor: NabeehColors.dark.withValues(alpha: 0.18),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'IBMPlexSansArabic',
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
           ),
           child: Text(_isSpeaking ? 'جاري النطق...' : 'نطق النص'),
-        ),
-      ],
-    );
-  }
-
-  BoxDecoration _mainCardDecoration() {
-    return BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(40),
-      border: Border.all(color: NabeehColors.slate100),
-      boxShadow: [
-        BoxShadow(
-          color: NabeehColors.dark.withValues(alpha: 0.05),
-          blurRadius: 30,
         ),
       ],
     );
@@ -592,7 +740,7 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: isActive ? Colors.red : NabeehColors.slate300,
+              color: isActive ? NabeehColors.lightBlue : NabeehColors.slate300,
               shape: BoxShape.circle,
             ),
           )
@@ -609,8 +757,8 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
           Text(
             isActive ? activeText : inactiveText,
             style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
               color: NabeehColors.slate400,
             ),
           ),
@@ -620,65 +768,75 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
   }
 
   Widget _buildMicWithRipples() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 120,
+          height: 120,
+         
+          child: Center(
+  child: _isRecording
+      ? Icon(
+          LucideIcons.mic,
+          size: 50,
+          color: NabeehColors.lightBlue,
+        )
+      : const SizedBox.shrink(),
+),
+        ),
+        const SizedBox(height: 40),
+        _buildWaveBars(isActive: _isRecording),
+      ],
+    );
+  }
+
+  Widget _buildRecordingWaveform() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: NabeehColors.slate50,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: NabeehColors.slate100),
+      ),
+      child: _buildWaveBars(isActive: _isRecording),
+    );
+  }
+
+  Widget _buildWaveBars({required bool isActive}) {
     return SizedBox(
-      width: 200,
-      height: 200,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.red.withValues(
-                  alpha: 0.08 + 0.25 * _amplitude,
+      height: 60,
+      child: AnimatedBuilder(
+        animation: _waveController,
+        builder: (context, child) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(15, (index) {
+              final offset = index * 0.4;
+              final baseWave =
+                  (math.sin((_waveController.value * 2 * math.pi) + offset) + 1) /
+                      2;
+              final liveLevel = isActive ? (0.35 + (_amplitude * 0.65)) : 0.0;
+              final barHeight = 10 + (baseWave * 50 * liveLevel);
+
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: 6,
+                height: barHeight,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? NabeehColors.lightBlue.withValues(alpha: 0.8)
+                      : NabeehColors.slate300,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                width: 2,
-              ),
-            ),
-          )
-              .animate(
-                onPlay: (controller) => _isRecording ? controller.repeat() : null,
-              )
-              .scale(
-                begin: const Offset(0.9, 0.9),
-                end: const Offset(1.25, 1.25),
-                duration: 1200.ms,
-                curve: Curves.easeInOut,
-              )
-              .fadeIn(duration: 400.ms),
-          Container(
-            width: 190,
-            height: 190,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.red.withValues(
-                  alpha: 0.05 + 0.2 * _amplitude,
-                ),
-                width: 2,
-              ),
-            ),
-          )
-              .animate(
-                delay: 300.ms,
-                onPlay: (controller) => _isRecording ? controller.repeat() : null,
-              )
-              .scale(
-                begin: const Offset(0.95, 0.95),
-                end: const Offset(1.3, 1.3),
-                duration: 1400.ms,
-                curve: Curves.easeInOut,
-              )
-              .fadeIn(duration: 400.ms),
-          _buildVisualizer(
-            icon: LucideIcons.mic,
-            isActive: true,
-            activeColor: Colors.red,
-          ),
-        ],
+              );
+            }),
+          );
+        },
       ),
     );
   }
@@ -694,14 +852,29 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isActive ? activeColor : NabeehColors.slate50,
+        color: isActive
+            ? activeColor.withValues(alpha: 0.12)
+            : NabeehColors.slate50,
         shape: BoxShape.circle,
-        border: isActive ? null : Border.all(color: NabeehColors.slate100),
+        border: Border.all(
+          color: isActive
+              ? activeColor.withValues(alpha: 0.18)
+              : NabeehColors.slate100,
+          width: 1.5,
+        ),
+        boxShadow: [
+          if (isActive)
+            BoxShadow(
+              color: activeColor.withValues(alpha: 0.18),
+              blurRadius: 26,
+              spreadRadius: 6,
+            ),
+        ],
       ),
       child: Center(
         child: Icon(
           icon,
-          color: isActive ? Colors.white : NabeehColors.slate200,
+          color: isActive ? activeColor : NabeehColors.slate400,
           size: size * 0.4,
         ),
       ),
@@ -724,17 +897,22 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: 200.ms,
         width: 96,
         height: 96,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.9),
+            width: 3,
+          ),
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.4),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -752,10 +930,24 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isDanger ? Colors.red.withValues(alpha: 0.05) : NabeehColors.slate50,
-          borderRadius: BorderRadius.circular(20),
+          color: isDanger
+              ? Colors.red.withValues(alpha: 0.05)
+              : NabeehColors.slate50,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDanger
+                ? Colors.red.withValues(alpha: 0.12)
+                : NabeehColors.slate100,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: NabeehColors.dark.withValues(alpha: 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -768,9 +960,10 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
                 color: isDanger ? Colors.red.shade400 : NabeehColors.slate400,
+                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -788,12 +981,19 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
           color: NabeehColors.slate50,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: NabeehColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: NabeehColors.dark.withValues(alpha: 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Text(
           phrase,
           style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
             color: NabeehColors.slate500,
           ),
         ),
@@ -810,6 +1010,14 @@ class _SttTtsScreenState extends State<SttTtsScreen> {
         decoration: BoxDecoration(
           color: NabeehColors.slate50,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: NabeehColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: NabeehColors.dark.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Icon(icon, size: 20, color: NabeehColors.slate400),
       ),
