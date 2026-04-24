@@ -35,8 +35,19 @@ android {
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+    // Firebase BOM - يحدد إصدارات Firebase تلقائياً
+    implementation(platform("com.google.firebase:firebase-bom:32.7.4"))
+    
+    // Analytics - تتبع استخدام التطبيق
     implementation("com.google.firebase:firebase-analytics")
+    
+    // Auth - تسجيل الدخول (Email/Password + Google)
+    implementation("com.google.firebase:firebase-auth")
+    
+    // Firestore - قاعدة البيانات لحفظ بيانات المستخدمين
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+
 }
 
 flutter {

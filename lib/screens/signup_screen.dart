@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -23,6 +25,14 @@ class _SignupScreenState extends State<SignupScreen>
   bool _rememberMe = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  // Controllers
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -68,7 +78,67 @@ class _SignupScreenState extends State<SignupScreen>
     _wave2Controller.dispose();
     _wave3Controller.dispose();
     _wave4Controller.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (_nameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('يرجى تعبئة جميع الحقول')));
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('كلمة المرور غير متطابقة')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+      await FirebaseFirestore.instance
+          .collection('User') // غيرنا من users إلى User
+          .doc(credential.user!.uid)
+          .set({
+            'FullName': _nameController.text.trim(), // غيرنا name
+            'Email': _emailController.text.trim(),
+            'PhoneNumber': _phoneController.text.trim(), // غيرنا phone
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.main);
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'حدث خطأ، حاولي مرة أخرى';
+      if (e.code == 'email-already-in-use') message = 'البريد مستخدم مسبقاً';
+      if (e.code == 'weak-password') message = 'كلمة المرور ضعيفة جداً';
+      if (e.code == 'invalid-email') message = 'البريد الإلكتروني غير صحيح';
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -131,7 +201,6 @@ class _SignupScreenState extends State<SignupScreen>
           SafeArea(
             child: Column(
               children: [
-                // ── شريط العلوي ──────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -202,11 +271,9 @@ class _SignupScreenState extends State<SignupScreen>
                   ),
                 ),
 
-                // ─── المنطقة البيضاء بموجة علوية ─────────────────────────
                 Expanded(
                   child: Stack(
                     children: [
-                      // الأبيض الكامل من تحت الموجة
                       Positioned(
                         top: 80,
                         left: 0,
@@ -215,7 +282,6 @@ class _SignupScreenState extends State<SignupScreen>
                         child: Container(color: Colors.white),
                       ),
 
-                      // الموجة العلوية — نفس أسلوب الصورة
                       Positioned(
                         top: 0,
                         left: 0,
@@ -227,7 +293,6 @@ class _SignupScreenState extends State<SignupScreen>
                         ),
                       ),
 
-                      // المحتوى
                       Positioned(
                         top: 80,
                         left: 0,
@@ -253,24 +318,28 @@ class _SignupScreenState extends State<SignupScreen>
                                 _buildInputField(
                                   hint: 'الاسم الكامل',
                                   icon: Icons.person_outline_rounded,
+                                  controller: _nameController,
                                 ),
                                 const SizedBox(height: 11),
                                 _buildInputField(
                                   hint: 'البريد الإلكتروني',
                                   icon: Icons.email_outlined,
                                   keyboardType: TextInputType.emailAddress,
+                                  controller: _emailController,
                                 ),
                                 const SizedBox(height: 11),
                                 _buildInputField(
                                   hint: 'رقم الجوال',
                                   icon: Icons.phone_android_rounded,
                                   keyboardType: TextInputType.phone,
+                                  controller: _phoneController,
                                 ),
                                 const SizedBox(height: 11),
                                 _buildInputField(
                                   hint: 'كلمة المرور',
                                   icon: Icons.lock_outline_rounded,
                                   obscure: _obscurePassword,
+                                  controller: _passwordController,
                                   onToggleObscure: () => setState(
                                     () => _obscurePassword = !_obscurePassword,
                                   ),
@@ -280,6 +349,7 @@ class _SignupScreenState extends State<SignupScreen>
                                   hint: 'تأكيد كلمة المرور',
                                   icon: Icons.lock_outline_rounded,
                                   obscure: _obscureConfirmPassword,
+                                  controller: _confirmPasswordController,
                                   onToggleObscure: () => setState(
                                     () => _obscureConfirmPassword =
                                         !_obscureConfirmPassword,
@@ -310,7 +380,6 @@ class _SignupScreenState extends State<SignupScreen>
                                           fontFamily: 'IBMPlexSansArabic',
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
-
                                           color: Color.fromARGB(
                                             255,
                                             17,
@@ -343,7 +412,7 @@ class _SignupScreenState extends State<SignupScreen>
                                     ),
                                   ),
                                   child: TextButton(
-                                    onPressed: () {},
+                                    onPressed: _isLoading ? null : _signUp,
                                     style: TextButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 15,
@@ -352,15 +421,19 @@ class _SignupScreenState extends State<SignupScreen>
                                         borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
-                                    child: const Text(
-                                      'إنشـــــاء حســاب',
-                                      style: TextStyle(
-                                        fontFamily: 'IBMPlexSansArabic',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFFFFD350),
-                                      ),
-                                    ),
+                                    child: _isLoading
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.white,
+                                          )
+                                        : const Text(
+                                            'إنشـــــاء حســاب',
+                                            style: TextStyle(
+                                              fontFamily: 'IBMPlexSansArabic',
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFFFD350),
+                                            ),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),
@@ -459,7 +532,6 @@ class _SignupScreenState extends State<SignupScreen>
                         ),
                       ),
 
-                      // الموجة السفلية
                       Positioned(
                         bottom: 0,
                         left: 0,
@@ -509,11 +581,13 @@ class _SignupScreenState extends State<SignupScreen>
   Widget _buildInputField({
     required String hint,
     required IconData icon,
+    required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     bool obscure = false,
     VoidCallback? onToggleObscure,
   }) {
     return TextField(
+      controller: controller,
       keyboardType: keyboardType,
       obscureText: obscure,
       textDirection: TextDirection.rtl,
@@ -597,7 +671,6 @@ class _SignupScreenState extends State<SignupScreen>
   }
 }
 
-// الموجة العلوية — تنحني من الأعلى للأسفل في المنتصف
 class _TopWavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -605,16 +678,14 @@ class _TopWavePainter extends CustomPainter {
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     final path = Path();
-    // ابدأ من أعلى يسار
     path.moveTo(0, 0);
-    // انحنِ للأسفل في المنتصف ثم ارجع للأعلى في اليمين
     path.cubicTo(
       size.width * 0.25,
-      size.height * 0.001, // نقطة تحكم 1 — تنزل كثيراً
+      size.height * 0.001,
       size.width * 0.75,
-      size.height * 1.8, // نقطة تحكم 2 — تبقى تحت
+      size.height * 1.8,
       size.width,
-      0, // نهاية — أعلى يمين
+      0,
     );
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);

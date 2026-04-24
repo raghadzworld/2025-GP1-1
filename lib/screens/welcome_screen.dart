@@ -59,17 +59,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         .animate(
           CurvedAnimation(parent: _wave1Controller, curve: Curves.easeInOut),
         );
-
     _wave2Anim = Tween<Offset>(begin: Offset.zero, end: const Offset(-14, 16))
         .animate(
           CurvedAnimation(parent: _wave2Controller, curve: Curves.easeInOut),
         );
-
     _wave3Anim = Tween<Offset>(begin: Offset.zero, end: const Offset(10, -12))
         .animate(
           CurvedAnimation(parent: _wave3Controller, curve: Curves.easeInOut),
         );
-
     _wave4Anim = Tween<Offset>(begin: Offset.zero, end: const Offset(-8, 10))
         .animate(
           CurvedAnimation(parent: _wave4Controller, curve: Curves.easeInOut),
@@ -93,10 +90,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       child: Scaffold(
         body: Stack(
           children: [
-            // ─── خلفية ────────────────────────────────────────────────────
             Container(color: const Color(0xFF1a1760)),
 
-            // ─── الدوائر المتحركة — فوق ────────────────────────────────────
             _buildAnimatedCircle(
               _wave1Anim,
               -80,
@@ -145,8 +140,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               const Color(0xFF7BBDE0),
               0.5,
             ),
-
-            // ─── الدوائر المتحركة — تحت يمين ويسار ───────────────────────
             _buildAnimatedCircle(
               _wave3Anim,
               550,
@@ -196,7 +189,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               0.5,
             ),
 
-            // ─── المحتوى ──────────────────────────────────────────────────
             SafeArea(
               child: Column(
                 children: [
@@ -238,58 +230,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
 
-                  // ── شعار نبيه ───────────────────────────────────────────
-                  const SizedBox(height: 20),
-                  AnimatedBuilder(
-                    animation: _pulseAnim,
-                    builder: (context, child) {
-                      return Opacity(opacity: _pulseAnim.value, child: child);
-                    },
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFFFD350).withValues(alpha: 0.08),
-                        border: Border.all(
-                          color: const Color(
-                            0xFFFFD350,
-                          ).withValues(alpha: 0.35),
-                          width: 1,
-                        ),
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(
-                              0xFFFFD350,
-                            ).withValues(alpha: 0.18),
-                            border: Border.all(
-                              color: const Color(
-                                0xFFFFD350,
-                              ).withValues(alpha: 0.55),
-                              width: 1,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Image.asset(
-                              'assets/images/logo_nabeeh.png',
-                              color: const Color(0xFFFFD350),
-                              colorBlendMode: BlendMode.srcIn,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ── النص — أعلى بعد الشعار مباشرة ──────────────────────
                   const Spacer(),
+
+                  // ── شعار نبيه ───────────────────────────────────────────
+                  Image.asset(
+                    'assets/images/logo_nabeeh.png',
+                    width: 280,
+                    height: 280,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── النص ────────────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
@@ -298,7 +250,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           textAlign: TextAlign.center,
                           text: const TextSpan(
                             children: [
-                              TextSpan(
+                              /* TextSpan(
                                 text: 'مرحباً بك في ',
                                 style: TextStyle(
                                   fontFamily: 'IBMPlexSansArabic',
@@ -306,14 +258,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   fontWeight: FontWeight.w400,
                                   color: Colors.white,
                                 ),
-                              ),
+                              ),*/
                               TextSpan(
-                                text: 'نبيه',
+                                text: 'مرحباً بك',
                                 style: TextStyle(
                                   fontFamily: 'IBMPlexSansArabic',
                                   fontSize: 28,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFFFFD350),
+                                  color: Color.fromARGB(255, 255, 255, 255),
                                 ),
                               ),
                             ],
@@ -358,9 +310,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                           ),
                           child: TextButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/signup');
-                            },
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/signup'),
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(

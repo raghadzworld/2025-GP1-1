@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +22,11 @@ class _LoginScreenState extends State<LoginScreen>
   late Animation<Offset> _wave4Anim;
 
   bool _obscurePassword = true;
+
+  // Controllers
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -66,7 +72,40 @@ class _LoginScreenState extends State<LoginScreen>
     _wave2Controller.dispose();
     _wave3Controller.dispose();
     _wave4Controller.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('يرجى تعبئة جميع الحقول')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.main);
+      }
+    } on FirebaseAuthException {
+      // رسالة عامة للحماية — لا نكشف سبب الخطأ
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('البريد أو كلمة المرور غير صحيحة')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -256,6 +295,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   hint: 'البريد الإلكتروني',
                                   icon: Icons.email_outlined,
                                   keyboardType: TextInputType.emailAddress,
+                                  controller: _emailController,
                                 ),
                                 const SizedBox(height: 11),
 
@@ -264,6 +304,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   hint: 'كلمة المرور',
                                   icon: Icons.lock_outline_rounded,
                                   obscure: _obscurePassword,
+                                  controller: _passwordController,
                                   onToggleObscure: () => setState(
                                     () => _obscurePassword = !_obscurePassword,
                                   ),
@@ -274,9 +315,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: GestureDetector(
-                                    onTap: () {
-                                      // TODO: نسيت كلمة المرور
-                                    },
+                                    onTap: () {},
                                     child: const Text(
                                       'هل نسيـت كلمــة المـرور؟ ',
                                       style: TextStyle(
@@ -312,11 +351,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                   child: TextButton(
-                                    onPressed: () =>
-                                        Navigator.pushReplacementNamed(
-                                          context,
-                                          AppRoutes.main,
-                                        ),
+                                    onPressed: _isLoading ? null : _login,
                                     style: TextButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 15,
@@ -325,15 +360,19 @@ class _LoginScreenState extends State<LoginScreen>
                                         borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
-                                    child: const Text(
-                                      'تسـجيــل الدخـــول',
-                                      style: TextStyle(
-                                        fontFamily: 'IBMPlexSansArabic',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFFFFD350),
-                                      ),
-                                    ),
+                                    child: _isLoading
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.white,
+                                          )
+                                        : const Text(
+                                            'تسـجيــل الدخـــول',
+                                            style: TextStyle(
+                                              fontFamily: 'IBMPlexSansArabic',
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFFFD350),
+                                            ),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),
@@ -384,9 +423,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       color: Colors.white,
                                     ),
                                     child: IconButton(
-                                      onPressed: () {
-                                        // TODO: تسجيل بـ Google
-                                      },
+                                      onPressed: () {},
                                       icon: Image.asset(
                                         'assets/images/icon_google.png',
                                         width: 22,
@@ -490,11 +527,13 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildInputField({
     required String hint,
     required IconData icon,
+    required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     bool obscure = false,
     VoidCallback? onToggleObscure,
   }) {
     return TextField(
+      controller: controller,
       keyboardType: keyboardType,
       obscureText: obscure,
       textDirection: TextDirection.rtl,
@@ -585,16 +624,14 @@ class _LoginTopWavePainter extends CustomPainter {
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     final path = Path();
-    // ابدأ من أعلى يسار
     path.moveTo(0, 0);
-    // انحنِ للأسفل في المنتصف ثم ارجع للأعلى في اليمين
     path.cubicTo(
       size.width * 0.25,
-      size.height * 0.001, // نقطة تحكم 1 — تنزل كثيراً
+      size.height * 0.001,
       size.width * 0.75,
-      size.height * 1.8, // نقطة تحكم 2 — تبقى تحت
+      size.height * 1.8,
       size.width,
-      0, // نهاية — أعلى يمين
+      0,
     );
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
