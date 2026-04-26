@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
+import 'settings_screen.dart';
 
 class ProfileInfoScreen extends StatelessWidget {
   final VoidCallback onEdit;
@@ -7,15 +11,17 @@ class ProfileInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current logged-in user's ID
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Stack(
           children: [
-            // Top gradient background
             Container(
-              height: 200,
+              height: 250,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -25,18 +31,38 @@ class ProfileInfoScreen extends StatelessWidget {
               ),
             ),
             SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 30),
-                  _buildHeader(context),
-                  const SizedBox(height: 40),
-                  _buildInfoRow(Icons.email, 'الايميل', 'Reem@gmail.com'),
-                  _buildInfoRow(Icons.phone_android, 'رقم الهاتف', '050 123 4567'),
-                  const Spacer(),
-                  _buildCommandButtons(context),
-                  const SizedBox(height: 40), 
-                ],
-              ),
+              child: currentUser == null 
+                ? const Center(child: Text('الرجاء تسجيل الدخول أولاً', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
+                : StreamBuilder<DocumentSnapshot>(
+                    // Listen to this user's specific document in Firestore
+                    stream: FirebaseFirestore.instance.collection('User').doc(currentUser.uid).snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: NabeehColors.darkBlue));
+                      }
+
+                      // Extract data with safe fallbacks
+                      final userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+                      final String name = userData['FullName'] ?? 'مستخدم جديد';
+                      final String email = currentUser.email ?? userData['Email'] ?? 'لا يوجد بريد إلكتروني';
+                      final String phone = userData['PhoneNumber'] ?? 'لم يتم إضافة رقم';
+
+                      return Column(
+                        children: [
+                          const SizedBox(height: 30),
+                          _buildHeader(context, name),
+                          const SizedBox(height: 40),
+                          
+                          _buildInfoRow(Icons.email, 'الايميل', email),
+                          _buildInfoRow(Icons.phone_android, 'رقم الهاتف', phone),
+                          
+                          const Spacer(),
+                          _buildCommandButtons(context),
+                          const SizedBox(height: 40), 
+                        ],
+                      );
+                    },
+                  ),
             ),
           ],
         ),
@@ -44,24 +70,24 @@ class ProfileInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, String name) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Right Side: Name (Aligned to the side as requested)
-          const Text(
-            'ريم العويس',
-            style: TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              fontSize: 32, // Increased size slightly to match the side-alignment aesthetic
-              fontWeight: FontWeight.bold,
-              color: NabeehColors.darkBlue,
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: NabeehColors.darkBlue,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-
-          // Left Side: Blue Icon
           Container(
             width: 50,
             height: 50,
@@ -93,55 +119,6 @@ class ProfileInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCommandButtons(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        children: [
-          ElevatedButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit, color: Colors.white),
-            label: const Text(
-              'تعديل الملف الشخصي',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 18, 
-                fontWeight: FontWeight.bold, 
-                color: Colors.white
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: NabeehColors.dark,
-              minimumSize: const Size(double.infinity, 60),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
-          const SizedBox(height: 15),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
-            },
-            icon: const Icon(Icons.logout, color: NabeehColors.dark), 
-            label: const Text(
-              'تسجيل الخروج',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                color: NabeehColors.dark 
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 60),
-              side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 45, vertical: 15),
@@ -161,18 +138,73 @@ class ProfileInfoScreen extends StatelessWidget {
             children: [
               Icon(icon, color: const Color(0xFF1773CF), size: 22),
               const SizedBox(width: 15),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: NabeehColors.darkBlue,
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: NabeehColors.darkBlue,
+                  ),
                 ),
               ),
             ],
           ),
           const Divider(height: 30, thickness: 0.5),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommandButtons(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
+        children: [
+          ElevatedButton.icon(
+            onPressed: onEdit,
+            icon: const Icon(LucideIcons.edit2, color: Colors.white, size: 20),
+            label: const Text(
+              'تعديل الملف الشخصي',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 18, 
+                fontWeight: FontWeight.bold, 
+                color: Colors.white
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: NabeehColors.dark,
+              minimumSize: const Size(double.infinity, 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 15),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => const SettingsScreen())
+              );
+            },
+            icon: const Icon(LucideIcons.settings, color: NabeehColors.dark, size: 20), 
+            label: const Text(
+              'الإعدادات',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 18, 
+                fontWeight: FontWeight.bold,
+                color: NabeehColors.dark 
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 60),
+              side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
         ],
       ),
     );

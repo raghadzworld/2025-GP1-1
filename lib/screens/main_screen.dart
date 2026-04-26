@@ -47,7 +47,7 @@ class _MainScreenState extends State<MainScreen> {
       unselectedIcon: 'assets/images/icon_NotSEme.png',
     ),
     _NavItem(
-      label: 'الملف',
+      label: 'حسابي',
       selectedIcon: 'assets/images/icon_SlectedProfile.png',
       unselectedIcon: 'assets/images/icon_NotSProfile.png',
     ),
@@ -74,9 +74,8 @@ class _MainScreenState extends State<MainScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => EditProfileScreen(
-                  onBack: () => Navigator.pop(context),
-                ),
+                // 👇 Removed the onBack error here!
+                builder: (context) => const EditProfileScreen(),
               ),
             );
           },
@@ -152,7 +151,7 @@ class _MainScreenState extends State<MainScreen> {
                     Text(
                       item.label,
                       style: const TextStyle(
-                        fontFamily: 'IBMPlexSansArabic', // تأكدت من إضافة الخط هنا أيضاً ليتناسب مع تصميمك
+                        fontFamily: 'IBMPlexSansArabic', 
                         color: Color(0xFF1773CF),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,

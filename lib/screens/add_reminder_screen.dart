@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
 
 class AddReminderScreen extends StatefulWidget {
-  const AddReminderScreen({super.key});
+  // 👇 Added to support Editing
+  final String? reminderId;
+  final Map<String, dynamic>? existingData;
+
+  const AddReminderScreen({super.key, this.reminderId, this.existingData});
 
   @override
   State<AddReminderScreen> createState() => _AddReminderScreenState();
@@ -23,18 +29,109 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   String repeat = "مطلقاً";
   double vibrationPowerValue = 1.0;
   String vibrationPattern = "متصل";
+  
+  // 👇 Loading state for backend
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
-    selectedHour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
-    selectedMinute = now.minute;
-    isAm = now.hour < 12;
+
+    // 👇 Check if we are Editing, and populate your exact UI variables
+    if (widget.existingData != null) {
+      final data = widget.existingData!;
+      label = data['label'] ?? "منبه جديد";
+
+      // Parse daysActive Array back to String
+      List<dynamic> daysArray = data['daysActive'] ?? [];
+      if (daysArray.isEmpty) {
+        repeat = "مطلقاً";
+      } else if (daysArray.length == 7) {
+        repeat = "كل يوم";
+      } else {
+        repeat = daysArray.join('، ');
+      }
+
+      // Parse vibration power to your slider double (1=0.0, 2=1.0, 3=2.0)
+      int vp = data['vibrationPower'] ?? 2;
+      vibrationPowerValue = (vp - 1).clamp(0, 2).toDouble();
+
+      // Parse vibration pattern int back to your string
+      int vpat = data['vibrationPattern'] ?? 1;
+      List<String> patterns = ['متصل', 'نبضات', 'متقطع', 'تصاعدي'];
+      vibrationPattern = (vpat >= 1 && vpat <= patterns.length) ? patterns[vpat - 1] : "متصل";
+
+      // Parse Time String
+      String timeStr = data['time'] ?? "12:00 ص";
+      isAm = timeStr.contains('ص');
+      String cleanStr = timeStr.replaceAll('ص', '').replaceAll('م', '').trim();
+      List<String> parts = cleanStr.split(':');
+      selectedHour = int.tryParse(parts.isNotEmpty ? parts[0] : '12') ?? 12;
+      selectedMinute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+
+    } else {
+      selectedHour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+      selectedMinute = now.minute;
+      isAm = now.hour < 12;
+    }
 
     _hourController = FixedExtentScrollController(initialItem: selectedHour - 1);
     _minuteController = FixedExtentScrollController(initialItem: selectedMinute);
     _amPmController = FixedExtentScrollController(initialItem: isAm ? 0 : 1);
+  }
+
+  // 👇 Save to Firebase Function
+  Future<void> _saveReminder() async {
+    setState(() => _isLoading = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      // 1. Format Time as String
+      final timeString = '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')} ${isAm ? 'ص' : 'م'}';
+
+      // 2. Parse Repeat String to Array
+      List<String> daysActive = [];
+      if (repeat == "كل يوم") {
+        daysActive = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+      } else if (repeat != "مطلقاً") {
+        daysActive = repeat.split('، ');
+      }
+
+      // 3. Format Integers for DB
+      int powerInt = vibrationPowerValue.toInt() + 1;
+      int patternInt = ['متصل', 'نبضات', 'متقطع', 'تصاعدي'].indexOf(vibrationPattern) + 1;
+      if (patternInt == 0) patternInt = 1;
+
+      final reminderData = {
+        'label': label,
+        'time': timeString, // explicitly saved as string
+        'daysActive': daysActive,
+        'isEnabled': widget.existingData?['isEnabled'] ?? true,
+        'vibrationPower': powerInt,
+        'vibrationPattern': patternInt,
+      };
+
+      // Explicitly using 'User' (singular) as requested
+      final remindersRef = FirebaseFirestore.instance.collection('User').doc(uid).collection('Reminders');
+
+      if (widget.reminderId == null) {
+        await remindersRef.add(reminderData);
+      } else {
+        await remindersRef.doc(widget.reminderId).update(reminderData);
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -152,9 +249,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               ),
             ),
           ),
-          const Column(
+          Column(
             children: [
-              Text(
+              const Text(
                 'تخصيص الوقت',
                 style: TextStyle(
                   fontSize: 10,
@@ -165,8 +262,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 ),
               ),
               Text(
-                'إضافة منبه',
-                style: TextStyle(
+                widget.reminderId == null ? 'إضافة منبه' : 'تعديل منبه',
+                style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -632,7 +729,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           Expanded(
             flex: 2,
             child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              // 👇 Connected to Backend Logic
+              onPressed: _isLoading ? null : _saveReminder,
               style: ElevatedButton.styleFrom(
                 backgroundColor: NabeehColors.dark,
                 foregroundColor: NabeehColors.background,
@@ -640,14 +738,16 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),
-              child: const Text(
-                'إضافة المنبه',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                ),
-              ),
+              child: _isLoading 
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: NabeehColors.background, strokeWidth: 2))
+                : Text(
+                    widget.reminderId == null ? 'إضافة المنبه' : 'تحديث المنبه',
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
             ),
           ),
         ],

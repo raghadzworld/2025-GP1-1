@@ -43,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'route': '/categories',          
     },
     {
-      'title': 'تسجيل\nالصوت',
+      'title': 'الاستشعار\nالصوتي',
       'iconSelected':   'assets/images/icon_YReco.png',
       'iconUnselected': 'assets/images/icon_GReco.png',
       'route': 'custom_listening', // Connects to ListeningScreen
