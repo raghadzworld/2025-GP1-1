@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
+import '../features/categories/data/services/category_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -10,7 +11,7 @@ class SettingsScreen extends StatelessWidget {
   // 👇 1. Firebase Logout Logic
   Future<void> _logout(BuildContext context) async {
     try {
-      await FirebaseAuth.instance.signOut();
+      await CategoryService.withDefaults().logout();
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
       }
