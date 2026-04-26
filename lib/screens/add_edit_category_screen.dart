@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../features/categories/data/models/category_model.dart';
+import '../features/categories/data/models/sound_setting_model.dart';
+import '../features/categories/data/services/category_service.dart';
 import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
 
@@ -13,16 +16,54 @@ class AddEditCategoryScreen extends StatefulWidget {
 }
 
 class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
+  final CategoryService _service = CategoryService.withDefaults();
   late TextEditingController _nameController;
-  late TextEditingController _descController;
-  List<Map<String, dynamic>> selectedSounds = [];
+  late List<SoundSettingModel> _sounds;
+  bool _isSaving = false;
 
-  final List<String> availableSounds = [
-    'الآذان',
-    'إنذار الحريق',
-    'بكاء طفل',
-    'طرق على الباب',
-    'جرس الباب '
+  static const List<int> _patternOptions = [1, 2, 3];
+
+  static const List<SoundSettingModel> _newCategoryDefaults = [
+    SoundSettingModel(
+      soundId: 'fire_alarm',
+      name: 'إنذار الحريق',
+      isEmergency: true,
+      isEnabled: true,
+      vibrationPower: 3,
+      vibrationPattern: 1,
+    ),
+    SoundSettingModel(
+      soundId: 'door_bell',
+      name: 'جرس الباب',
+      isEmergency: false,
+      isEnabled: false,
+      vibrationPower: 2,
+      vibrationPattern: 1,
+    ),
+    SoundSettingModel(
+      soundId: 'door_knock',
+      name: 'طرق على الباب',
+      isEmergency: false,
+      isEnabled: false,
+      vibrationPower: 2,
+      vibrationPattern: 1,
+    ),
+    SoundSettingModel(
+      soundId: 'baby_cry',
+      name: 'بكاء طفل',
+      isEmergency: false,
+      isEnabled: false,
+      vibrationPower: 2,
+      vibrationPattern: 1,
+    ),
+    SoundSettingModel(
+      soundId: 'adhan',
+      name: 'الآذان',
+      isEmergency: false,
+      isEnabled: false,
+      vibrationPower: 2,
+      vibrationPattern: 1,
+    ),
   ];
 
   bool get isEditing => widget.category != null;
@@ -30,36 +71,31 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategoryData();
+    _loadData();
   }
 
-  void _loadCategoryData() {
+  void _loadData() {
     final cat = widget.category;
     if (cat != null) {
-      _nameController = TextEditingController(text: cat['name'] ?? '');
-      _descController = TextEditingController(text: cat['desc'] ?? '');
-      if (cat['sounds'] != null) {
-        selectedSounds = List<Map<String, dynamic>>.from(
-          (cat['sounds'] as List).map((s) => Map<String, dynamic>.from(s))
-        );
-      } else {
-        selectedSounds = [];
-      }
+      _nameController = TextEditingController(text: cat['name'] as String? ?? '');
+      final model = CategoryModel.fromMap(Map<String, dynamic>.from(cat));
+      final soundMap = {for (final s in model.sounds) s.soundId: s};
+      _sounds = _newCategoryDefaults.map((def) {
+        return soundMap[def.soundId] ?? def.copyWith(isEnabled: def.soundId == 'fire_alarm');
+      }).toList();
     } else {
       _nameController = TextEditingController();
-      _descController = TextEditingController();
-      selectedSounds = [];
+      _sounds = List.from(_newCategoryDefaults);
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _descController.dispose();
     super.dispose();
   }
 
-  bool _validateAndSave() {
+  Future<void> _handleSave() async {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -67,27 +103,32 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           backgroundColor: Colors.red,
         ),
       );
-      return false;
+      return;
     }
-    if (selectedSounds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('الرجاء اختيار صوت واحد على الأقل'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return false;
-    }
-    return true;
-  }
+    setState(() => _isSaving = true);
 
-  void _handleSave() {
-    if (_validateAndSave()) {
-      Navigator.pop(context, {
-        'name': _nameController.text.trim(),
-        'desc': _descController.text.trim(),
-        'sounds': selectedSounds,
-      });
+    final cat = widget.category;
+    final model = CategoryModel(
+      id: cat?['id'] as String? ?? '',
+      name: _nameController.text.trim(),
+      isEnabled: cat?['isEnabled'] as bool? ?? false,
+      sounds: _sounds,
+    );
+
+    try {
+      if (isEditing) {
+        await _service.editCategory(model);
+      } else {
+        await _service.addCategory(model);
+      }
+      if (mounted) Navigator.pop(context, 'SAVED');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -105,14 +146,16 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء', style: TextStyle(color: NabeehColors.slate400)),
+              child: const Text('إلغاء',
+                  style: TextStyle(color: NabeehColors.slate400)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('حذف'),
             ),
@@ -121,9 +164,80 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       ),
     );
 
-    if (confirm == true) {
-      Navigator.pop(context, 'DELETE');
+    if (confirm != true) return;
+
+    try {
+      final id = widget.category!['id'] as String;
+      await _service.deleteCategory(id);
+      if (mounted) Navigator.pop(context, 'DELETED');
+    } on StateError {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لا يمكن حذف الفئة الوحيدة'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  void _showPatternSheet(int soundIndex) {
+    final current = _sounds[soundIndex].vibrationPattern;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'نمط الاهتزاز',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.dark,
+                ),
+              ),
+            ),
+            ..._patternOptions.map(
+              (opt) => ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 32),
+                title: Text(
+                  _intensityLabel(opt),
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontWeight: FontWeight.w600,
+                    color: opt == current
+                        ? NabeehColors.darkBlue
+                        : NabeehColors.dark,
+                  ),
+                ),
+                trailing: opt == current
+                    ? const Icon(LucideIcons.checkCircle2,
+                        color: NabeehColors.darkBlue)
+                    : null,
+                onTap: () {
+                  setState(() {
+                    _sounds[soundIndex] =
+                        _sounds[soundIndex].copyWith(vibrationPattern: opt);
+                  });
+                  Navigator.pop(ctx);
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -145,10 +259,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                     children: [
                       const SizedBox(height: 16),
                       _buildNameInput(),
-                      const SizedBox(height: 24),
-                      _buildDescriptionInput(),
-                      const SizedBox(height: 40),
-                      _buildSoundsSelection(),
+                      const SizedBox(height: 32),
+                      _buildSoundsSection(),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -162,7 +274,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     );
   }
 
-  // ─── Custom Header matching EditProfileScreen / HomeScreen ─────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
@@ -175,7 +286,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       ),
       child: Row(
         children: [
-          // Right side: Back button (white circle, border)
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
@@ -184,29 +294,23 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,
-                border: Border.all(
-                  color: NabeehColors.dark,
-                  width: 1.5,
-                ),
+                border: Border.all(color: NabeehColors.dark, width: 1.5),
               ),
               child: const Directionality(
                 textDirection: TextDirection.ltr,
-                child: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: NabeehColors.dark,
-                  size: 18,
-                ),
+                child: Icon(Icons.arrow_forward_ios_rounded,
+                    color: NabeehColors.dark, size: 18),
               ),
             ),
           ),
-
-          // Center: Title – flexible
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 isEditing ? 'تعديل الفئة' : 'إضافة فئة',
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 26,
@@ -214,13 +318,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                   color: NabeehColors.dark,
                   letterSpacing: -1,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
-
-          // Left side: Blue gradient sign language icon
           Container(
             width: 50,
             height: 50,
@@ -233,9 +333,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 end: Alignment.bottomCenter,
               ),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
+                  color: Colors.white.withValues(alpha: 0.25), width: 1.5),
             ),
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -272,7 +370,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             hintText: 'مثلاً: المنزل، العمل...',
             filled: true,
             fillColor: NabeehColors.slate50,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
@@ -284,45 +383,12 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     );
   }
 
-  Widget _buildDescriptionInput() {
+  Widget _buildSoundsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'وصف الفئة',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: NabeehColors.slate400,
-            letterSpacing: 2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _descController,
-          decoration: InputDecoration(
-            hintText: 'وصف قصير لهذه البيئة...',
-            filled: true,
-            fillColor: NabeehColors.slate50,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          maxLines: 2,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSoundsSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'الأصوات وشِدّة الاهتزاز',
+          'الأصوات والاهتزاز',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w900,
@@ -334,244 +400,203 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: availableSounds.length,
-          itemBuilder: (context, index) {
-            final soundName = availableSounds[index];
-            final soundIdx = selectedSounds.indexWhere((s) => s['name'] == soundName);
-            final isSelected = soundIdx != -1;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFFEFF6FF) : NabeehColors.background,
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: isSelected ? const Color(0xFFDBEAFE) : Colors.transparent,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: isSelected,
-                        onChanged: (val) {
-                          setState(() {
-                            if (val == true) {
-                              selectedSounds.add({
-                                'name': soundName,
-                                'vibration': 'متوسط',
-                              });
-                            } else {
-                              selectedSounds.removeAt(soundIdx);
-                            }
-                          });
-                        },
-                        activeColor: NabeehColors.accent,
-                        side: const BorderSide(color: NabeehColors.slate300, width: 2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        soundName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: isSelected ? NabeehColors.dark : NabeehColors.slate400,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (isSelected) ...[
-                    const SizedBox(height: 16),
-                    const Divider(color: Color(0xFFDBEAFE)),
-                    const SizedBox(height: 16),
-                    _buildVibrationSelector(soundName, soundIdx),
-                  ],
-                ],
-              ),
-            );
-          },
+          itemCount: _sounds.length,
+          itemBuilder: (_, i) => _buildSoundItem(i),
         ),
       ],
     );
   }
 
-  Widget _buildVibrationSelector(String soundName, int soundIdx) {
-    final levels = ['ضعيف', 'متوسط', 'قوي'];
-    final currentLevel = selectedSounds[soundIdx]['vibration'];
-    final displayLevels = levels.reversed.toList(); // ['قوي', 'متوسط', 'ضعيف']
-    final currentIndex = levels.indexOf(currentLevel);
-    final visualIndex = 2 - currentIndex;
+  Widget _buildSoundItem(int index) {
+    final sound = _sounds[index];
+    final isFireAlarm = sound.soundId == 'fire_alarm';
 
     return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: NabeehColors.slate100),
+        color: sound.isEnabled ? const Color(0xFFEFF6FF) : NabeehColors.slate50,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: sound.isEnabled ? const Color(0xFFDBEAFE) : Colors.transparent,
+        ),
       ),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(LucideIcons.activity, size: 12, color: NabeehColors.accent),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'مستوى الاهتزاز',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: NabeehColors.slate400,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: NabeehColors.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              if (isFireAlarm) ...[
+                const Icon(Icons.lock_outline_rounded,
+                    size: 14, color: NabeehColors.slate300),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
                 child: Text(
-                  currentLevel,
-                  style: const TextStyle(
-                    fontSize: 10,
+                  sound.name,
+                  style: TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: NabeehColors.accent,
+                    color: sound.isEnabled
+                        ? NabeehColors.dark
+                        : NabeehColors.slate400,
                   ),
+                ),
+              ),
+              Switch(
+                value: sound.isEnabled,
+                onChanged: isFireAlarm
+                    ? null
+                    : (val) => setState(
+                        () => _sounds[index] = sound.copyWith(isEnabled: val)),
+                activeThumbColor: NabeehColors.accent,
+                inactiveThumbColor: NabeehColors.slate300,
+                inactiveTrackColor: NabeehColors.slate100,
+              ),
+            ],
+          ),
+          if (sound.isEnabled) ...[
+            const SizedBox(height: 12),
+            const Divider(color: Color(0xFFDBEAFE)),
+            const SizedBox(height: 12),
+            _buildVibrationSlider(index),
+            const SizedBox(height: 12),
+            _buildPatternPicker(index),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVibrationSlider(int soundIndex) {
+    final sound = _sounds[soundIndex];
+    final currentValue = sound.vibrationPower.toDouble();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: NabeehColors.slate50,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: NabeehColors.slate100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(LucideIcons.zap, color: NabeehColors.slate400, size: 18),
+              SizedBox(width: 12),
+              Text(
+                'قوة الاهتزاز',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.dark,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return SizedBox(
-                height: 60,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      height: 2,
-                      color: NabeehColors.slate100,
-                      margin: EdgeInsets.symmetric(horizontal: constraints.maxWidth / 6),
-                    ),
-                    ...displayLevels.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      double leftPosition;
-                      if (idx == 0) {
-                        leftPosition = 0;
-                      } else if (idx == 1) {
-                        leftPosition = constraints.maxWidth / 2 - 1;
-                      } else {
-                        leftPosition = constraints.maxWidth - 2;
-                      }
-                      return Positioned(
-                        left: leftPosition,
-                        child: Container(
-                          width: 2,
-                          height: idx == 1 ? 16 : 12,
-                          color: NabeehColors.slate200,
-                        ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Text(
+                'خفيف',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  color: NabeehColors.slate400,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    activeTrackColor: NabeehColors.darkBlue,
+                    inactiveTrackColor: NabeehColors.slate200,
+                    thumbColor: Colors.white,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 12),
+                    overlayColor:
+                        NabeehColors.darkBlue.withValues(alpha: 0.15),
+                  ),
+                  child: Slider(
+                    value: currentValue,
+                    min: 1,
+                    max: 3,
+                    divisions: 2,
+                    onChanged: (val) => setState(() {
+                      _sounds[soundIndex] = sound.copyWith(
+                        vibrationPower: val.round(),
                       );
                     }),
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      left: visualIndex == 0
-                          ? 0
-                          : visualIndex == 1
-                              ? constraints.maxWidth / 2 - 16
-                              : constraints.maxWidth - 32,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: NabeehColors.accent,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: NabeehColors.accent.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Wrap(
-                            spacing: 2,
-                            runSpacing: 2,
-                            children: List.generate(
-                              4,
-                              (_) => Container(
-                                width: 3,
-                                height: 3,
-                                decoration: const BoxDecoration(
-                                  color: NabeehColors.dark,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: displayLevels.map((displayLevel) {
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              String logicalLevel;
-                              if (displayLevel == 'قوي') {
-                                logicalLevel = 'قوي';
-                              } else if (displayLevel == 'متوسط') {
-                                logicalLevel = 'متوسط';
-                              } else {
-                                logicalLevel = 'ضعيف';
-                              }
-                              setState(() {
-                                selectedSounds[soundIdx]['vibration'] = logicalLevel;
-                              });
-                            },
-                            behavior: HitTestBehavior.opaque,
-                            child: const SizedBox.expand(),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: displayLevels.map((level) {
-                final isSelected = level == currentLevel;
-                return Text(
-                  level,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: isSelected ? NabeehColors.dark : NabeehColors.slate300,
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              ),
+              const Text(
+                'قوي',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  color: NabeehColors.slate400,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPatternPicker(int soundIndex) {
+    final sound = _sounds[soundIndex];
+    return GestureDetector(
+      onTap: () => _showPatternSheet(soundIndex),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: NabeehColors.slate50,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: NabeehColors.slate100),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(LucideIcons.activity,
+                    color: NabeehColors.slate400, size: 18),
+                const SizedBox(width: 12),
+                const Text(
+                  'نمط الاهتزاز',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: NabeehColors.dark,
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Text(
+                  _intensityLabel(sound.vibrationPattern),
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: NabeehColors.darkBlue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    color: NabeehColors.slate300, size: 13),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -584,12 +609,13 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         border: Border(top: BorderSide(color: NabeehColors.slate100)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
                   child: const Text(
                     'إلغاء',
                     style: TextStyle(
@@ -607,7 +633,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                   text: isEditing ? 'تحديث الفئة' : 'إضافة الفئة',
                   color: NabeehColors.dark,
                   textColor: Colors.white,
-                  onClick: _handleSave,
+                  onClick: () {
+                    if (!_isSaving) _handleSave();
+                  },
                 ),
               ),
             ],
@@ -615,7 +643,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           if (isEditing) ...[
             const SizedBox(height: 16),
             GestureDetector(
-              onTap: _handleDelete,
+              onTap: _isSaving ? null : _handleDelete,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -641,5 +669,18 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         ],
       ),
     );
+  }
+
+  String _intensityLabel(int value) {
+    switch (value) {
+      case 1:
+        return 'خفيف';
+      case 2:
+        return 'متوسط';
+      case 3:
+        return 'قوي';
+      default:
+        return '$value';
+    }
   }
 }
