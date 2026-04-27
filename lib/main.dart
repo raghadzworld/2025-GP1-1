@@ -1,9 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'screens/main_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/add_edit_category_screen.dart';
+import 'features/categories/data/services/category_service.dart';
+import 'features/categories/data/models/category_model.dart';
 import 'screens/stt_tts_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
@@ -12,6 +15,10 @@ import 'screens/login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
   runApp(const NabeehApp());
 }
 
@@ -43,8 +50,13 @@ class NabeehApp extends StatelessWidget {
         // مسار إضافة/تعديل الفئة (يحتاج arguments)
         if (settings.name == AppRoutes.addCategory) {
           final args = settings.arguments as Map<String, dynamic>?;
+          final category = args?['category'] as CategoryModel?;
+          final service = args?['service'] as CategoryService?;
           return MaterialPageRoute(
-            builder: (context) => AddEditCategoryScreen(category: args),
+            builder: (context) => AddEditCategoryScreen(
+              category: category,
+              service: service,
+            ),
           );
         }
 
