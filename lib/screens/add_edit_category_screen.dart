@@ -27,6 +27,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   late TextEditingController _nameController;
   late List<SoundSettingModel> _sounds;
   bool _isSaving = false;
+  String? _nameError;
 
   static const List<int> _patternOptions = [1, 2, 3];
 
@@ -70,31 +71,23 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     final trimmedName = _nameController.text.trim();
 
     if (trimmedName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('الرجاء إدخال اسم الفئة'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setState(() => _nameError = 'الرجاء إدخال اسم المجموعة');
       return;
     }
 
-    // تحقق من تكرار الاسم — يتجاهل الفئة الحالية عند التعديل
     final isDuplicate = widget.existingCategories.any((c) =>
         c.name.trim().toLowerCase() == trimmedName.toLowerCase() &&
         c.id != widget.category?.id);
 
     if (isDuplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يوجد فئة بهذا الاسم، اختر اسماً مختلفاً'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setState(() => _nameError = 'يوجد مجموعة بهذا الاسم، اختر اسماً مختلفاً');
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _nameError = null;
+      _isSaving = true;
+    });
 
     final cat = widget.category;
     final model = CategoryModel(
@@ -127,34 +120,99 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _handleDelete() async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showModalBottomSheet<bool>(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('حذف الفئة'),
-          content: const Text(
-            'هل أنت متأكد من حذف هذه الفئة؟ لا يمكن التراجع عن هذا الإجراء.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء',
-                  style: TextStyle(color: NabeehColors.slate400)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.red, size: 24),
               ),
-              child: const Text('حذف'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'حذف المجموعة',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.dark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 13,
+                  color: NabeehColors.slate400,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(color: NabeehColors.slate100),
+                        ),
+                      ),
+                      child: const Text(
+                        'إلغاء',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontWeight: FontWeight.w900,
+                          color: NabeehColors.slate400,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'حذف',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -163,8 +221,11 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
     try {
       final id = widget.category!.id;
-      await _service.deleteCategory(id);
-      if (mounted) Navigator.pop(context, DeletedCategoryResult(id));
+      final activatedId = await _service.deleteCategory(
+        id,
+        currentCategories: widget.existingCategories,
+      );
+      if (mounted) Navigator.pop(context, DeletedCategoryResult(id, activatedId: activatedId));
     } on StateError {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -367,19 +428,68 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _nameController,
+          textDirection: TextDirection.rtl,
+          keyboardType: TextInputType.text,
+          onChanged: (_) {
+            if (_nameError != null) setState(() => _nameError = null);
+          },
           decoration: InputDecoration(
             hintText: 'مثلاً: المنزل، العمل...',
+            hintTextDirection: TextDirection.rtl,
             filled: true,
-            fillColor: NabeehColors.slate50,
+            fillColor: _nameError != null
+                ? Colors.red.withValues(alpha: 0.05)
+                : NabeehColors.slate50,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: _nameError != null
+                  ? BorderSide(color: Colors.red.withValues(alpha: 0.4))
+                  : BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide(
+                color: _nameError != null
+                    ? Colors.red.withValues(alpha: 0.6)
+                    : NabeehColors.darkBlue.withValues(alpha: 0.4),
+              ),
+            ),
           ),
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
+        if (_nameError != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.alertCircle,
+                    size: 14, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(
+                  _nameError!,
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -690,8 +800,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 }
 
-// نتيجة الحذف تحمل الـ id للحذف من القائمة المحلية
 class DeletedCategoryResult {
   final String id;
-  const DeletedCategoryResult(this.id);
+  final String? activatedId;
+  const DeletedCategoryResult(this.id, {this.activatedId});
 }
