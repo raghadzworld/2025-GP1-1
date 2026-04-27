@@ -68,6 +68,105 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   // حذف الفئة من الذاكرة مباشرة — wasActive يُحسب قبل العملية
   Future<void> _deleteCategory(String id) async {
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.red, size: 24),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'حذف المجموعة',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: NabeehColors.dark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 13,
+                  color: NabeehColors.slate400,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(color: NabeehColors.slate100),
+                        ),
+                      ),
+                      child: const Text(
+                        'إلغاء',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontWeight: FontWeight.w900,
+                          color: NabeehColors.slate400,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'حذف',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
     // يُحسب قبل الاستدعاء لضمان الدقة
     final wasActive = _categories.any((c) => c.id == id && c.isEnabled);
     try {
@@ -131,12 +230,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         }
       });
     } else if (result is DeletedCategoryResult) {
-      final wasActive =
-          _categories.any((c) => c.id == result.id && c.isEnabled);
       setState(() {
         _categories = _categories.where((c) => c.id != result.id).toList();
-        if (wasActive && _categories.isNotEmpty) {
-          _categories[0] = _categories[0].copyWith(isEnabled: true);
+        if (result.activatedId != null) {
+          final idx = _categories.indexWhere((c) => c.id == result.activatedId);
+          if (idx >= 0) {
+            _categories[idx] = _categories[idx].copyWith(isEnabled: true);
+          }
         }
       });
     }
