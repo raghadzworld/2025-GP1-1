@@ -111,12 +111,13 @@ class CategoryService {
     await _firebase.deleteCategory(id);
 
     if (wasActive) {
+      final idx = categories.indexWhere((c) => c.id == id);
       final remaining = categories.where((c) => c.id != id).toList();
       if (remaining.isNotEmpty) {
-        await _firebase.saveCategory(
-          remaining.first.copyWith(isEnabled: true),
-        );
-        return remaining.first.id;
+        final nextIdx = idx < remaining.length ? idx : remaining.length - 1;
+        final toActivate = remaining[nextIdx];
+        await _firebase.saveCategory(toActivate.copyWith(isEnabled: true));
+        return toActivate.id;
       }
     }
     return null;
