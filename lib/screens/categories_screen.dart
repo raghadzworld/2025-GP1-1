@@ -111,7 +111,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       MaterialPageRoute(
         builder: (_) => AddEditCategoryScreen(
           category: category,
-          service: _service, // مشاركة نفس النسخة
+          service: _service,
+          existingCategories: _categories,
         ),
       ),
     );
