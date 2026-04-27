@@ -7,11 +7,16 @@ import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
 
 class AddEditCategoryScreen extends StatefulWidget {
-  // يستقبل CategoryModel مباشرة بدلاً من Map
   final CategoryModel? category;
   final CategoryService? service;
+  final List<CategoryModel> existingCategories;
 
-  const AddEditCategoryScreen({super.key, this.category, this.service});
+  const AddEditCategoryScreen({
+    super.key,
+    this.category,
+    this.service,
+    this.existingCategories = const [],
+  });
 
   @override
   State<AddEditCategoryScreen> createState() => _AddEditCategoryScreenState();
@@ -62,7 +67,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _handleSave() async {
-    if (_nameController.text.trim().isEmpty) {
+    final trimmedName = _nameController.text.trim();
+
+    if (trimmedName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('الرجاء إدخال اسم الفئة'),
@@ -71,12 +78,28 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       );
       return;
     }
+
+    // تحقق من تكرار الاسم — يتجاهل الفئة الحالية عند التعديل
+    final isDuplicate = widget.existingCategories.any((c) =>
+        c.name.trim().toLowerCase() == trimmedName.toLowerCase() &&
+        c.id != widget.category?.id);
+
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يوجد فئة بهذا الاسم، اختر اسماً مختلفاً'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     final cat = widget.category;
     final model = CategoryModel(
       id: cat?.id ?? '',
-      name: _nameController.text.trim(),
+      name: trimmedName,
       isEnabled: cat?.isEnabled ?? false,
       sounds: _sounds,
     );
