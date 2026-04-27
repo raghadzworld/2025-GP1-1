@@ -7,81 +7,47 @@ import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
 
 class AddEditCategoryScreen extends StatefulWidget {
-  final Map<String, dynamic>? category;
+  // يستقبل CategoryModel مباشرة بدلاً من Map
+  final CategoryModel? category;
+  final CategoryService? service;
 
-  const AddEditCategoryScreen({super.key, this.category});
+  const AddEditCategoryScreen({super.key, this.category, this.service});
 
   @override
   State<AddEditCategoryScreen> createState() => _AddEditCategoryScreenState();
 }
 
 class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
-  final CategoryService _service = CategoryService.withDefaults();
+  late final CategoryService _service;
   late TextEditingController _nameController;
   late List<SoundSettingModel> _sounds;
   bool _isSaving = false;
 
   static const List<int> _patternOptions = [1, 2, 3];
 
-  static const List<SoundSettingModel> _newCategoryDefaults = [
-    SoundSettingModel(
-      soundId: 'fire_alarm',
-      name: 'إنذار الحريق',
-      isEmergency: true,
-      isEnabled: true,
-      vibrationPower: 3,
-      vibrationPattern: 1,
-    ),
-    SoundSettingModel(
-      soundId: 'door_bell',
-      name: 'جرس الباب',
-      isEmergency: false,
-      isEnabled: false,
-      vibrationPower: 2,
-      vibrationPattern: 1,
-    ),
-    SoundSettingModel(
-      soundId: 'door_knock',
-      name: 'طرق على الباب',
-      isEmergency: false,
-      isEnabled: false,
-      vibrationPower: 2,
-      vibrationPattern: 1,
-    ),
-    SoundSettingModel(
-      soundId: 'baby_cry',
-      name: 'بكاء طفل',
-      isEmergency: false,
-      isEnabled: false,
-      vibrationPower: 2,
-      vibrationPattern: 1,
-    ),
-    SoundSettingModel(
-      soundId: 'adhan',
-      name: 'الآذان',
-      isEmergency: false,
-      isEnabled: false,
-      vibrationPower: 2,
-      vibrationPattern: 1,
-    ),
-  ];
+  // مصدر واحد للأصوات — عند إنشاء فئة جديدة يُغلق كل شيء عدا fire_alarm
+  static List<SoundSettingModel> get _newCategoryDefaults =>
+      CategoryService.defaultSounds
+          .map((s) => s.copyWith(isEnabled: s.soundId == 'fire_alarm'))
+          .toList();
 
   bool get isEditing => widget.category != null;
 
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? CategoryService.withDefaults();
     _loadData();
   }
 
   void _loadData() {
     final cat = widget.category;
     if (cat != null) {
-      _nameController = TextEditingController(text: cat['name'] as String? ?? '');
-      final model = CategoryModel.fromMap(Map<String, dynamic>.from(cat));
-      final soundMap = {for (final s in model.sounds) s.soundId: s};
+      _nameController = TextEditingController(text: cat.name);
+      final soundMap = {for (final s in cat.sounds) s.soundId: s};
       _sounds = _newCategoryDefaults.map((def) {
-        return soundMap[def.soundId] ?? def.copyWith(isEnabled: def.soundId == 'fire_alarm');
+        return soundMap[def.soundId] ??
+            def.copyWith(isEnabled: def.soundId == 'fire_alarm');
       }).toList();
     } else {
       _nameController = TextEditingController();
@@ -109,19 +75,24 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
     final cat = widget.category;
     final model = CategoryModel(
-      id: cat?['id'] as String? ?? '',
+      id: cat?.id ?? '',
       name: _nameController.text.trim(),
-      isEnabled: cat?['isEnabled'] as bool? ?? false,
+      isEnabled: cat?.isEnabled ?? false,
       sounds: _sounds,
     );
 
     try {
+      CategoryModel saved;
       if (isEditing) {
         await _service.editCategory(model);
+        // عند التعديل: أرجع النموذج المحدّث (fire_alarm مُطبَّق عليه)
+        saved = model.copyWith(
+          sounds: _service.enforceFireAlarm(model.sounds),
+        );
       } else {
-        await _service.addCategory(model);
+        saved = await _service.addCategory(model);
       }
-      if (mounted) Navigator.pop(context, 'SAVED');
+      if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -138,7 +109,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: const Text('حذف الفئة'),
           content: const Text(
             'هل أنت متأكد من حذف هذه الفئة؟ لا يمكن التراجع عن هذا الإجراء.',
@@ -167,9 +139,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     if (confirm != true) return;
 
     try {
-      final id = widget.category!['id'] as String;
+      final id = widget.category!.id;
       await _service.deleteCategory(id);
-      if (mounted) Navigator.pop(context, 'DELETED');
+      if (mounted) Navigator.pop(context, DeletedCategoryResult(id));
     } on StateError {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -209,7 +181,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             ),
             ..._patternOptions.map(
               (opt) => ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 32),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 32),
                 title: Text(
                   _intensityLabel(opt),
                   style: TextStyle(
@@ -276,7 +249,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      padding:
+          const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -327,7 +301,11 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                colors: [
+                  Color(0xFF181059),
+                  Color(0xFF181059),
+                  Color(0xFF1773CF)
+                ],
                 stops: [0.09, 0.30, 1.0],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -415,10 +393,13 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: sound.isEnabled ? const Color(0xFFEFF6FF) : NabeehColors.slate50,
+        color:
+            sound.isEnabled ? const Color(0xFFEFF6FF) : NabeehColors.slate50,
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: sound.isEnabled ? const Color(0xFFDBEAFE) : Colors.transparent,
+          color: sound.isEnabled
+              ? const Color(0xFFDBEAFE)
+              : Colors.transparent,
         ),
       ),
       child: Column(
@@ -526,9 +507,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                     max: 3,
                     divisions: 2,
                     onChanged: (val) => setState(() {
-                      _sounds[soundIndex] = sound.copyWith(
-                        vibrationPower: val.round(),
-                      );
+                      _sounds[soundIndex] =
+                          sound.copyWith(vibrationPower: val.round());
                     }),
                   ),
                 ),
@@ -554,7 +534,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     return GestureDetector(
       onTap: () => _showPatternSheet(soundIndex),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           color: NabeehColors.slate50,
           borderRadius: BorderRadius.circular(24),
@@ -650,7 +631,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border:
+                      Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: const Center(
                   child: Text(
@@ -683,4 +665,10 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         return '$value';
     }
   }
+}
+
+// نتيجة الحذف تحمل الـ id للحذف من القائمة المحلية
+class DeletedCategoryResult {
+  final String id;
+  const DeletedCategoryResult(this.id);
 }
