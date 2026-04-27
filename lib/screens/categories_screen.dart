@@ -4,6 +4,7 @@ import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
 import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
+import 'add_edit_category_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -24,29 +25,66 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _initialize() async {
-    await _service.initializeForUser();
-    await _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    final categories = await _service.getCategories();
-    if (mounted) {
-      setState(() {
-        _categories = categories;
-        _isLoading = false;
-      });
+    try {
+      final categories = await _service.initializeForUser();
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذّر تحميل الفئات: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
+  // تحديث الفئة في الذاكرة مباشرة — يمرر القائمة الحالية لتجنب قراءة Firestore
   Future<void> _setActiveCategory(String id) async {
-    await _service.setActiveCategory(id);
-    await _loadCategories();
+    try {
+      await _service.setActiveCategory(id, currentCategories: _categories);
+      setState(() {
+        _categories = _categories
+            .map((c) => c.copyWith(isEnabled: c.id == id))
+            .toList();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('تعذّر التفعيل: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
+  // حذف الفئة من الذاكرة مباشرة — wasActive يُحسب قبل العملية
   Future<void> _deleteCategory(String id) async {
+    // يُحسب قبل الاستدعاء لضمان الدقة
+    final wasActive = _categories.any((c) => c.id == id && c.isEnabled);
     try {
-      await _service.deleteCategory(id);
-      await _loadCategories();
+      // يمرر القائمة الحالية ويستقبل ID الفئة التي فُعِّلت (إن وُجدت)
+      final activatedId = await _service.deleteCategory(
+        id,
+        currentCategories: _categories,
+      );
+      setState(() {
+        _categories = _categories.where((c) => c.id != id).toList();
+        if (wasActive && activatedId != null) {
+          final idx = _categories.indexWhere((c) => c.id == activatedId);
+          if (idx >= 0) {
+            _categories[idx] = _categories[idx].copyWith(isEnabled: true);
+          }
+        }
+      });
     } on StateError {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -56,17 +94,50 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           ),
         );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('تعذّر الحذف: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   Future<void> _navigateToAddEdit({CategoryModel? category}) async {
-    final result = await Navigator.pushNamed(
+    final result = await Navigator.push<Object>(
       context,
-      '/add-category',
-      arguments: category?.toMap(),
+      MaterialPageRoute(
+        builder: (_) => AddEditCategoryScreen(
+          category: category,
+          service: _service, // مشاركة نفس النسخة
+        ),
+      ),
     );
-    if (result != null) {
-      await _loadCategories();
+
+    if (result == null) return;
+
+    if (result is CategoryModel) {
+      setState(() {
+        final index = _categories.indexWhere((c) => c.id == result.id);
+        if (index >= 0) {
+          // تعديل: استبدل في مكانه
+          _categories[index] = result;
+        } else {
+          // إضافة: أضفه للقائمة
+          _categories = [..._categories, result];
+        }
+      });
+    } else if (result is DeletedCategoryResult) {
+      final wasActive =
+          _categories.any((c) => c.id == result.id && c.isEnabled);
+      setState(() {
+        _categories = _categories.where((c) => c.id != result.id).toList();
+        if (wasActive && _categories.isNotEmpty) {
+          _categories[0] = _categories[0].copyWith(isEnabled: true);
+        }
+      });
     }
   }
 
@@ -83,11 +154,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : DefaultTextStyle.merge(
-                      style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                      style:
+                          const TextStyle(fontFamily: 'IBMPlexSansArabic'),
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 20),
                           child: Column(
                             children: [
                               const SizedBox(height: 4),
@@ -112,7 +185,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                   elevation: 0,
-                                  minimumSize: const Size(double.infinity, 48),
+                                  minimumSize:
+                                      const Size(double.infinity, 48),
                                 ),
                                 child: const FittedBox(
                                   fit: BoxFit.scaleDown,
@@ -141,7 +215,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      padding:
+          const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -195,7 +270,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                colors: [
+                  Color(0xFF181059),
+                  Color(0xFF181059),
+                  Color(0xFF1773CF)
+                ],
                 stops: [0.09, 0.30, 1.0],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -222,7 +301,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Widget _buildCategoryCard(CategoryModel category) {
     final isOnlyOne = _categories.length <= 1;
-    final enabledSounds = category.sounds.where((s) => s.isEnabled).toList();
+    final enabledSounds =
+        category.sounds.where((s) => s.isEnabled).toList();
 
     return BentoCard(
       border: category.isEnabled
@@ -261,7 +341,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               ),
               const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: category.isEnabled
                       ? const Color(0xFFFFD350).withValues(alpha: 0.2)
@@ -299,32 +380,37 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 onPressed: () => _navigateToAddEdit(category: category),
                 style: TextButton.styleFrom(
                   foregroundColor: NabeehColors.blue,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text(
                   'تعديل',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  style:
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(width: 8),
               TextButton(
-                onPressed: isOnlyOne ? null : () => _deleteCategory(category.id),
+                onPressed:
+                    isOnlyOne ? null : () => _deleteCategory(category.id),
                 style: TextButton.styleFrom(
                   backgroundColor: isOnlyOne
                       ? NabeehColors.slate100
                       : Colors.red.withValues(alpha: 0.08),
                   foregroundColor:
                       isOnlyOne ? NabeehColors.slate300 : Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 child: const Text(
                   'حذف',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style:
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
               const Spacer(),
@@ -347,8 +433,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       child: Text(
                         'تفعيل المجموعة',
                         maxLines: 1,
-                        style:
-                            TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w900, fontSize: 12),
                       ),
                     ),
                   ),
