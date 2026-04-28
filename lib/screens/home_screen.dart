@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'listening_screen.dart'; 
-import 'reminders_screen.dart'; 
-import 'stt_tts_screen.dart'; // 👇 Added import for the Communication screen
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'listening_screen.dart';
+import 'reminders_screen.dart';
+import 'stt_tts_screen.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -34,6 +36,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedFeature = 0;
+  String _userName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserName();
+  }
+
+  Future<void> _fetchUserName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // محاولة أولى: جلب بالـ UID مباشرة
+      final doc = await FirebaseFirestore.instance
+          .collection('User')
+          .doc(user.uid)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() => _userName = doc.data()?['FullName'] ?? '');
+        return;
+      }
+
+      // محاولة ثانية: البحث بالإيميل
+      final query = await FirebaseFirestore.instance
+          .collection('User')
+          .where('Email', isEqualTo: user.email)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty && mounted) {
+        setState(() => _userName = query.docs.first.data()['FullName'] ?? '');
+      }
+    } catch (_) {
+      // الاسم يبقى فارغاً إذا فشل الجلب
+    }
+  }
 
   final List<Map<String, String>> _features = [
     {
@@ -99,9 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'اهلاً ريم',
-            style: TextStyle(
+          Text(
+            'أهــــلًا${_userName.isNotEmpty ? ' $_userName' : ''}',
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: NabeehColors.darkBlue,
@@ -190,16 +228,16 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 11),
             decoration: BoxDecoration(
-              color: const Color(0xFFD4F4E2),
+              color: const Color(0xFFEEEEEE),
               borderRadius: BorderRadius.circular(30),
             ),
             child: const Text(
-              'متصلة',
+              'غير متصلة',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: NabeehColors.green,
+                color: Color(0xFF757575),
               ),
             ),
           ),

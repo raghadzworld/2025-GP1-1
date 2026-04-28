@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -15,15 +20,33 @@ class NabeehColors {
 
 // ─── Contact Model ────────────────────────────────────────────────────────────
 class EmergencyContact {
+  final String id;
   final String name;
   final String email;
   final String relation;
 
   EmergencyContact({
+    this.id = '',
     required this.name,
     required this.email,
     required this.relation,
   });
+
+  factory EmergencyContact.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return EmergencyContact(
+      id: doc.id,
+      name: data['Name'] ?? '',
+      email: data['Email'] ?? '',
+      relation: data['Relation'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toFirestore() => {
+    'Name': name,
+    'Email': email,
+    'Relation': relation,
+  };
 }
 
 const _kBlueGradient = LinearGradient(
@@ -43,14 +66,7 @@ class EmergencyScreen extends StatefulWidget {
 
 class _EmergencyScreenState extends State<EmergencyScreen>
     with SingleTickerProviderStateMixin {
-  bool _numbersExpanded = false;
-  final List<EmergencyContact> _contacts = [
-    EmergencyContact(
-      name: 'محمد العويس',
-      email: 'mo@example.com',
-      relation: 'أخ',
-    ),
-  ];
+  final List<EmergencyContact> _contacts = [];
 
   // SOS state
   bool _sosActive = false;
@@ -61,12 +77,6 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
-  final List<Map<String, String>> _emergencyNumbers = [
-    {'name': 'مركز القيادة والسيطرة والتحكم', 'number': '991'},
-    {'name': 'الدوريات الامنية', 'number': '999'},
-    {'name': 'الهلال الأحمر', 'number': '997'},
-    {'name': 'الدفاع المدني', 'number': '998'},
-  ];
 
   @override
   void initState() {
@@ -78,6 +88,32 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.18).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _loadContacts();
+  }
+
+  CollectionReference<Map<String, dynamic>>? get _contactsRef {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+    return FirebaseFirestore.instance
+        .collection('User')
+        .doc(uid)
+        .collection('EmergencyContacts');
+  }
+
+  Future<void> _loadContacts() async {
+    try {
+      final ref = _contactsRef;
+      if (ref == null) return;
+      final snapshot = await ref.get();
+      if (!mounted) return;
+      setState(() {
+        _contacts
+          ..clear()
+          ..addAll(snapshot.docs.map(EmergencyContact.fromFirestore));
+      });
+    } catch (_) {
+      // تبقى القائمة فارغة إذا فشل الجلب
+    }
   }
 
   @override
@@ -112,13 +148,139 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     });
   }
 
-  void _triggerSOS() {
+  Future<void> _triggerSOS() async {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('تم إرسال نداء الاستغاثة إلى جهات الاتصال'),
-        backgroundColor: Colors.red,
+        content: Text('جاري إرسال نداء الاستغاثة...'),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 2),
       ),
     );
+
+    try {
+      // 1. طلب صلاحية الموقع
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      double? latitude;
+      double? longitude;
+
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+        latitude = position.latitude;
+        longitude = position.longitude;
+      }
+
+      // 2. جلب بيانات المستخدم والإيميلات من Firestore
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('User')
+          .doc(uid)
+          .get();
+      String userName = (userDoc.data()?['FullName'] as String? ?? '').trim();
+      if (userName.isEmpty) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser?.email != null) {
+          final query = await FirebaseFirestore.instance
+              .collection('User')
+              .where('Email', isEqualTo: currentUser!.email)
+              .limit(1)
+              .get();
+          if (query.docs.isNotEmpty) {
+            userName = (query.docs.first.data()['FullName'] as String? ?? '').trim();
+          }
+        }
+      }
+      if (userName.isEmpty) userName = 'مستخدم نبيه';
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('User')
+          .doc(uid)
+          .collection('EmergencyContacts')
+          .get();
+
+      final emails = snapshot.docs
+          .map((doc) => doc.data()['Email'] as String?)
+          .whereType<String>()
+          .toList();
+
+      if (emails.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لا توجد جهات اتصال لإرسال النداء إليها'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // 3. إرسال إيميل لكل جهة اتصال عبر EmailJS REST API
+      const emailjsServiceId  = 'service_z8s2iye';
+      const emailjsTemplateId = 'template_5skt4yr';
+      const emailjsPublicKey  = 'iTX-OPPPTV27wvJyw';
+      const emailjsPrivateKey = '-cAevJ-wpLtQbsPtHHn6S';
+
+      final hasLocation = latitude != null && longitude != null;
+      final mapsLink = hasLocation
+          ? 'https://www.google.com/maps?q=$latitude,$longitude'
+          : 'غير متاح';
+
+      for (final email in emails) {
+        final response = await http.post(
+          Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'service_id':  emailjsServiceId,
+            'template_id': emailjsTemplateId,
+            'user_id':     emailjsPublicKey,
+            'accessToken': emailjsPrivateKey,
+            'template_params': {
+              'to_email':   email,
+              'name':       userName,
+              'user_name':  userName,
+              'latitude':   latitude?.toString() ?? 'غير متاح',
+              'longitude':  longitude?.toString() ?? 'غير متاح',
+              'maps_link':  mapsLink,
+            },
+          }),
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('EmailJS error: ${response.body}');
+        }
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال نداء الاستغاثة إلى جهات الاتصال'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('فشل الإرسال: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(email.trim());
   }
 
   // ── Add Contact Sheet ──────────────────────────────────────────────────────
@@ -144,7 +306,8 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (ctx) => Directionality(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Directionality(
         textDirection: TextDirection.rtl,
         child: Padding(
           padding: EdgeInsets.only(
@@ -157,7 +320,6 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   width: 40,
@@ -184,26 +346,47 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 label: 'الايميل:',
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
+                errorText: emailCtrl.text.isNotEmpty && !_isValidEmail(emailCtrl.text)
+                    ? 'صيغة البريد الإلكتروني غير صحيحة'
+                    : null,
               ),
               const SizedBox(height: 20),
               _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
               const SizedBox(height: 32),
-              // Add button
               OutlinedButton(
-                onPressed: () {
-                  if (nameCtrl.text.isNotEmpty &&
-                      emailCtrl.text.isNotEmpty &&
-                      relationCtrl.text.isNotEmpty) {
-                    setState(() {
-                      _contacts.add(
-                        EmergencyContact(
-                          name: nameCtrl.text.trim(),
-                          email: emailCtrl.text.trim(),
-                          relation: relationCtrl.text.trim(),
-                        ),
-                      );
-                    });
+                onPressed: () async {
+                  setSheetState(() {}); // لإظهار الخطأ إن وُجد
+                  if (nameCtrl.text.trim().isEmpty ||
+                      emailCtrl.text.trim().isEmpty ||
+                      relationCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
+                    );
+                    return;
+                  }
+                  if (!_isValidEmail(emailCtrl.text)) return;
+                  try {
+                    final newContact = EmergencyContact(
+                      name: nameCtrl.text.trim(),
+                      email: emailCtrl.text.trim(),
+                      relation: relationCtrl.text.trim(),
+                    );
+                    final docRef = await _contactsRef!.add(newContact.toFirestore());
+                    if (!ctx.mounted) return;
                     Navigator.pop(ctx);
+                    if (mounted) {
+                      setState(() => _contacts.add(EmergencyContact(
+                        id: docRef.id,
+                        name: newContact.name,
+                        email: newContact.email,
+                        relation: newContact.relation,
+                      )));
+                    }
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('حدث خطأ: $e')),
+                    );
                   }
                 },
                 style: OutlinedButton.styleFrom(
@@ -249,6 +432,225 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           ),
         ),
       ),
+      ),
+    );
+  }
+
+  Future<void> _deleteContact(int index) async {
+    final contact = _contacts[index];
+    if (contact.id.isNotEmpty) {
+      await _contactsRef?.doc(contact.id).delete();
+    }
+    if (mounted) setState(() => _contacts.removeAt(index));
+  }
+
+  void _selectContactForEdit() {
+    if (_contacts.isEmpty) return;
+    if (_contacts.length == 1) {
+      _showEditContactSheet(_contacts.first, 0);
+      return;
+    }
+    _showContactSelectorSheet(onSelect: (index) {
+      Navigator.pop(context);
+      _showEditContactSheet(_contacts[index], index);
+    });
+  }
+
+  void _selectContactForDelete() {
+    if (_contacts.isEmpty) return;
+    if (_contacts.length == 1) {
+      _deleteContact(0);
+      return;
+    }
+    _showContactSelectorSheet(onSelect: (index) {
+      Navigator.pop(context);
+      _deleteContact(index);
+    });
+  }
+
+  void _showContactSelectorSheet({required void Function(int index) onSelect}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: NabeehColors.cardBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'اختر جهة الاتصال:',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: NabeehColors.darkBlue,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._contacts.asMap().entries.map((entry) => ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: NabeehColors.lightBlueBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.person_rounded, color: NabeehColors.lightBlue, size: 22),
+                ),
+                title: Text(
+                  entry.value.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: NabeehColors.darkBlue),
+                ),
+                subtitle: Text(
+                  'جهة القرابة: ${entry.value.relation}',
+                  style: const TextStyle(fontSize: 12, color: NabeehColors.gray),
+                ),
+                onTap: () => onSelect(entry.key),
+              )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditContactSheet(EmergencyContact contact, int index) {
+    final nameCtrl = TextEditingController(text: contact.name);
+    final emailCtrl = TextEditingController(text: contact.email);
+    final relationCtrl = TextEditingController(text: contact.relation);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: 24,
+            right: 24,
+            left: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: NabeehColors.cardBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'تعديل جهة الاتصال:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: NabeehColors.darkBlue,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildFormField(label: 'الاسم:', controller: nameCtrl),
+              const SizedBox(height: 20),
+              _buildFormField(
+                label: 'الايميل:',
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                errorText: emailCtrl.text.isNotEmpty && !_isValidEmail(emailCtrl.text)
+                    ? 'صيغة البريد الإلكتروني غير صحيحة'
+                    : null,
+              ),
+              const SizedBox(height: 20),
+              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
+              const SizedBox(height: 32),
+              OutlinedButton(
+                onPressed: () async {
+                  setSheetState(() {});
+                  if (nameCtrl.text.trim().isEmpty ||
+                      emailCtrl.text.trim().isEmpty ||
+                      relationCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
+                    );
+                    return;
+                  }
+                  if (!_isValidEmail(emailCtrl.text)) return;
+                  final updated = EmergencyContact(
+                    id: contact.id,
+                    name: nameCtrl.text.trim(),
+                    email: emailCtrl.text.trim(),
+                    relation: relationCtrl.text.trim(),
+                  );
+                  if (contact.id.isNotEmpty) {
+                    await _contactsRef?.doc(contact.id).update(updated.toFirestore());
+                  }
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  if (mounted) setState(() => _contacts[index] = updated);
+                },
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 52),
+                  side: const BorderSide(color: NabeehColors.lightBlue, width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text(
+                  'حفظ',
+                  style: TextStyle(
+                    color: NabeehColors.lightBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 52),
+                  side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text(
+                  'تراجع',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      ),
     );
   }
 
@@ -256,6 +658,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
+    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,16 +679,26 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           decoration: InputDecoration(
             hintText: 'اكتب هنا',
             hintStyle: const TextStyle(color: NabeehColors.gray, fontSize: 14),
-            enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: NabeehColors.cardBorder),
+            errorText: errorText,
+            errorStyle: const TextStyle(fontSize: 12),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : NabeehColors.cardBorder,
+              ),
             ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: NabeehColors.lightBlue, width: 2),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : NabeehColors.lightBlue,
+                width: 2,
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 8,
-              horizontal: 0,
+            errorBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.red),
             ),
+            focusedErrorBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.red, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
           ),
         ),
       ],
@@ -310,15 +723,53 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildEmergencyNumbersCard(),
-                    const SizedBox(height: 32),
-                    const Text(
-                      'جهات الاتصال:',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: NabeehColors.darkBlue,
-                      ),
+                    Row(
+                      children: [
+                        const Text(
+                          'جهات الاتصال:',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: NabeehColors.darkBlue,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _contacts.isNotEmpty ? _selectContactForEdit : null,
+                          style: TextButton.styleFrom(
+                            foregroundColor: NabeehColors.darkBlue,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            side: const BorderSide(color: NabeehColors.gray, width: 1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'تعديل',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _contacts.isNotEmpty ? _selectContactForDelete : null,
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.red.withValues(alpha: 0.08),
+                            foregroundColor: Colors.red,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'حذف',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     ..._contacts.map((c) => _buildContactTile(c)),
@@ -390,132 +841,6 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     );
   }
 
-  // ── Emergency Numbers Card ────────────────────────────────────────────────
-  Widget _buildEmergencyNumbersCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: NabeehColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Header row (tap to expand)
-          GestureDetector(
-            onTap: () => setState(() => _numbersExpanded = !_numbersExpanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  // Siren icon on the right (in RTL)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: NabeehColors.cardBorder),
-                    ),
-                    child: Image.asset(
-                      'assets/images/icon_SlectedEme.png',
-                      width: 22,
-                      height: 22,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Text next to the icon
-                  const Text(
-                    'ارقام الطوارئ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: NabeehColors.darkBlue,
-                    ),
-                  ),
-                  const Spacer(),
-                  // Arrow on the far left (in RTL)
-                  AnimatedRotation(
-                    turns: _numbersExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 250),
-                    child: Image.asset(
-                      'assets/images/icon_DownArrow.png',
-                      width: 24,
-                      height: 24,
-                      color: NabeehColors.lightBlue,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Expandable numbers list
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 300),
-            crossFadeState: _numbersExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            firstChild: const SizedBox.shrink(),
-            secondChild: Column(
-              children: [
-                const Divider(height: 1, color: NabeehColors.cardBorder),
-                ..._emergencyNumbers.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Name on the left
-                        Text(
-                          item['name']!,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: NabeehColors.darkBlue,
-                          ),
-                        ),
-                        // Number badge on the right
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: NabeehColors.lightBlueBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: NabeehColors.cardBorder.withOpacity(0.5),
-                            ),
-                          ),
-                          child: Text(
-                            item['number']!,
-                            style: const TextStyle(
-                              color: NabeehColors.lightBlue,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ── Contact Tile ──────────────────────────────────────────────────────────
   Widget _buildContactTile(EmergencyContact contact) {
@@ -528,7 +853,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         border: Border.all(color: NabeehColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -637,7 +962,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                   height: 170,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.red.withOpacity(0.08),
+                    color: Colors.red.withValues(alpha: 0.08),
                   ),
                 ),
               ),
@@ -649,7 +974,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                   height: 170,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.red.withOpacity(0.15),
+                    color: Colors.red.withValues(alpha: 0.15),
                   ),
                 ),
               ),
