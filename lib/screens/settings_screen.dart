@@ -11,50 +11,92 @@ class SettingsScreen extends StatelessWidget {
   // 👇 1. Firebase Logout Logic
   Future<void> _logout(BuildContext context) async {
     try {
-      await CategoryService.withDefaults().logout();
+      // تسجيل الخروج من فايربيس
+      await FirebaseAuth.instance.signOut();
+      
+      // مسح البيانات المحلية إذا لزم الأمر
+      await CategoryService.withDefaults().logout(); 
+
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء تسجيل الخروج: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic'))),
+          SnackBar(
+            content: Text('حدث خطأ أثناء تسجيل الخروج: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
-  // 👇 2. Firebase Delete Account Logic
+// 👇 2. Firebase Delete Account Logic
   Future<void> _deleteAccount(BuildContext context) async {
+    // إظهار مؤشر التحميل
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingContext) => const Center(child: CircularProgressIndicator(color: Colors.red)),
+    );
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final uid = user.uid;
+        
+        // 1. حذف بيانات المستخدم من Firestore
         await FirebaseFirestore.instance.collection('User').doc(uid).delete();
+        
+        // 2. حذف الحساب من Firebase Auth
         await user.delete();
 
         if (context.mounted) {
+          // إغلاق مؤشر التحميل بشكل آمن
+          Navigator.of(context, rootNavigator: true).pop(); 
+          
+          // إظهار رسالة التأكيد
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم حذف الحساب بنجاح. نتمنى رؤيتك قريباً!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+
+          // الانتقال إلى صفحة الترحيب
           Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
         }
+      } else {
+        // في حال كان المستخدم غير موجود، نغلق التحميل فقط
+        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       }
     } on FirebaseAuthException catch (e) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop(); // إغلاق مؤشر التحميل
+
       if (e.code == 'requires-recent-login') {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
             ),
           );
         }
       } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('حدث خطأ: ${e.message}', style: const TextStyle(fontFamily: 'IBMPlexSansArabic'))),
+            SnackBar(
+              content: Text('حدث خطأ: ${e.message}', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
     } catch (e) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       debugPrint('Error deleting account: $e');
     }
   }
@@ -156,9 +198,63 @@ class SettingsScreen extends StatelessWidget {
                       Expanded(
                         child: ElevatedButton(
                           // Disable button if rules aren't met
-                          onPressed: isAllValid ? () {
-                            // TODO: Add Firebase Update Password Logic here
-                            Navigator.pop(context); 
+                          onPressed: isAllValid ? () async {
+                            try {
+                              // 1. إظهار مؤشر التحميل (Loading Indicator)
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(child: CircularProgressIndicator(color: NabeehColors.lightBlue)),
+                              );
+
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user != null && user.email != null) {
+                                
+                                // 2. إعادة المصادقة باستخدام كلمة المرور الحالية (مطلوب من فايربيس للأمان)
+                                final credential = EmailAuthProvider.credential(
+                                  email: user.email!,
+                                  password: currentPasswordCtrl.text,
+                                );
+                                await user.reauthenticateWithCredential(credential);
+
+                                // 3. تحديث كلمة المرور
+                                await user.updatePassword(newPasswordCtrl.text);
+
+                                // 4. إغلاق مؤشر التحميل ونافذة التغيير
+                                if (context.mounted) {
+                                  Navigator.pop(context); // إغلاق التحميل
+                                  Navigator.pop(context); // إغلاق النافذة
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('تم تغيير كلمة المرور بنجاح!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              }
+                            } on FirebaseAuthException catch (e) {
+                              if (context.mounted) Navigator.pop(context); // إغلاق التحميل في حال الخطأ
+                              
+                              String message = 'حدث خطأ أثناء التغيير. الرجاء المحاولة لاحقاً.';
+                              if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+                                message = 'كلمة المرور الحالية غير صحيحة.';
+                              } else if (e.code == 'network-request-failed') {
+                                message = 'تأكد من اتصالك بالإنترنت.';
+                              }
+                              
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(message, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) Navigator.pop(context);
+                              debugPrint('Error updating password: $e');
+                            }
                           } : null,
                           style: ElevatedButton.styleFrom(
                             fixedSize: const Size.fromHeight(50), 
@@ -195,8 +291,8 @@ class SettingsScreen extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isValid ? LucideIcons.checkCircle2 : LucideIcons.circle,
-            color: isValid ? Colors.green : NabeehColors.slate400,
+            isValid ? LucideIcons.checkCircle2 : LucideIcons.xCircle,
+            color: isValid ? Colors.green : Colors.red,
             size: 16,
           ),
           const SizedBox(width: 8),
@@ -206,7 +302,7 @@ class SettingsScreen extends StatelessWidget {
               fontFamily: 'IBMPlexSansArabic',
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: isValid ? Colors.green : NabeehColors.slate500,
+              color: isValid ? Colors.green : Colors.red,
             ),
           ),
         ],
@@ -241,10 +337,10 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _confirmDeleteAccount(BuildContext context) {
+void _confirmDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (BuildContext dialogContext) { // 👈 Changed to dialogContext
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
@@ -270,7 +366,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.pop(dialogContext), // 👈 Use dialogContext here
                       style: TextButton.styleFrom(
                         fixedSize: const Size.fromHeight(50), 
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -290,8 +386,8 @@ class SettingsScreen extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        Navigator.pop(context);
-                        await _deleteAccount(context);
+                        Navigator.pop(dialogContext); // 👈 Close the dialog first
+                        await _deleteAccount(context); // 👈 Pass the MAIN screen context!
                       },
                       style: ElevatedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50), 
