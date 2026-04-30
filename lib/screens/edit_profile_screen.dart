@@ -88,24 +88,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: Stack(
-          children: [
-            Container(
-              height: 250,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFB8D4F0), Colors.white],
-                ),
-              ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  _buildHeader(context),
-                  const SizedBox(height: 30),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              _buildHeader(context),
+              const SizedBox(height: 30),
                   
                   Expanded(
                     child: SingleChildScrollView(
@@ -132,7 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ElevatedButton(
                             onPressed: _isLoading ? null : _saveProfile,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: NabeehColors.darkBlue,
+                              backgroundColor: Color(0xFF181059),
                               minimumSize: const Size(double.infinity, 60),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               elevation: 0,
@@ -157,45 +145,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          const Expanded(
+            child: Text(
+              'تعديل الملف',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF181059),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 50,
-              height: 50,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
-                border: Border.all(color: NabeehColors.dark, width: 1.5),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                  stops: [0.09, 0.30, 1.0],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
               child: const Directionality(
                 textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: NabeehColors.dark, size: 18),
+                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
               ),
             ),
           ),
-          const Text(
-            'تعديل الملف',
-            style: TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: NabeehColors.dark,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(width: 50), 
         ],
       ),
     );
@@ -219,7 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontWeight: FontWeight.normal),
-        prefixIcon: Icon(icon, color: NabeehColors.lightBlue, size: 22),
+        prefixIcon: Icon(icon, color: Color(0xFF181059), size: 22),
         filled: true,
         fillColor: NabeehColors.slate50,
         border: OutlineInputBorder(

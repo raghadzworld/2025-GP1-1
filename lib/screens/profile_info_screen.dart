@@ -18,61 +18,51 @@ class ProfileInfoScreen extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: Stack(
-          children: [
-            Container(
-              height: 250,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFB8D4F0), Colors.white],
-                ),
+        body: SafeArea(
+          top: false,
+          child: currentUser == null
+            ? const Center(child: Text('الرجاء تسجيل الدخول أولاً', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
+            : StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('User').doc(currentUser.uid).snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFF181059)));
+                  }
+
+                  final userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+                  final String name = userData['FullName'] ?? 'مستخدم جديد';
+                  final String email = currentUser.email ?? userData['Email'] ?? 'لا يوجد بريد إلكتروني';
+                  final String phone = userData['PhoneNumber'] ?? 'لم يتم إضافة رقم';
+
+                  return Column(
+                    children: [
+                      _buildHeader(context, name),
+                      const SizedBox(height: 24),
+                      _buildInfoRow(Icons.email, 'الايميل', email),
+                      _buildInfoRow(Icons.phone_android, 'رقم الهاتف', phone),
+                      const Spacer(),
+                      _buildCommandButtons(context),
+                      const SizedBox(height: 40),
+                    ],
+                  );
+                },
               ),
-            ),
-            SafeArea(
-              child: currentUser == null 
-                ? const Center(child: Text('الرجاء تسجيل الدخول أولاً', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
-                : StreamBuilder<DocumentSnapshot>(
-                    // Listen to this user's specific document in Firestore
-                    stream: FirebaseFirestore.instance.collection('User').doc(currentUser.uid).snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator(color: NabeehColors.darkBlue));
-                      }
-
-                      // Extract data with safe fallbacks
-                      final userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
-                      final String name = userData['FullName'] ?? 'مستخدم جديد';
-                      final String email = currentUser.email ?? userData['Email'] ?? 'لا يوجد بريد إلكتروني';
-                      final String phone = userData['PhoneNumber'] ?? 'لم يتم إضافة رقم';
-
-                      return Column(
-                        children: [
-                          const SizedBox(height: 30),
-                          _buildHeader(context, name),
-                          const SizedBox(height: 40),
-                          
-                          _buildInfoRow(Icons.email, 'الايميل', email),
-                          _buildInfoRow(Icons.phone_android, 'رقم الهاتف', phone),
-                          
-                          const Spacer(),
-                          _buildCommandButtons(context),
-                          const SizedBox(height: 40), 
-                        ],
-                      );
-                    },
-                  ),
-            ),
-          ],
         ),
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context, String name) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -81,39 +71,39 @@ class ProfileInfoScreen extends StatelessWidget {
               name,
               style: const TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: NabeehColors.darkBlue,
+                color: Color(0xFF181059),
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-                stops: [0.09, 0.30, 1.0],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+              stops: [0.09, 0.30, 1.0],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
-              ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
             ),
           ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              'assets/images/icon_signLan.png',
+              color: Colors.white,
+              colorBlendMode: BlendMode.srcIn,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
         ],
       ),
     );
@@ -136,7 +126,7 @@ class ProfileInfoScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF1773CF), size: 22),
+              Icon(icon, color: const Color(0xFF181059), size: 22),
               const SizedBox(width: 15),
               Expanded(
                 child: Text(

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -15,38 +13,7 @@ class WatchScreen extends StatefulWidget {
 }
 
 class _WatchScreenState extends State<WatchScreen> {
-  bool _isConnected = true;
-  String _deviceName = 'LILYGO Watch ';
-  int _batteryLevel = 84;
-  DateTime _lastSync = DateTime.now();
-  Timer? _syncTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) {
-        setState(() {
-          _lastSync = DateTime.now();
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _syncTimer?.cancel();
-    super.dispose();
-  }
-
-  String _getFormattedSyncTime() {
-    final now = DateTime.now();
-    final difference = now.difference(_lastSync);
-    if (difference.inSeconds < 60) return 'الآن';
-    if (difference.inMinutes < 60) return 'منذ ${difference.inMinutes} دقيقة';
-    if (difference.inHours < 24) return 'منذ ${difference.inHours} ساعة';
-    return 'منذ ${difference.inDays} يوم';
-  }
+  final String _deviceName = 'LILYGO Watch';
 
   @override
   Widget build(BuildContext context) {
@@ -97,34 +64,29 @@ Widget _buildHeader(BuildContext context) {
     ),
     child: Row(
       children: [
-        // تم حذف زر الرجوع بالكامل من هنا
-        // وضعنا مساحة فارغة للحفاظ على التوازن
-        const SizedBox(width: 50),
-        
         // العنوان
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.only(right: 4),
             child: Text(
               'معلومات الساعة',
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.right,
               style: const TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: NabeehColors.dark,
-                letterSpacing: -1,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF181059),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
-        
+
         // أيقونة لغة الإشارة
         Container(
-          width: 50,
-          height: 50,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
@@ -139,7 +101,7 @@ Widget _buildHeader(BuildContext context) {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             child: Image.asset(
               'assets/images/icon_signLan.png',
               color: Colors.white,
@@ -169,19 +131,20 @@ Widget _buildHeader(BuildContext context) {
                     const Text(
                       'الساعة المتصلة',
                       style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
                         fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: NabeehColors.slate400,
-                        letterSpacing: 2,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF181059),
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       _deviceName,
                       style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
                         fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: NabeehColors.dark,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF181059),
                         height: 1.2,
                       ),
                       maxLines: 1,
@@ -274,23 +237,19 @@ Widget _buildHeader(BuildContext context) {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: _isConnected
-                    ? Colors.green.withValues(alpha: 0.1)
-                    : Colors.grey.withValues(alpha: 0.1),
+                color: Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: _isConnected
-                      ? Colors.green.withValues(alpha: 0.18)
-                      : Colors.grey.withValues(alpha: 0.18),
+                  color: Colors.grey.withValues(alpha: 0.18),
                 ),
               ),
-              child: Text(
-                _isConnected ? 'متصل' : 'غير متصل',
+              child: const Text(
+                'غير متصل',
                 style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
                   fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: _isConnected ? Colors.green : Colors.grey,
-                  letterSpacing: 2,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey,
                 ),
               ),
             ),
@@ -316,56 +275,54 @@ Widget _buildSyncCard() {
     child: BentoCard(
       border: Border.all(width: 0.8, color: NabeehColors.cardBorder),
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'آخر تزامن',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.slate400,
-                  letterSpacing: 2,
+          // العنوان في الأعلى
+          const Align(
+            alignment: Alignment.topCenter,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'آخر تزامن',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF181059),
+                  ),
                 ),
-              ),
-              Icon(
-                LucideIcons.refreshCcw,
-                color: NabeehColors.gray,
-                size: 18,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          Center(
-            child: Text(
-              _getFormattedSyncTime(),
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w900,
-                color: NabeehColors.dark,
-                height: 1.1,
-              ),
+                Icon(
+                  LucideIcons.refreshCcw,
+                  color: NabeehColors.gray,
+                  size: 18,
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 12),
-
-          Center(
-            child: Icon(
-              LucideIcons.checkCircle2,
-              color: NabeehColors.green,
-              size: 28,
-            )
-                .animate(onPlay: (c) => c.repeat())
-                .shimmer(
-                  duration: 1500.ms,
-                  color: NabeehColors.background,
+          // المحتوى في المنتصف
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'غير متاح',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey,
+                    height: 1,
+                  ),
                 ),
+                SizedBox(height: 8),
+                Icon(
+                  LucideIcons.wifiOff,
+                  color: Colors.grey,
+                  size: 28,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -393,10 +350,10 @@ Widget _buildSyncCard() {
               Text(
                 'البطارية',
                 style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
                   fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.slate400,
-                  letterSpacing: 2,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF181059),
                 ),
               ),
             ],
@@ -404,51 +361,40 @@ Widget _buildSyncCard() {
 
           const SizedBox(height: 18),
 
-          Center(
+          const Center(
             child: Text(
-              '$_batteryLevel%',
-              style: const TextStyle(
+              '--',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
                 fontSize: 34,
-                fontWeight: FontWeight.w900,
-                color: NabeehColors.dark,
+                fontWeight: FontWeight.w400,
+                color: Colors.grey,
               ),
             ),
           ),
 
           const SizedBox(height: 6),
 
-          Center(
+          const Center(
             child: Text(
-              _batteryLevel > 20 ? 'حالة جيدة' : 'منخفضة',
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                color: NabeehColors.slate400,
+              'غير متاح',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 8,
+                fontWeight: FontWeight.w400,
+                color: Colors.grey,
               ),
             ),
           ),
 
           const SizedBox(height: 18),
 
-          // 🔋 progress bar
           Container(
             height: 6,
             width: double.infinity,
             decoration: BoxDecoration(
               color: NabeehColors.slate100,
               borderRadius: BorderRadius.circular(3),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerRight,
-              widthFactor: _batteryLevel / 100,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _batteryLevel > 20
-                      ? NabeehColors.green
-                      : Colors.red,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
             ),
           ),
         ],

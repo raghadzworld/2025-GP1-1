@@ -333,8 +333,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 60, bottom: 24, right: 24, left: 24),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -343,67 +343,38 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         ),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Expanded(
+            child: Text(
+              isEditing ? 'تعديل الفئة' : 'إضافة فئة',
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF181059),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 50,
-              height: 50,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
-                border: Border.all(color: NabeehColors.dark, width: 1.5),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                  stops: [0.09, 0.30, 1.0],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
               child: const Directionality(
                 textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded,
-                    color: NabeehColors.dark, size: 18),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                isEditing ? 'تعديل الفئة' : 'إضافة فئة',
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.dark,
-                  letterSpacing: -1,
-                ),
-              ),
-            ),
-          ),
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF181059),
-                  Color(0xFF181059),
-                  Color(0xFF1773CF)
-                ],
-                stops: [0.09, 0.30, 1.0],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25), width: 1.5),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
+                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
               ),
             ),
           ),

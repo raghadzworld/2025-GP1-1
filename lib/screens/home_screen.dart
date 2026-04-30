@@ -140,28 +140,38 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             'أهــــلًا${_userName.isNotEmpty ? ' $_userName' : ''}',
             style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
               fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: NabeehColors.darkBlue,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF181059),
             ),
           ),
           Container(
-            width: 50,
-            height: 50,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: _kBlueGradient,
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+              stops: [0.09, 0.30, 1.0],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(11),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
-              ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
             ),
           ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              'assets/images/icon_signLan.png',
+              color: Colors.white,
+              colorBlendMode: BlendMode.srcIn,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
         ],
       ),
     );

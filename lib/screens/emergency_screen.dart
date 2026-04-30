@@ -289,7 +289,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('لا يمكن إضافة أكثر من جهتَي اتصال'),
-          backgroundColor: NabeehColors.darkBlue,
+          backgroundColor: Color(0xFF181059),
         ),
       );
       return;
@@ -336,7 +336,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: NabeehColors.darkBlue,
+                  color: Color(0xFF181059),
                 ),
               ),
               const SizedBox(height: 24),
@@ -392,7 +392,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
                   side: const BorderSide(
-                    color: NabeehColors.lightBlue,
+                    color: Color(0xFF181059),
                     width: 1.2,
                   ),
                   shape: RoundedRectangleBorder(
@@ -402,7 +402,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 child: const Text(
                   'إضافة',
                   style: TextStyle(
-                    color: NabeehColors.lightBlue,
+                    color: Color(0xFF181059),
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -499,7 +499,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: NabeehColors.darkBlue,
+                  color: Color(0xFF181059),
                 ),
               ),
               const SizedBox(height: 16),
@@ -515,7 +515,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 ),
                 title: Text(
                   entry.value.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: NabeehColors.darkBlue),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF181059)),
                 ),
                 subtitle: Text(
                   'جهة القرابة: ${entry.value.relation}',
@@ -573,7 +573,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: NabeehColors.darkBlue,
+                  color: Color(0xFF181059),
                 ),
               ),
               const SizedBox(height: 24),
@@ -617,13 +617,13 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 },
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: NabeehColors.lightBlue, width: 1.2),
+                  side: const BorderSide(color: Color(0xFF181059), width: 1.2),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'حفظ',
                   style: TextStyle(
-                    color: NabeehColors.lightBlue,
+                    color: Color(0xFF181059),
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -668,7 +668,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: NabeehColors.darkBlue,
+            color: Color(0xFF181059),
           ),
         ),
         const SizedBox(height: 4),
@@ -730,18 +730,18 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: NabeehColors.darkBlue,
+                            color: Color(0xFF181059),
                           ),
                         ),
                         const Spacer(),
                         TextButton(
                           onPressed: _contacts.isNotEmpty ? _selectContactForEdit : null,
                           style: TextButton.styleFrom(
-                            foregroundColor: NabeehColors.darkBlue,
+                            foregroundColor: Color(0xFF181059),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(color: NabeehColors.gray, width: 1),
+                            side: const BorderSide(color: NabeehColors.cardBorder, width: 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -760,6 +760,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            side: const BorderSide(color: NabeehColors.cardBorder, width: 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -780,7 +781,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: NabeehColors.darkBlue,
+                        color: Color(0xFF181059),
                       ),
                     ),
                     const SizedBox(height: 75),
@@ -800,7 +801,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, bottom: 24, right: 24, left: 24),
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -812,30 +813,39 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'الطوارئ',
+            'الـطــوارئ',
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
-              color: NabeehColors.darkBlue,
+              color: Color(0xFF181059),
             ),
           ),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: _kBlueGradient,
+         Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+              stops: [0.09, 0.30, 1.0],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
-              ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
             ),
           ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              'assets/images/icon_signLan.png',
+              color: Colors.white,
+              colorBlendMode: BlendMode.srcIn,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
         ],
       ),
     );
@@ -865,12 +875,12 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: const BoxDecoration(
-              color: NabeehColors.lightBlueBg,
+              color: Color(0xFFEEF0F8),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.person_rounded,
-              color: NabeehColors.lightBlue,
+              color: Color(0xFF181059),
               size: 24,
             ),
           ),
@@ -885,7 +895,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: NabeehColors.darkBlue,
+                    color: Color(0xFF181059),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -922,7 +932,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               width: 32,
               height: 32,
               decoration: const BoxDecoration(
-                color: NabeehColors.lightBlue,
+                color: Color(0xFF181059),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.add, color: Colors.white, size: 22),
@@ -933,7 +943,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 'اضف جهة اتصال',
                 style: TextStyle(
                   fontSize: 16,
-                  color: NabeehColors.darkBlue,
+                  color: Color(0xFF181059),
                   fontWeight: FontWeight.w500,
                 ),
               ),
