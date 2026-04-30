@@ -213,16 +213,9 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: NabeehColors.slate50,
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: NabeehColors.slate200, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: NabeehColors.darkBlue.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            )
-          ],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +224,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
               children: [
                 Icon(
                   isListening ? LucideIcons.activity : LucideIcons.moon, 
-                  color: isListening ? NabeehColors.lightBlue : NabeehColors.slate400, 
+                  color: isListening ? const Color(0xFF181059) : NabeehColors.slate400,
                   size: 20
                 ),
                 const SizedBox(width: 12),

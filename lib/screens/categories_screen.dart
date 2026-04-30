@@ -273,30 +273,33 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                   ],
                                 ),
                               ),
-                              ElevatedButton(
-                                onPressed: () => _navigateToAddEdit(),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: NabeehColors.blue,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
+                              Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1.5,
                                   ),
-                                  elevation: 0,
-                                  minimumSize:
-                                      const Size(double.infinity, 48),
                                 ),
-                                child: const FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
+                                child: TextButton(
+                                  onPressed: () => _navigateToAddEdit(),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 15),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  child: const Text(
                                     'إضافة مجموعة جديدة',
-                                    maxLines: 1,
                                     style: TextStyle(
+                                      fontFamily: 'IBMPlexSansArabic',
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 12,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),

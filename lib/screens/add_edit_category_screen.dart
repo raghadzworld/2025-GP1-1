@@ -3,7 +3,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../features/categories/data/models/category_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
-import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
 
 class AddEditCategoryScreen extends StatefulWidget {
@@ -714,40 +713,55 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               const SizedBox(width: 16),
               Expanded(
                 flex: 2,
-                child: PremiumButton(
-                  text: isEditing ? 'تحديث الفئة' : 'إضافة الفئة',
-                  color: NabeehColors.dark,
-                  textColor: Colors.white,
-                  onClick: () {
-                    if (!_isSaving) _handleSave();
-                  },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: TextButton(
+                    onPressed: _isSaving ? null : _handleSave,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text(
+                      isEditing ? 'تحديث الفئة' : 'إضافة الفئة',
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
           if (isEditing) ...[
             const SizedBox(height: 16),
-            GestureDetector(
-              onTap: _isSaving ? null : _handleDelete,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(16),
-                  border:
-                      Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                ),
-                child: const Center(
-                  child: Text(
-                    'حذف الفئة',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                    ),
-                  ),
+            OutlinedButton(
+              onPressed: _isSaving ? null : _handleDelete,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text(
+                'حذف الفئة',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.redAccent,
                 ),
               ),
             ),
