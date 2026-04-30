@@ -147,67 +147,53 @@ class _RemindersScreenState extends State<RemindersScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: NabeehColors.background,
-        body: Stack(
-          children: [
-            Container(
-              height: 250,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFB8D4F0), Colors.white],
-                ),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 40),
+
+              Expanded(
+                child: currentUser == null
+                    ? const Center(child: Text('الرجاء تسجيل الدخول لعرض المنبهات', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
+                    : StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('User')
+                            .doc(currentUser!.uid)
+                            .collection('Reminders')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator(color: NabeehColors.darkBlue));
+                          }
+
+                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            return _buildEmptyState();
+                          }
+
+                          final reminders = snapshot.data!.docs;
+
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              children: [
+                                ...reminders.map((doc) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  return _buildAlarmCard(doc.id, data);
+                                }),
+                                const SizedBox(height: 8),
+                                _buildAddButton(),
+                                const SizedBox(height: 40),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
               ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  _buildHeader(),
-                  const SizedBox(height: 40),
-                  
-                  Expanded(
-                    child: currentUser == null
-                        ? const Center(child: Text('الرجاء تسجيل الدخول لعرض المنبهات', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
-                        : StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('User')
-                                .doc(currentUser!.uid)
-                                .collection('Reminders') 
-                                .snapshots(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator(color: NabeehColors.darkBlue));
-                              }
-
-                              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                                return _buildEmptyState();
-                              }
-
-                              final reminders = snapshot.data!.docs;
-
-                              return SingleChildScrollView(
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                                child: Column(
-                                  children: [
-                                    ...reminders.map((doc) {
-                                      final data = doc.data() as Map<String, dynamic>;
-                                      return _buildAlarmCard(doc.id, data);
-                                    }),
-                                    const SizedBox(height: 8),
-                                    _buildAddButton(),
-                                    const SizedBox(height: 40),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -236,7 +222,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, bottom: 24, right: 24, left: 24),
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -425,34 +411,38 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   Widget _buildAddButton() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const AddReminderScreen()));
-      },
-      child: Container(
-        width: double.infinity,
-        height: 80,
-        decoration: BoxDecoration(
-          border: Border.all(color: NabeehColors.darkBlue, width: 2),
-          borderRadius: BorderRadius.circular(32),
-          color: Colors.transparent,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.plus, color: NabeehColors.darkBlue),
-            SizedBox(width: 8),
-            Text(
-              'إضافة منبه جديد',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                color: NabeehColors.darkBlue,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                fontSize: 14,
-              ),
-            ),
-          ],
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+      ),
+      child: TextButton.icon(
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddReminderScreen()));
+        },
+        icon: const Icon(LucideIcons.plus, color: Colors.white),
+        label: const Text(
+          'إضافة منبه جديد',
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+            fontSize: 14,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );

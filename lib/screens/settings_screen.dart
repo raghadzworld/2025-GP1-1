@@ -366,16 +366,19 @@ void _confirmDeleteAccount(BuildContext context) {
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext), // 👈 Use dialogContext here
+                      onPressed: () => Navigator.pop(dialogContext),
                       style: TextButton.styleFrom(
-                        fixedSize: const Size.fromHeight(50), 
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        fixedSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
+                        ),
                       ),
                       child: const Text(
                         'إلغاء',
                         style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic', 
-                          color: NabeehColors.slate500, 
+                          fontFamily: 'IBMPlexSansArabic',
+                          color: NabeehColors.slate500,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -384,22 +387,22 @@ void _confirmDeleteAccount(BuildContext context) {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
+                    child: OutlinedButton(
                       onPressed: () async {
-                        Navigator.pop(dialogContext); // 👈 Close the dialog first
-                        await _deleteAccount(context); // 👈 Pass the MAIN screen context!
+                        Navigator.pop(dialogContext);
+                        await _deleteAccount(context);
                       },
-                      style: ElevatedButton.styleFrom(
-                        fixedSize: const Size.fromHeight(50), 
-                        backgroundColor: Colors.red,
+                      style: OutlinedButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
                         'حذف نهائي',
                         style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic', 
-                          fontWeight: FontWeight.bold, 
-                          color: Colors.white,
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontWeight: FontWeight.bold,
+                          color: Colors.redAccent,
                           fontSize: 16,
                         ),
                       ),
@@ -525,11 +528,12 @@ void _confirmDeleteAccount(BuildContext context) {
   }
 
   Widget _buildSettingsTile({
-    required IconData icon, 
-    required String title, 
-    required VoidCallback onTap, 
-    Color titleColor = NabeehColors.darkBlue, 
-    Color iconColor = NabeehColors.darkBlue
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color titleColor = NabeehColors.darkBlue,
+    Color iconColor = NabeehColors.darkBlue,
+    Color borderColor = const Color.fromARGB(255, 235, 233, 229),
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -539,9 +543,9 @@ void _confirmDeleteAccount(BuildContext context) {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           decoration: BoxDecoration(
-            color: NabeehColors.slate50,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: NabeehColors.slate200, width: 1.5),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             children: [

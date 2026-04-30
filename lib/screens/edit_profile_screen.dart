@@ -117,25 +117,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           const SizedBox(height: 60),
 
-                          ElevatedButton(
-                            onPressed: _isLoading ? null : _saveProfile,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF181059),
-                              minimumSize: const Size(double.infinity, 60),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              elevation: 0,
+                          Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                width: 1.5,
+                              ),
                             ),
-                            child: _isLoading
-                                ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text(
-                                    'حفظ التغييرات',
-                                    style: TextStyle(
-                                      fontFamily: 'IBMPlexSansArabic', 
-                                      fontSize: 18, 
-                                      fontWeight: FontWeight.bold, 
-                                      color: Colors.white
+                            child: TextButton(
+                              onPressed: _isLoading ? null : _saveProfile,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: _isLoading
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Text(
+                                      'حفظ التغييرات',
+                                      style: TextStyle(
+                                        fontFamily: 'IBMPlexSansArabic',
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
+                            ),
                           ),
                           const SizedBox(height: 40), 
                         ],
@@ -221,18 +234,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         labelStyle: const TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontWeight: FontWeight.normal),
         prefixIcon: Icon(icon, color: Color(0xFF181059), size: 22),
         filled: true,
-        fillColor: NabeehColors.slate50,
+        fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: NabeehColors.slate200, width: 1.5),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: NabeehColors.slate200, width: 1.5),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: NabeehColors.lightBlue, width: 2),
+          borderSide: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
         ),
       ),
     );

@@ -443,41 +443,34 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              TextButton(
+              OutlinedButton(
                 onPressed: () => _navigateToAddEdit(category: category),
-                style: TextButton.styleFrom(
-                  foregroundColor: NabeehColors.blue,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  minimumSize: Size.zero,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  minimumSize: const Size(90, 44),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: const BorderSide(color: Color(0xFF181059), width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: const Text(
                   'تعديل',
-                  style:
-                      TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF181059)),
                 ),
               ),
               const SizedBox(width: 8),
-              TextButton(
-                onPressed:
-                    isOnlyOne ? null : () => _deleteCategory(category.id),
-                style: TextButton.styleFrom(
-                  backgroundColor: isOnlyOne
-                      ? NabeehColors.slate100
-                      : Colors.red.withValues(alpha: 0.08),
-                  foregroundColor:
-                      isOnlyOne ? NabeehColors.slate300 : Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+              OutlinedButton(
+                onPressed: isOnlyOne ? null : () => _deleteCategory(category.id),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  minimumSize: const Size(90, 44),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: BorderSide(color: isOnlyOne ? NabeehColors.slate300 : Colors.redAccent, width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text(
+                child: Text(
                   'حذف',
-                  style:
-                      TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isOnlyOne ? NabeehColors.slate300 : Colors.redAccent),
                 ),
               ),
               const Spacer(),

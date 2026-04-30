@@ -667,25 +667,36 @@ class _SttTtsScreenState extends State<SttTtsScreen>
           small: true,
         ),
         const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: _speakText,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: NabeehColors.dark,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 56),
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            elevation: 10,
-            shadowColor: NabeehColors.dark.withValues(alpha: 0.18),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'IBMPlexSansArabic',
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF181059), Color(0xFF1773CF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
             ),
           ),
-          child: Text(_isSpeaking ? 'جاري النطق...' : 'نطق النص'),
+          child: TextButton(
+            onPressed: _speakText,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: Text(
+              _isSpeaking ? 'جاري النطق...' : 'نطق النص',
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
         ),
       ],
     );

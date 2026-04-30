@@ -152,22 +152,36 @@ class ProfileInfoScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
-          ElevatedButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(LucideIcons.edit2, color: Colors.white, size: 20),
-            label: const Text(
-              'تعديل الملف الشخصي',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 18, 
-                fontWeight: FontWeight.bold, 
-                color: Colors.white
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: NabeehColors.dark,
-              minimumSize: const Size(double.infinity, 60),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: TextButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(LucideIcons.edit2, color: Colors.white, size: 20),
+              label: const Text(
+                'تعديل الملف الشخصي',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
             ),
           ),
           const SizedBox(height: 15),

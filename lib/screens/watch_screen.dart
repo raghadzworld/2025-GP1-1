@@ -118,6 +118,8 @@ Widget _buildHeader(BuildContext context) {
   Widget _buildWatchHeroCard() {
     return BentoCard(
       padding: const EdgeInsets.all(24),
+      borderRadius: 16,
+      border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -128,7 +130,7 @@ Widget _buildHeader(BuildContext context) {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    /*const Text(
                       'الساعة المتصلة',
                       style: TextStyle(
                         fontFamily: 'IBMPlexSansArabic',
@@ -136,13 +138,13 @@ Widget _buildHeader(BuildContext context) {
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF181059),
                       ),
-                    ),
+                    )*/
                     const SizedBox(height: 6),
                     Text(
-                      _deviceName,
+                      'حـالة الساعـة:',
                       style: const TextStyle(
                         fontFamily: 'IBMPlexSansArabic',
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF181059),
                         height: 1.2,
@@ -151,26 +153,6 @@ Widget _buildHeader(BuildContext context) {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // 👇 Watch icon – EXACT match from HomeScreen
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF1F1F1), Color(0xFFF3F3F3)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF9F9F9F)),
-                ),
-                child: const Icon(
-                  Icons.watch_rounded,
-                  color: NabeehColors.darkBlue,
-                  size: 24,
                 ),
               ),
             ],
@@ -222,7 +204,6 @@ Widget _buildHeader(BuildContext context) {
                     shape: BoxShape.circle,
                     color: NabeehColors.slate50.withValues(alpha: 0.7),
                   ),
-                  // 👇 Using the same watch icon inside the circle
                   child: const Icon(
                     Icons.watch_rounded,
                     size: 80,
@@ -273,7 +254,8 @@ Widget _buildSyncCard() {
   return SizedBox(
     height: 200,
     child: BentoCard(
-      border: Border.all(width: 0.8, color: NabeehColors.cardBorder),
+      borderRadius: 16,
+      border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
       padding: const EdgeInsets.all(20),
       child: Stack(
         children: [
@@ -287,7 +269,7 @@ Widget _buildSyncCard() {
                   'آخر تزامن',
                   style: TextStyle(
                     fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 10,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF181059),
                   ),
@@ -334,7 +316,8 @@ Widget _buildSyncCard() {
   return SizedBox(
     height: 200,
     child: BentoCard(
-      border: Border.all(width: 0.8, color: NabeehColors.cardBorder),
+      borderRadius: 16,
+      border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,19 +325,19 @@ Widget _buildSyncCard() {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(
-                LucideIcons.battery,
-                color: Colors.green,
-                size: 18,
-              ),
               Text(
                 'البطارية',
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 10,
+                  fontSize: 20,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF181059),
                 ),
+              ),
+              Icon(
+                LucideIcons.battery,
+                color: Colors.green,
+                size: 18,
               ),
             ],
           ),

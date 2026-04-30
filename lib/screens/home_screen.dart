@@ -262,6 +262,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF21277B),
                   decoration: TextDecoration.underline,
+                  decorationThickness: 1.5,
+                  height: 1.8,
                 ),
               ),
             ),

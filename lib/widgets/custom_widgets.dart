@@ -7,6 +7,7 @@ class BentoCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
   final BoxBorder? border;
+  final double? borderRadius;
 
   const BentoCard({
     super.key,
@@ -15,6 +16,7 @@ class BentoCard extends StatelessWidget {
     this.onTap,
     this.color,
     this.border,
+    this.borderRadius,
   });
 
   @override
@@ -26,7 +28,7 @@ class BentoCard extends StatelessWidget {
         padding: padding ?? const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: color ?? Colors.white,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(borderRadius ?? 32),
           border: border ?? Border.all(color: NabeehColors.slate100.withValues(alpha: 0.6)),
           boxShadow: [
             BoxShadow(

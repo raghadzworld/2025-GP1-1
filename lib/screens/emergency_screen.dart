@@ -353,58 +353,68 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               const SizedBox(height: 20),
               _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
               const SizedBox(height: 32),
-              OutlinedButton(
-                onPressed: () async {
-                  setSheetState(() {}); // لإظهار الخطأ إن وُجد
-                  if (nameCtrl.text.trim().isEmpty ||
-                      emailCtrl.text.trim().isEmpty ||
-                      relationCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
-                    );
-                    return;
-                  }
-                  if (!_isValidEmail(emailCtrl.text)) return;
-                  try {
-                    final newContact = EmergencyContact(
-                      name: nameCtrl.text.trim(),
-                      email: emailCtrl.text.trim(),
-                      relation: relationCtrl.text.trim(),
-                    );
-                    final docRef = await _contactsRef!.add(newContact.toFirestore());
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    if (mounted) {
-                      setState(() => _contacts.add(EmergencyContact(
-                        id: docRef.id,
-                        name: newContact.name,
-                        email: newContact.email,
-                        relation: newContact.relation,
-                      )));
-                    }
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('حدث خطأ: $e')),
-                    );
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(
-                    color: Color(0xFF181059),
-                    width: 1.2,
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
                   ),
                 ),
-                child: const Text(
-                  'إضافة',
-                  style: TextStyle(
-                    color: Color(0xFF181059),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                child: TextButton(
+                  onPressed: () async {
+                    setSheetState(() {});
+                    if (nameCtrl.text.trim().isEmpty ||
+                        emailCtrl.text.trim().isEmpty ||
+                        relationCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
+                      );
+                      return;
+                    }
+                    if (!_isValidEmail(emailCtrl.text)) return;
+                    try {
+                      final newContact = EmergencyContact(
+                        name: nameCtrl.text.trim(),
+                        email: emailCtrl.text.trim(),
+                        relation: relationCtrl.text.trim(),
+                      );
+                      final docRef = await _contactsRef!.add(newContact.toFirestore());
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+                      if (mounted) {
+                        setState(() => _contacts.add(EmergencyContact(
+                          id: docRef.id,
+                          name: newContact.name,
+                          email: newContact.email,
+                          relation: newContact.relation,
+                        )));
+                      }
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('حدث خطأ: $e')),
+                      );
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text(
+                    'إضافة',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -511,7 +521,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                     color: NabeehColors.lightBlueBg,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.person_rounded, color: NabeehColors.lightBlue, size: 22),
+                  child: const Icon(Icons.person_rounded, color: Color(0xFF181059), size: 22),
                 ),
                 title: Text(
                   entry.value.name,
@@ -590,42 +600,57 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               const SizedBox(height: 20),
               _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
               const SizedBox(height: 32),
-              OutlinedButton(
-                onPressed: () async {
-                  setSheetState(() {});
-                  if (nameCtrl.text.trim().isEmpty ||
-                      emailCtrl.text.trim().isEmpty ||
-                      relationCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
-                    );
-                    return;
-                  }
-                  if (!_isValidEmail(emailCtrl.text)) return;
-                  final updated = EmergencyContact(
-                    id: contact.id,
-                    name: nameCtrl.text.trim(),
-                    email: emailCtrl.text.trim(),
-                    relation: relationCtrl.text.trim(),
-                  );
-                  if (contact.id.isNotEmpty) {
-                    await _contactsRef?.doc(contact.id).update(updated.toFirestore());
-                  }
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  if (mounted) setState(() => _contacts[index] = updated);
-                },
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: Color(0xFF181059), width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                child: const Text(
-                  'حفظ',
-                  style: TextStyle(
-                    color: Color(0xFF181059),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                child: TextButton(
+                  onPressed: () async {
+                    setSheetState(() {});
+                    if (nameCtrl.text.trim().isEmpty ||
+                        emailCtrl.text.trim().isEmpty ||
+                        relationCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
+                      );
+                      return;
+                    }
+                    if (!_isValidEmail(emailCtrl.text)) return;
+                    final updated = EmergencyContact(
+                      id: contact.id,
+                      name: nameCtrl.text.trim(),
+                      email: emailCtrl.text.trim(),
+                      relation: relationCtrl.text.trim(),
+                    );
+                    if (contact.id.isNotEmpty) {
+                      await _contactsRef?.doc(contact.id).update(updated.toFirestore());
+                    }
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    if (mounted) setState(() => _contacts[index] = updated);
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text(
+                    'حفظ',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -734,40 +759,42 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                           ),
                         ),
                         const Spacer(),
-                        TextButton(
+                        OutlinedButton(
                           onPressed: _contacts.isNotEmpty ? _selectContactForEdit : null,
-                          style: TextButton.styleFrom(
-                            foregroundColor: Color(0xFF181059),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            minimumSize: const Size(90, 44),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(color: NabeehColors.cardBorder, width: 1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            side: const BorderSide(color: Color(0xFF181059), width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           child: const Text(
                             'تعديل',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF181059),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        TextButton(
+                        OutlinedButton(
                           onPressed: _contacts.isNotEmpty ? _selectContactForDelete : null,
-                          style: TextButton.styleFrom(
-                            backgroundColor: Colors.red.withValues(alpha: 0.08),
-                            foregroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            minimumSize: const Size(90, 44),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(color: NabeehColors.cardBorder, width: 1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           child: const Text(
                             'حذف',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.redAccent,
+                            ),
                           ),
                         ),
                       ],
@@ -924,7 +951,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: NabeehColors.cardBorder),
+          border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
         ),
         child: Row(
           children: [

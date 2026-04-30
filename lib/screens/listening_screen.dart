@@ -52,34 +52,19 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: NabeehColors.background,
-        body: Stack(
-          children: [
-            // Top Gradient Background
-            Container(
-              height: 250,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFB8D4F0), Colors.white],
-                ),
-              ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  _buildHeader(),
-                  const SizedBox(height: 60),
-                  _buildMicAndWaves(),
-                  const Spacer(),
-                  _buildCurrentSoundCard(),
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ],
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 60),
+              _buildMicAndWaves(),
+              const Spacer(),
+              _buildCurrentSoundCard(),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
@@ -88,7 +73,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, bottom: 24, right: 24, left: 24),
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
