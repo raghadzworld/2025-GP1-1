@@ -53,7 +53,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
-  void _confirmDelete(String reminderId) {
+void _confirmDelete(String reminderId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -80,34 +80,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
             actions: [
               Row(
                 children: [
+                  // 1. Delete Button (First in RTL = Right Side) - NOW OUTLINED
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        fixedSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'إلغاء',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic', 
-                          color: NabeehColors.slate500, 
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
+                    child: OutlinedButton(
                       onPressed: () {
                         Navigator.pop(context); 
                         _deleteReminder(reminderId); 
                       },
-                      style: ElevatedButton.styleFrom(
+                      style: OutlinedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
-                        backgroundColor: Colors.red,
+                        // Matching the red outline from the Settings screen
+                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
@@ -115,7 +98,30 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         style: TextStyle(
                           fontFamily: 'IBMPlexSansArabic', 
                           fontWeight: FontWeight.bold, 
-                          color: Colors.white,
+                          color: Colors.redAccent, // Red text instead of white
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 2. Cancel Button (Second in RTL = Left Side)
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)), 
+                        ),
+                      ),
+                      child: const Text(
+                        'إلغاء',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic', 
+                          color: NabeehColors.slate500, 
+                          fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
@@ -219,22 +225,49 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+Widget _buildHeader() {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Expanded(
-            child: Text(
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // 1. Grouped Back Button and Text (Anchored to the Right in RTL)
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  // Replaced solid color with the gradient
+                  gradient: const LinearGradient(
+                    colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                    stops: [0.09, 0.30, 1.0],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  // Matched the border to the other button
+                  border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+                ),
+                child: const Directionality(
+                  textDirection: TextDirection.ltr,
+                  // Changed icon color to white so it's visible on the dark gradient
+                  child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
               'المنبهات',
               style: TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
@@ -242,35 +275,43 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF181059),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
-              ),
-              child: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
 
+        // 2. Sign Language Button
+        GestureDetector(
+          onTap: () {
+             // Add your gesture button action here
+          },
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: NabeehColors.background,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildAlarmCard(String reminderId, Map<String, dynamic> alarm) {
     final bool isActive = alarm['isEnabled'] ?? false;
     final String timeString = alarm['time'] ?? '00:00';
@@ -290,7 +331,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
         color: isActive ? NabeehColors.background : NabeehColors.slate50,
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: isActive ? NabeehColors.lightBlue : NabeehColors.slate100,
+          color: isActive ? Color(0xFF181059) : NabeehColors.slate100,
           width: isActive ? 2 : 1,
         ),
         boxShadow: isActive
@@ -335,7 +376,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
               Switch(
                 value: isActive,
                 activeColor: NabeehColors.background,
-                activeTrackColor: NabeehColors.lightBlue,
+                activeTrackColor: Color(0xFF181059),
                 inactiveThumbColor: NabeehColors.slate400,
                 inactiveTrackColor: NabeehColors.slate200,
                 trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
@@ -368,7 +409,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                             fontFamily: 'IBMPlexSansArabic',
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
-                            color: isActive ? NabeehColors.lightBlue : NabeehColors.slate500,
+                            color: isActive ? Color(0xFF181059) : NabeehColors.slate500,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -410,41 +451,45 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  Widget _buildAddButton() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF181059), Color(0xFF1773CF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1.5,
+Widget _buildAddButton() {
+  return Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(14),
+      gradient: const LinearGradient(
+        colors: [Color(0xFF181059), Color(0xFF1773CF)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.25),
+        width: 1.5,
+      ),
+    ),
+    child: TextButton.icon(
+      onPressed: () {
+        // Your exact function from the top code
+        Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (context) => const AddReminderScreen())
+        );
+      },
+      icon: const Icon(LucideIcons.plus, color: Colors.white),
+      label: const Text(
+        'إضافة منبه جديد',
+        style: TextStyle(
+          fontFamily: 'IBMPlexSansArabic',
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2,
+          fontSize: 14,
         ),
       ),
-      child: TextButton.icon(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddReminderScreen()));
-        },
-        icon: const Icon(LucideIcons.plus, color: Colors.white),
-        label: const Text(
-          'إضافة منبه جديد',
-          style: TextStyle(
-            fontFamily: 'IBMPlexSansArabic',
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
-            fontSize: 14,
-          ),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-    );
-  }
+    ),
+  );
+}
 }

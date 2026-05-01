@@ -218,36 +218,70 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Text(
-              widget.reminderId == null ? 'إضافة منبه' : 'تعديل منبه',
-              style: const TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF181059),
+          // 1. Grouped Back Button and Dynamic Text (Anchored to the Right in RTL)
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                      stops: [0.09, 0.30, 1.0],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+                  ),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 12),
+              Text(
+                // Kept your dynamic title logic
+                widget.reminderId == null ? 'إضافة منبه' : 'تعديل منبه',
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+              ),
+            ],
           ),
+
+          // 2. Sign Language Button (Pushed to the far Left in RTL)
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+               // Add your gesture button action here
+            },
             child: Container(
-              width: 44,
-              height: 44,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
                   stops: [0.09, 0.30, 1.0],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
-              child: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Image.asset(
+                  'assets/images/icon_signLan.png',
+                  color: NabeehColors.background,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -654,7 +688,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     );
   }
 
-  Widget _buildBottomActions() {
+Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: const BoxDecoration(
@@ -663,43 +697,68 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'إلغاء',
-                style: TextStyle(
-                  color: NabeehColors.slate400,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  fontFamily: 'IBMPlexSansArabic',
+          // 1. Add Reminder Button (Right Side in RTL)
+          Expanded( // 👇 Removed "flex: 2" so it matches the Cancel button
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.5,
+                ),
+              ),
+              child: TextButton(
+                onPressed: _isLoading ? null : _saveReminder,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: _isLoading 
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text(
+                      widget.reminderId == null ? 'إضافة المنبه' : 'تحديث المنبه',
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
               ),
             ),
           ),
+          
           const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              // 👇 Connected to Backend Logic
-              onPressed: _isLoading ? null : _saveReminder,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: NabeehColors.dark,
-                foregroundColor: NabeehColors.background,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
+          
+          // 2. Cancel Button (Left Side in RTL)
+          Expanded( // 👇 Matches the first button for a perfect 50/50 split
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
               ),
-              child: _isLoading 
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: NabeehColors.background, strokeWidth: 2))
-                : Text(
-                    widget.reminderId == null ? 'إضافة المنبه' : 'تحديث المنبه',
-                    style: const TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                    ),
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    color: NabeehColors.slate500,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                    fontFamily: 'IBMPlexSansArabic',
                   ),
+                ),
+              ),
             ),
           ),
         ],
