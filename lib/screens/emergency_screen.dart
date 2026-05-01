@@ -419,20 +419,18 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              // Back button
               OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
-                  'تراجع',
+                  'إلغاء',
                   style: TextStyle(
-                    color: Colors.redAccent,
+                    fontFamily: 'IBMPlexSansArabic',
+                    color: Colors.grey,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -466,15 +464,96 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     });
   }
 
+  Future<void> _confirmDeleteContact(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text(
+                'حذف جهة الاتصال',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontWeight: FontWeight.bold,
+                  color: Colors.redAccent,
+                  fontSize: 20,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'هل أنت متأكد من رغبتك في حذف جهة الاتصال هذه نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+            style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 15),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    style: OutlinedButton.styleFrom(
+                      fixedSize: const Size.fromHeight(50),
+                      side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      'حذف نهائي',
+                      style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontWeight: FontWeight.bold,
+                        color: Colors.redAccent,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    style: TextButton.styleFrom(
+                      fixedSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
+                      ),
+                    ),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true) _deleteContact(index);
+  }
+
   void _selectContactForDelete() {
     if (_contacts.isEmpty) return;
     if (_contacts.length == 1) {
-      _deleteContact(0);
+      _confirmDeleteContact(0);
       return;
     }
     _showContactSelectorSheet(onSelect: (index) {
       Navigator.pop(context);
-      _deleteContact(index);
+      _confirmDeleteContact(index);
     });
   }
 
@@ -659,13 +738,14 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 onPressed: () => Navigator.pop(ctx),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                  side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
-                  'تراجع',
+                  'إلغاء',
                   style: TextStyle(
-                    color: Colors.redAccent,
+                    fontFamily: 'IBMPlexSansArabic',
+                    color: Colors.grey,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -785,15 +865,18 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             minimumSize: const Size(90, 44),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                            side: BorderSide(
+                              color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade300,
+                              width: 1.2,
+                            ),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Text(
+                          child: Text(
                             'حذف',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Colors.redAccent,
+                              color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade400,
                             ),
                           ),
                         ),
