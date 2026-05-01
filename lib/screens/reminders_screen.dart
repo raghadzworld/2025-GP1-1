@@ -19,7 +19,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (currentUser == null) return;
     try {
       await FirebaseFirestore.instance
-          .collection('User') // Using exact User collection
+          .collection('User')
           .doc(currentUser!.uid)
           .collection('Reminders')
           .doc(reminderId)
@@ -53,7 +53,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
-void _confirmDelete(String reminderId) {
+  void _confirmDelete(String reminderId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -80,7 +80,7 @@ void _confirmDelete(String reminderId) {
             actions: [
               Row(
                 children: [
-                  // 1. Delete Button (First in RTL = Right Side) - NOW OUTLINED
+                  // 1. Delete Button (Right Side in RTL)
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
@@ -89,41 +89,56 @@ void _confirmDelete(String reminderId) {
                       },
                       style: OutlinedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
-                        // Matching the red outline from the Settings screen
+                        padding: EdgeInsets.zero,
                         side: const BorderSide(color: Colors.redAccent, width: 1.2),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'حذف',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic', 
-                          fontWeight: FontWeight.bold, 
-                          color: Colors.redAccent, // Red text instead of white
-                          fontSize: 16,
-                        ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'حذف',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic', 
+                              fontWeight: FontWeight.bold, 
+                              color: Colors.redAccent,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // 2. Cancel Button (Second in RTL = Left Side)
+                  // 2. Cancel Button (Left Side in RTL)
                   Expanded(
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
                       style: TextButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
+                        padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)), 
                         ),
                       ),
-                      child: const Text(
-                        'إلغاء',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic', 
-                          color: NabeehColors.slate500, 
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic', 
+                              color: NabeehColors.slate500, 
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -225,102 +240,100 @@ void _confirmDelete(String reminderId) {
     );
   }
 
-Widget _buildHeader() {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // 1. Grouped Back Button and Text (Anchored to the Right in RTL)
-        Row(
-          children: [
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  // Replaced solid color with the gradient
-                  gradient: const LinearGradient(
-                    colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
-                    stops: [0.09, 0.30, 1.0],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  // Matched the border to the other button
-                  border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
-                ),
-                child: const Directionality(
-                  textDirection: TextDirection.ltr,
-                  // Changed icon color to white so it's visible on the dark gradient
-                  child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'المنبهات',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF181059),
-              ),
-            ),
-          ],
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-
-        // 2. Sign Language Button
-        GestureDetector(
-          onTap: () {
-             // Add your gesture button action here
-          },
-          child: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
-                stops: [0.09, 0.30, 1.0],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF181059),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr, 
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded, 
+                      color: Color(0xFF181059), 
+                      size: 18),
+                  ),
+                ),
               ),
-              border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: NabeehColors.background,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
+              const SizedBox(width: 12),
+              const Text(
+                'المنبهات',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+              ),
+            ],
+          ),
+          GestureDetector(
+            onTap: () {},
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                  stops: [0.09, 0.30, 1.0],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Image.asset(
+                  'assets/images/icon_signLan.png',
+                  color: NabeehColors.background,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
+
   Widget _buildAlarmCard(String reminderId, Map<String, dynamic> alarm) {
     final bool isActive = alarm['isEnabled'] ?? false;
     final String timeString = alarm['time'] ?? '00:00';
     final String label = alarm['label'] ?? 'منبه';
     
     final List<dynamic> daysArray = alarm['daysActive'] ?? [];
-    final String daysText = daysArray.isEmpty ? 'مرة واحدة' : daysArray.join('، ');
+    
+    // 👇 Returns empty string if no days, avoiding "مرة واحدة"
+    final String daysText = daysArray.isEmpty ? '' : daysArray.join('، ');
+    
+    // 👇 If daysText is empty, just show the label. Otherwise show Label • Days
+    final String bottomText = daysText.isEmpty ? label : '$label • $daysText';
 
-    // 👇 FIXED: Much simpler and 100% accurate AM/PM check
     final bool isAm = timeString.contains('ص');
 
     return AnimatedContainer(
@@ -331,7 +344,7 @@ Widget _buildHeader() {
         color: isActive ? NabeehColors.background : NabeehColors.slate50,
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: isActive ? Color(0xFF181059) : NabeehColors.slate100,
+          color: isActive ? const Color(0xFF181059) : NabeehColors.slate100,
           width: isActive ? 2 : 1,
         ),
         boxShadow: isActive
@@ -351,32 +364,48 @@ Widget _buildHeader() {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Label above the time
                   Text(
-                    timeString.replaceAll('ص', '').replaceAll('م', '').trim(), 
+                    label,
                     style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 48,
-                      fontWeight: FontWeight.w900,
-                      color: isActive ? NabeehColors.darkBlue : NabeehColors.slate400,
-                      letterSpacing: -2,
-                      height: 1.1,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isActive ? NabeehColors.lightBlue : NabeehColors.slate400,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Icon(
-                    isAm ? LucideIcons.sun : LucideIcons.moon,
-                    size: 28,
-                    color: isActive ? (isAm ? NabeehColors.yellow : NabeehColors.darkBlue) : NabeehColors.slate300,
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        timeString.replaceAll('ص', '').replaceAll('م', '').trim(),
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? NabeehColors.darkBlue : NabeehColors.slate400,
+                          letterSpacing: -2,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        isAm ? LucideIcons.sun : LucideIcons.moon,
+                        size: 22,
+                        color: isActive ? (isAm ? NabeehColors.yellow : NabeehColors.darkBlue) : NabeehColors.slate300,
+                      ),
+                    ],
                   ),
                 ],
               ),
               Switch(
                 value: isActive,
                 activeColor: NabeehColors.background,
-                activeTrackColor: Color(0xFF181059),
+                activeTrackColor: const Color(0xFF181059),
                 inactiveThumbColor: NabeehColors.slate400,
                 inactiveTrackColor: NabeehColors.slate200,
                 trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
@@ -387,61 +416,96 @@ Widget _buildHeader() {
             ],
           ),
           const SizedBox(height: 16),
-          
+
+          // Days chip row
+          if (daysText.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isActive ? NabeehColors.lightBlue.withOpacity(0.05) : NabeehColors.slate100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.bellRing, size: 13, color: isActive ? NabeehColors.lightBlue : NabeehColors.slate500),
+                    const SizedBox(width: 6),
+                    Text(
+                      daysText,
+                      style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isActive ? const Color(0xFF181059) : NabeehColors.slate500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Edit & Delete rectangle buttons
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isActive ? NabeehColors.lightBlue.withOpacity(0.05) : NabeehColors.slate100,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(LucideIcons.bellRing, size: 14, color: isActive ? NabeehColors.lightBlue : NabeehColors.slate500),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '$label • $daysText',
+                child: GestureDetector(
+                  onTap: () => _editAlarm(reminderId, alarm),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: NabeehColors.darkBlue, width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(LucideIcons.edit2, size: 16, color: NabeehColors.darkBlue),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'تعديل',
                           style: TextStyle(
                             fontFamily: 'IBMPlexSansArabic',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: isActive ? Color(0xFF181059) : NabeehColors.slate500,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: NabeehColors.darkBlue,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              
-              GestureDetector(
-                onTap: () => _editAlarm(reminderId, alarm),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: NabeehColors.slate100,
-                    shape: BoxShape.circle,
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _confirmDelete(reminderId),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.redAccent, width: 1.2),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.trash2, size: 16, color: Colors.redAccent),
+                        SizedBox(width: 6),
+                        Text(
+                          'حذف',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Icon(LucideIcons.edit2, size: 18, color: NabeehColors.slate500),
-                ),
-              ),
-              const SizedBox(width: 8),
-              
-              GestureDetector(
-                onTap: () => _confirmDelete(reminderId),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(LucideIcons.trash2, size: 18, color: Colors.red),
                 ),
               ),
             ],
@@ -451,45 +515,45 @@ Widget _buildHeader() {
     );
   }
 
-Widget _buildAddButton() {
-  return Container(
-    width: double.infinity,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(14),
-      gradient: const LinearGradient(
-        colors: [Color(0xFF181059), Color(0xFF1773CF)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      border: Border.all(
-        color: Colors.white.withValues(alpha: 0.25),
-        width: 1.5,
-      ),
-    ),
-    child: TextButton.icon(
-      onPressed: () {
-        // Your exact function from the top code
-        Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (context) => const AddReminderScreen())
-        );
-      },
-      icon: const Icon(LucideIcons.plus, color: Colors.white),
-      label: const Text(
-        'إضافة منبه جديد',
-        style: TextStyle(
-          fontFamily: 'IBMPlexSansArabic',
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2,
-          fontSize: 14,
+  Widget _buildAddButton() {
+    return Container(
+      height: 60,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1.5,
         ),
       ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: TextButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (context) => const AddReminderScreen())
+          );
+        },
+        icon: const Icon(LucideIcons.plus, color: Colors.white),
+        label: const Text(
+          'إضافة منبه جديد',
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            color: Colors.white,
+            letterSpacing: 2,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

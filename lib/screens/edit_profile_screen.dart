@@ -14,6 +14,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController(); 
   bool _isLoading = false;
 
   @override
@@ -32,6 +33,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           setState(() {
             _nameController.text = data['FullName'] ?? '';
             _phoneController.text = data['PhoneNumber'] ?? '';
+            _emailController.text = data['Email'] ?? user.email ?? ''; 
           });
         }
       } catch (e) {
@@ -46,10 +48,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        final newEmail = _emailController.text.trim();
+
+        // 1. Update Firestore Data
         await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
           'FullName': _nameController.text.trim(),
           'PhoneNumber': _phoneController.text.trim(),
+          'Email': newEmail,
         }, SetOptions(merge: true));
+
+        // 2. Attempt to update Firebase Auth Email
+        if (user.email != newEmail && newEmail.isNotEmpty) {
+          try {
+            await user.updateEmail(newEmail); 
+          } catch (e) {
+            debugPrint("Auth email update warning: $e");
+          }
+        }
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -79,6 +94,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose(); 
     super.dispose();
   }
 
@@ -95,51 +111,66 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _buildHeader(context),
               const SizedBox(height: 30),
                   
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20), // Replaced Avatar with just spacing
-                          
-                          _buildTextField(
-                            controller: _nameController,
-                            label: 'الاسم الكامل',
-                            icon: LucideIcons.user,
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          _buildTextField(
-                            controller: _phoneController,
-                            label: 'رقم الهاتف',
-                            icon: LucideIcons.phone,
-                            keyboardType: TextInputType.phone,
-                          ),
-                          const SizedBox(height: 60),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      
+                      _buildTextField(
+                        controller: _nameController,
+                        label: 'الاسم الكامل',
+                        icon: LucideIcons.user,
+                      ),
+                      const SizedBox(height: 20),
 
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: TextButton(
-                              onPressed: _isLoading ? null : _saveProfile,
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                              child: _isLoading
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text(
+                      _buildTextField(
+                        controller: _emailController,
+                        label: 'الايميل',
+                        icon: LucideIcons.mail,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      _buildTextField(
+                        controller: _phoneController,
+                        label: 'رقم الهاتف',
+                        icon: LucideIcons.phone,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 60),
+
+                      // Updated Save Button
+                      Container(
+                        height: 60, // Enforced height
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: TextButton(
+                          onPressed: _isLoading ? null : _saveProfile,
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero, // Removed padding to respect the 60 height
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(LucideIcons.save, color: Colors.white, size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
                                       'حفظ التغييرات',
                                       style: TextStyle(
                                         fontFamily: 'IBMPlexSansArabic',
@@ -148,18 +179,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         color: Colors.white,
                                       ),
                                     ),
-                            ),
-                          ),
-                          const SizedBox(height: 40), 
-                        ],
+                                  ],
+                                ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 40), 
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        );
+        ),
+      ),
+    );
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -176,22 +209,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Expanded(
-            child: Text(
-              'تعديل الملف',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF181059),
+          // 1. Grouped Back Button and Text (Anchored to the Right in RTL)
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 44, // Matched size
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15), // Login screen glass style
+                    border: Border.all(
+                      color: const Color(0xFF181059), // 👈 Changed the border to dark blue!
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr, // Ensures arrow points Right
+                    child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF181059), size: 18),
+                  ),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 12),
+              const Text(
+                'تعديل الملف',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
+
+          // 2. Sign Language Gesture Button (Left Side)
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+               // Add your gesture button action here
+            },
             child: Container(
-              width: 44,
+              width: 44, // Matched size
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -203,9 +263,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
-              child: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+              child: Padding(
+                padding: const EdgeInsets.all(10), // Matched padding
+                child: Image.asset(
+                  'assets/images/icon_signLan.png',
+                  color: NabeehColors.background,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -232,7 +297,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontWeight: FontWeight.normal),
-        prefixIcon: Icon(icon, color: Color(0xFF181059), size: 22),
+        prefixIcon: Icon(icon, color: const Color(0xFF181059), size: 22),
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(

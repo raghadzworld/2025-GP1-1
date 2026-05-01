@@ -32,7 +32,7 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
-// 👇 2. Firebase Delete Account Logic
+  // 👇 2. Firebase Delete Account Logic
   Future<void> _deleteAccount(BuildContext context) async {
     // إظهار مؤشر التحميل
     showDialog(
@@ -176,100 +176,137 @@ class SettingsScreen extends StatelessWidget {
                 actions: [
                   Row(
                     children: [
+                      // 1. SAVE BUTTON (Right Side in RTL)
                       Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: TextButton.styleFrom(
-                            fixedSize: const Size.fromHeight(50), 
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Container(
+                          height: 50,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            // Apply gradient only if valid
+                            gradient: isAllValid
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            // Fallback color if disabled
+                            color: isAllValid ? null : NabeehColors.slate300,
                           ),
-                          child: const Text(
-                            'إلغاء',
-                            style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic',
-                              color: NabeehColors.slate500,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          child: ElevatedButton(
+                            // Disable button if rules aren't met
+                            onPressed: isAllValid ? () async {
+                              try {
+                                // 1. إظهار مؤشر التحميل (Loading Indicator)
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => const Center(child: CircularProgressIndicator(color: NabeehColors.lightBlue)),
+                                );
+
+                                final user = FirebaseAuth.instance.currentUser;
+                                if (user != null && user.email != null) {
+                                  
+                                  // 2. إعادة المصادقة باستخدام كلمة المرور الحالية (مطلوب من فايربيس للأمان)
+                                  final credential = EmailAuthProvider.credential(
+                                    email: user.email!,
+                                    password: currentPasswordCtrl.text,
+                                  );
+                                  await user.reauthenticateWithCredential(credential);
+
+                                  // 3. تحديث كلمة المرور
+                                  await user.updatePassword(newPasswordCtrl.text);
+
+                                  // 4. إغلاق مؤشر التحميل ونافذة التغيير
+                                  if (context.mounted) {
+                                    Navigator.pop(context); // إغلاق التحميل
+                                    Navigator.pop(context); // إغلاق النافذة
+                                    
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('تم تغيير كلمة المرور بنجاح!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } on FirebaseAuthException catch (e) {
+                                if (context.mounted) Navigator.pop(context); // إغلاق التحميل في حال الخطأ
+                                
+                                String message = 'حدث خطأ أثناء التغيير. الرجاء المحاولة لاحقاً.';
+                                if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+                                  message = 'كلمة المرور الحالية غير صحيحة.';
+                                } else if (e.code == 'network-request-failed') {
+                                  message = 'تأكد من اتصالك بالإنترنت.';
+                                }
+                                
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(message, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) Navigator.pop(context);
+                                debugPrint('Error updating password: $e');
+                              }
+                            } : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent, // Allow gradient to show
+                              shadowColor: Colors.transparent, // Remove shadow
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(LucideIcons.save, color: Colors.white, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  'حفظ',
+                                  style: TextStyle(
+                                    fontFamily: 'IBMPlexSansArabic', 
+                                    fontWeight: FontWeight.bold, 
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
+                      // 2. CANCEL BUTTON (Left Side in RTL)
                       Expanded(
-                        child: ElevatedButton(
-                          // Disable button if rules aren't met
-                          onPressed: isAllValid ? () async {
-                            try {
-                              // 1. إظهار مؤشر التحميل (Loading Indicator)
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => const Center(child: CircularProgressIndicator(color: NabeehColors.lightBlue)),
-                              );
-
-                              final user = FirebaseAuth.instance.currentUser;
-                              if (user != null && user.email != null) {
-                                
-                                // 2. إعادة المصادقة باستخدام كلمة المرور الحالية (مطلوب من فايربيس للأمان)
-                                final credential = EmailAuthProvider.credential(
-                                  email: user.email!,
-                                  password: currentPasswordCtrl.text,
-                                );
-                                await user.reauthenticateWithCredential(credential);
-
-                                // 3. تحديث كلمة المرور
-                                await user.updatePassword(newPasswordCtrl.text);
-
-                                // 4. إغلاق مؤشر التحميل ونافذة التغيير
-                                if (context.mounted) {
-                                  Navigator.pop(context); // إغلاق التحميل
-                                  Navigator.pop(context); // إغلاق النافذة
-                                  
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('تم تغيير كلمة المرور بنجاح!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                }
-                              }
-                            } on FirebaseAuthException catch (e) {
-                              if (context.mounted) Navigator.pop(context); // إغلاق التحميل في حال الخطأ
-                              
-                              String message = 'حدث خطأ أثناء التغيير. الرجاء المحاولة لاحقاً.';
-                              if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-                                message = 'كلمة المرور الحالية غير صحيحة.';
-                              } else if (e.code == 'network-request-failed') {
-                                message = 'تأكد من اتصالك بالإنترنت.';
-                              }
-                              
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(message, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) Navigator.pop(context);
-                              debugPrint('Error updating password: $e');
-                            }
-                          } : null,
-                          style: ElevatedButton.styleFrom(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
                             fixedSize: const Size.fromHeight(50), 
-                            // Change color based on validity
-                            backgroundColor: isAllValid ? NabeehColors.lightBlue : NabeehColors.slate300,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text(
-                            'حفظ',
-                            style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic', 
-                              fontWeight: FontWeight.bold, 
-                              color: Colors.white,
-                              fontSize: 16,
+                            backgroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
                             ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                              SizedBox(width: 6),
+                              Text(
+                                'إلغاء',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  color: NabeehColors.slate500,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -337,10 +374,10 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-void _confirmDeleteAccount(BuildContext context) {
+  void _confirmDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) { // 👈 Changed to dialogContext
+      builder: (BuildContext dialogContext) { 
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
@@ -364,28 +401,7 @@ void _confirmDeleteAccount(BuildContext context) {
             actions: [
               Row(
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      style: TextButton.styleFrom(
-                        fixedSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
-                        ),
-                      ),
-                      child: const Text(
-                        'إلغاء',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          color: NabeehColors.slate500,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+                  // 1. DELETE BUTTON (Right Side in RTL)
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
@@ -394,17 +410,167 @@ void _confirmDeleteAccount(BuildContext context) {
                       },
                       style: OutlinedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
+                        padding: EdgeInsets.zero,
                         side: const BorderSide(color: Colors.redAccent, width: 1.2),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'حذف نهائي',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontWeight: FontWeight.bold,
-                          color: Colors.redAccent,
-                          fontSize: 16,
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'حذف نهائي',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.redAccent,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 2. CANCEL BUTTON (Left Side in RTL)
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: TextButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
                         ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: NabeehColors.slate500,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 👇 4. NEW: Confirm Logout Dialog
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) { 
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(LucideIcons.logOut, color: NabeehColors.darkBlue),
+                SizedBox(width: 10),
+                Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: NabeehColors.darkBlue),
+                ),
+              ],
+            ),
+            content: const Text(
+              'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            actions: [
+              Row(
+                children: [
+                  // 1. LOGOUT BUTTON (Right Side in RTL) - Gradient
+                  Expanded(
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext); // Close the dialog
+                          _logout(context); // Proceed with logout
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(LucideIcons.logOut, color: Colors.white, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'تأكيد',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 2. CANCEL BUTTON (Left Side in RTL) - Outline
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: TextButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        backgroundColor: Colors.white,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: NabeehColors.slate500,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -445,25 +611,37 @@ void _confirmDeleteAccount(BuildContext context) {
                   
                   const Spacer(),
                   
+                  // 👇 Updated Main Logout Button 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: OutlinedButton.icon(
-                      onPressed: () => _logout(context),
-                      icon: const Icon(LucideIcons.logOut, color: NabeehColors.dark, size: 20), 
-                      label: const Text(
-                        'تسجيل الخروج',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 18, 
-                          fontWeight: FontWeight.bold,
-                          color: NabeehColors.dark 
+                    child: Container(
+                      height: 60,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 60),
-                        side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _confirmLogout(context), // Triggers the new dialog
+                        icon: const Icon(LucideIcons.logOut, color: Colors.white, size: 20), 
+                        label: const Text(
+                          'تسجيل الخروج',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 18, 
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white // Changed to white for contrast
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent, // Makes gradient visible
+                          shadowColor: Colors.transparent, // Removes shadow
+                          minimumSize: const Size(double.infinity, 60),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
                       ),
                     ),
                   ),
@@ -478,7 +656,7 @@ void _confirmDeleteAccount(BuildContext context) {
   Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, bottom: 24, right: 24, left: 24),
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -489,20 +667,50 @@ void _confirmDeleteAccount(BuildContext context) {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Expanded(
-            child: Text(
-              'الإعدادات',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF181059),
+          // 1. Grouped Back Button and Text (Anchored to the Right in RTL)
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF181059), // 👈 Dark blue border
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr, 
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded, 
+                      color: Color(0xFF181059), 
+                      size: 18),
+                  ),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 12),
+              const Text(
+                'الإعدادات',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
+
+          // 2. Sign Language Button (Left Side)
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+               // Add your gesture button action here
+            },
             child: Container(
               width: 44,
               height: 44,
@@ -516,9 +724,14 @@ void _confirmDeleteAccount(BuildContext context) {
                 ),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
-              child: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Image.asset(
+                  'assets/images/icon_signLan.png',
+                  color: NabeehColors.background,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -556,7 +769,7 @@ void _confirmDeleteAccount(BuildContext context) {
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 16,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.bold,
                   color: titleColor,
                 ),
               ),

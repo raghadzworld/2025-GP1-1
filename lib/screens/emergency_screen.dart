@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -340,101 +341,124 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              _buildFormField(label: 'الاسم:', controller: nameCtrl),
+              _buildFormField(label: 'الاسم:', controller: nameCtrl, icon: Icons.person_outline),
               const SizedBox(height: 20),
               _buildFormField(
                 label: 'الايميل:',
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
+                icon: Icons.email_outlined,
                 errorText: emailCtrl.text.isNotEmpty && !_isValidEmail(emailCtrl.text)
                     ? 'صيغة البريد الإلكتروني غير صحيحة'
                     : null,
               ),
               const SizedBox(height: 20),
-              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
+              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl, icon: Icons.people_outline),
               const SizedBox(height: 32),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                ),
-                child: TextButton(
-                  onPressed: () async {
-                    setSheetState(() {});
-                    if (nameCtrl.text.trim().isEmpty ||
-                        emailCtrl.text.trim().isEmpty ||
-                        relationCtrl.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
-                      );
-                      return;
-                    }
-                    if (!_isValidEmail(emailCtrl.text)) return;
-                    try {
-                      final newContact = EmergencyContact(
-                        name: nameCtrl.text.trim(),
-                        email: emailCtrl.text.trim(),
-                        relation: relationCtrl.text.trim(),
-                      );
-                      final docRef = await _contactsRef!.add(newContact.toFirestore());
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (mounted) {
-                        setState(() => _contacts.add(EmergencyContact(
-                          id: docRef.id,
-                          name: newContact.name,
-                          email: newContact.email,
-                          relation: newContact.relation,
-                        )));
-                      }
-                    } catch (e) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('حدث خطأ: $e')),
-                      );
-                    }
-                  },
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text(
-                    'إضافة',
-                    style: TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: TextButton(
+                        onPressed: () async {
+                          setSheetState(() {});
+                          if (nameCtrl.text.trim().isEmpty ||
+                              emailCtrl.text.trim().isEmpty ||
+                              relationCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
+                            );
+                            return;
+                          }
+                          if (!_isValidEmail(emailCtrl.text)) return;
+                          try {
+                            final newContact = EmergencyContact(
+                              name: nameCtrl.text.trim(),
+                              email: emailCtrl.text.trim(),
+                              relation: relationCtrl.text.trim(),
+                            );
+                            final docRef = await _contactsRef!.add(newContact.toFirestore());
+                            if (!ctx.mounted) return;
+                            Navigator.pop(ctx);
+                            if (mounted) {
+                              setState(() => _contacts.add(EmergencyContact(
+                                id: docRef.id,
+                                name: newContact.name,
+                                email: newContact.email,
+                                relation: newContact.relation,
+                              )));
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('حدث خطأ: $e')),
+                            );
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 52),
+                          alignment: Alignment.center,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add, color: Colors.white, size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'إضافة',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    color: Colors.grey,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 52),
+                        side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.close, color: Colors.grey, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: Colors.grey,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -503,14 +527,21 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                       side: const BorderSide(color: Colors.redAccent, width: 1.2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text(
-                      'حذف نهائي',
-                      style: TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.redAccent,
-                        fontSize: 16,
-                      ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'حذف نهائي',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -525,14 +556,22 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                         side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
                       ),
                     ),
-                    child: const Text(
-                      'إلغاء',
-                      style: TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        color: Colors.grey,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.close, color: Colors.grey, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'إلغاء',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            color: Colors.grey,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(width: 22),
+                      ],
                     ),
                   ),
                 ),
@@ -666,90 +705,113 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              _buildFormField(label: 'الاسم:', controller: nameCtrl),
+              _buildFormField(label: 'الاسم:', controller: nameCtrl, icon: Icons.person_outline),
               const SizedBox(height: 20),
               _buildFormField(
                 label: 'الايميل:',
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
+                icon: Icons.email_outlined,
                 errorText: emailCtrl.text.isNotEmpty && !_isValidEmail(emailCtrl.text)
                     ? 'صيغة البريد الإلكتروني غير صحيحة'
                     : null,
               ),
               const SizedBox(height: 20),
-              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl),
+              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl, icon: Icons.people_outline),
               const SizedBox(height: 32),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                ),
-                child: TextButton(
-                  onPressed: () async {
-                    setSheetState(() {});
-                    if (nameCtrl.text.trim().isEmpty ||
-                        emailCtrl.text.trim().isEmpty ||
-                        relationCtrl.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
-                      );
-                      return;
-                    }
-                    if (!_isValidEmail(emailCtrl.text)) return;
-                    final updated = EmergencyContact(
-                      id: contact.id,
-                      name: nameCtrl.text.trim(),
-                      email: emailCtrl.text.trim(),
-                      relation: relationCtrl.text.trim(),
-                    );
-                    if (contact.id.isNotEmpty) {
-                      await _contactsRef?.doc(contact.id).update(updated.toFirestore());
-                    }
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    if (mounted) setState(() => _contacts[index] = updated);
-                  },
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text(
-                    'حفظ',
-                    style: TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: TextButton(
+                        onPressed: () async {
+                          setSheetState(() {});
+                          if (nameCtrl.text.trim().isEmpty ||
+                              emailCtrl.text.trim().isEmpty ||
+                              relationCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
+                            );
+                            return;
+                          }
+                          if (!_isValidEmail(emailCtrl.text)) return;
+                          final updated = EmergencyContact(
+                            id: contact.id,
+                            name: nameCtrl.text.trim(),
+                            email: emailCtrl.text.trim(),
+                            relation: relationCtrl.text.trim(),
+                          );
+                          if (contact.id.isNotEmpty) {
+                            await _contactsRef?.doc(contact.id).update(updated.toFirestore());
+                          }
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (mounted) setState(() => _contacts[index] = updated);
+                        },
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 52),
+                          alignment: Alignment.center,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(LucideIcons.save, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'حفظ',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 52),
-                  side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    color: Colors.grey,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 52),
+                        side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.close, color: Colors.grey, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: Colors.grey,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -764,17 +826,27 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     String? errorText,
+    IconData? icon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF181059),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: const Color(0xFF181059)),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF181059),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         TextField(
@@ -849,13 +921,20 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                             side: const BorderSide(color: Color(0xFF181059), width: 1.2),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Text(
-                            'تعديل',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF181059),
-                            ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.edit_outlined, size: 20, color: Color(0xFF181059)),
+                              SizedBox(width: 6),
+                              Text(
+                                'تعديل',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF181059),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -871,13 +950,20 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                             ),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: Text(
-                            'حذف',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade400,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(LucideIcons.trash2, size: 20, color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade400),
+                              const SizedBox(width: 6),
+                              Text(
+                                'حذف',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

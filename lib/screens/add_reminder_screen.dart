@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
 
 class AddReminderScreen extends StatefulWidget {
-  // 👇 Added to support Editing
   final String? reminderId;
   final Map<String, dynamic>? existingData;
 
@@ -16,7 +15,6 @@ class AddReminderScreen extends StatefulWidget {
 }
 
 class _AddReminderScreenState extends State<AddReminderScreen> {
-  // Custom Time Picker State
   late int selectedHour;
   late int selectedMinute;
   late bool isAm;
@@ -25,12 +23,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   late FixedExtentScrollController _minuteController;
   late FixedExtentScrollController _amPmController;
 
-  String label = "منبه جديد";
+  String label = "منبه"; // 👈 Default label set to "منبه"
   String repeat = "مطلقاً";
   double vibrationPowerValue = 1.0;
   String vibrationPattern = "متصل";
   
-  // 👇 Loading state for backend
   bool _isLoading = false;
 
   @override
@@ -38,12 +35,10 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     super.initState();
     final now = DateTime.now();
 
-    // 👇 Check if we are Editing, and populate your exact UI variables
     if (widget.existingData != null) {
       final data = widget.existingData!;
-      label = data['label'] ?? "منبه جديد";
+      label = data['label'] ?? "منبه";
 
-      // Parse daysActive Array back to String
       List<dynamic> daysArray = data['daysActive'] ?? [];
       if (daysArray.isEmpty) {
         repeat = "مطلقاً";
@@ -53,23 +48,19 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
         repeat = daysArray.join('، ');
       }
 
-      // Parse vibration power to your slider double (1=0.0, 2=1.0, 3=2.0)
       int vp = data['vibrationPower'] ?? 2;
       vibrationPowerValue = (vp - 1).clamp(0, 2).toDouble();
 
-      // Parse vibration pattern int back to your string
       int vpat = data['vibrationPattern'] ?? 1;
       List<String> patterns = ['متصل', 'نبضات', 'متقطع', 'تصاعدي'];
       vibrationPattern = (vpat >= 1 && vpat <= patterns.length) ? patterns[vpat - 1] : "متصل";
 
-      // Parse Time String
       String timeStr = data['time'] ?? "12:00 ص";
       isAm = timeStr.contains('ص');
       String cleanStr = timeStr.replaceAll('ص', '').replaceAll('م', '').trim();
       List<String> parts = cleanStr.split(':');
       selectedHour = int.tryParse(parts.isNotEmpty ? parts[0] : '12') ?? 12;
       selectedMinute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
-
     } else {
       selectedHour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
       selectedMinute = now.minute;
@@ -81,17 +72,14 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     _amPmController = FixedExtentScrollController(initialItem: isAm ? 0 : 1);
   }
 
-  // 👇 Save to Firebase Function
   Future<void> _saveReminder() async {
     setState(() => _isLoading = true);
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
-      // 1. Format Time as String
       final timeString = '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')} ${isAm ? 'ص' : 'م'}';
 
-      // 2. Parse Repeat String to Array
       List<String> daysActive = [];
       if (repeat == "كل يوم") {
         daysActive = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -99,21 +87,19 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
         daysActive = repeat.split('، ');
       }
 
-      // 3. Format Integers for DB
       int powerInt = vibrationPowerValue.toInt() + 1;
       int patternInt = ['متصل', 'نبضات', 'متقطع', 'تصاعدي'].indexOf(vibrationPattern) + 1;
       if (patternInt == 0) patternInt = 1;
 
       final reminderData = {
         'label': label,
-        'time': timeString, // explicitly saved as string
+        'time': timeString,
         'daysActive': daysActive,
         'isEnabled': widget.existingData?['isEnabled'] ?? true,
         'vibrationPower': powerInt,
         'vibrationPattern': patternInt,
       };
 
-      // Explicitly using 'User' (singular) as requested
       final remindersRef = FirebaseFirestore.instance.collection('User').doc(uid).collection('Reminders');
 
       if (widget.reminderId == null) {
@@ -218,33 +204,32 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 1. Grouped Back Button and Dynamic Text (Anchored to the Right in RTL)
           Row(
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  width: 50,
-                  height: 50,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
-                      stops: [0.09, 0.30, 1.0],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF181059),
+                      width: 1.5,
                     ),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
                   ),
                   child: const Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+                    textDirection: TextDirection.ltr, 
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded, 
+                      color: Color(0xFF181059), 
+                      size: 18),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Text(
-                // Kept your dynamic title logic
                 widget.reminderId == null ? 'إضافة منبه' : 'تعديل منبه',
                 style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
@@ -255,15 +240,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               ),
             ],
           ),
-
-          // 2. Sign Language Button (Pushed to the far Left in RTL)
           GestureDetector(
-            onTap: () {
-               // Add your gesture button action here
-            },
+            onTap: () {},
             child: Container(
-              width: 50,
-              height: 50,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
@@ -275,7 +256,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 child: Image.asset(
                   'assets/images/icon_signLan.png',
                   color: NabeehColors.background,
@@ -319,7 +300,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 👇 Minutes Wheel 
               SizedBox(
                 width: 80,
                 child: ListWheelScrollView.useDelegate(
@@ -351,12 +331,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 ':',
                 style: TextStyle(
                   fontSize: 32,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.bold,
                   color: NabeehColors.slate400,
                   height: 0.8,
                 ),
               ),
-              // 👇 Hours Wheel 
               SizedBox(
                 width: 80,
                 child: ListWheelScrollView.useDelegate(
@@ -386,7 +365,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              // AM/PM Wheel with Icons 
               SizedBox(
                 width: 70,
                 child: ListWheelScrollView.useDelegate(
@@ -444,7 +422,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                   style: const TextStyle(
                     fontFamily: 'IBMPlexSansArabic',
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.bold,
                     color: NabeehColors.dark,
                   ),
                 ),
@@ -491,7 +469,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 16,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.bold,
                   color: NabeehColors.dark,
                 ),
               ),
@@ -545,7 +523,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 children: [
                   const Padding(
                     padding: EdgeInsets.all(24.0),
-                    child: Text('التكرار', style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 20, fontWeight: FontWeight.w900, color: NabeehColors.dark)),
+                    child: Text('التكرار', style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 20, fontWeight: FontWeight.bold, color: NabeehColors.dark)),
                   ),
                   Expanded(
                     child: ListView.builder(
@@ -616,36 +594,66 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           actions: [
             Row(
               children: [
+                // 1. SAVE BUTTON (Right Side in RTL)
                 Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 52), // ENFORCED IDENTICAL HEIGHT
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: NabeehColors.slate200, width: 1.5),
+                  child: Container(
+                    height: 52, // 👈 Strict height
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                     ),
-                    child: const Text('إلغاء', style: TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontWeight: FontWeight.w900)),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() => label = controller.text);
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent, 
+                        shadowColor: Colors.transparent,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.save, color: Colors.white, size: 18),
+                          SizedBox(width: 6),
+                          Text('حفظ', style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.white)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
+                
+                // 2. CANCEL BUTTON (Left Side in RTL)
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() => label = controller.text);
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: NabeehColors.dark, 
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(0, 52), // ENFORCED IDENTICAL HEIGHT
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
+                  child: Container(
+                    height: 52, // 👈 Exact same strict height
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: NabeehColors.slate200, width: 1.5), 
                     ),
-                    child: const Text('حفظ', style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.w900)),
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          SizedBox(width: 6),
+                          Text('إلغاء', style: TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -669,7 +677,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: Text(title, style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 20, fontWeight: FontWeight.w900, color: NabeehColors.dark)),
+                child: Text(title, style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 20, fontWeight: FontWeight.bold, color: NabeehColors.dark)),
               ),
               ...options.map((opt) => ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 32),
@@ -688,7 +696,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     );
   }
 
-Widget _buildBottomActions() {
+  Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: const BoxDecoration(
@@ -697,9 +705,10 @@ Widget _buildBottomActions() {
       ),
       child: Row(
         children: [
-          // 1. Add Reminder Button (Right Side in RTL)
-          Expanded( // 👇 Removed "flex: 2" so it matches the Cancel button
+          // 1. Add/Update Reminder Button (Right Side in RTL)
+          Expanded( 
             child: Container(
+              height: 54, 
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: const LinearGradient(
@@ -715,19 +724,26 @@ Widget _buildBottomActions() {
               child: TextButton(
                 onPressed: _isLoading ? null : _saveReminder,
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: _isLoading 
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(
-                      widget.reminderId == null ? 'إضافة المنبه' : 'تحديث المنبه',
-                      style: const TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(LucideIcons.save, color: Colors.white, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          widget.reminderId == null ? 'إضافة المنبه' : 'تحديث المنبه',
+                          style: const TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
               ),
             ),
@@ -736,8 +752,9 @@ Widget _buildBottomActions() {
           const SizedBox(width: 16),
           
           // 2. Cancel Button (Left Side in RTL)
-          Expanded( // 👇 Matches the first button for a perfect 50/50 split
+          Expanded( 
             child: Container(
+              height: 54,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -746,17 +763,24 @@ Widget _buildBottomActions() {
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(
-                    color: NabeehColors.slate500,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    fontFamily: 'IBMPlexSansArabic',
-                  ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        color: NabeehColors.slate500,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

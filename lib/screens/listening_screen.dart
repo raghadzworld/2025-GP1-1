@@ -70,7 +70,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildHeader() {
+ Widget _buildHeader() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
@@ -84,22 +84,51 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Expanded(
-            child: Text(
-              'الاستماع النشط',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF181059),
+          // 1. Grouped Back Button and Title (Anchored to the Right in RTL)
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF181059), // 👈 Changed the border to dark blue!
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr, 
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded, 
+                      color: Color(0xFF181059), 
+                      size: 18),
+                  ),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 12),
+              const Text(
+                'الاستماع النشط',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+              ),
+            ],
           ),
+
+          // 2. Sign Language Gesture Button (Anchored to the Left in RTL)
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+               // Add your gesture button action here
+            },
             child: Container(
-              width: 44,
+              width: 44, // 👈 Consistently sized to 44
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -111,9 +140,14 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
                 ),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
-              child: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+              child: Padding(
+                padding: const EdgeInsets.all(10), // 👈 Consistently padded to 10
+                child: Image.asset(
+                  'assets/images/icon_signLan.png',
+                  color: NabeehColors.background,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -233,7 +267,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
                   style: TextStyle(
                     fontFamily: 'IBMPlexSansArabic',
                     fontSize: 14,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.bold,
                     color: NabeehColors.slate500,
                   ),
                 ),
@@ -249,7 +283,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
                     style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: isListening ? 22 : 18,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.bold,
                       color: isListening ? NabeehColors.darkBlue : NabeehColors.slate400,
                     ),
                   ),

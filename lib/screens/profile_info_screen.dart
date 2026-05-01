@@ -31,7 +31,12 @@ class ProfileInfoScreen extends StatelessWidget {
 
                   final userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
                   final String name = userData['FullName'] ?? 'مستخدم جديد';
-                  final String email = currentUser.email ?? userData['Email'] ?? 'لا يوجد بريد إلكتروني';
+                  final String firestoreEmail = userData['Email'] ?? '';
+                  
+                  // 👇 2. Prioritize Firestore email. Fall back to Auth email ONLY if Firestore is empty.
+                  final String email = firestoreEmail.isNotEmpty 
+                      ? firestoreEmail 
+                      : (currentUser.email ?? 'لا يوجد بريد إلكتروني');
                   final String phone = userData['PhoneNumber'] ?? 'لم يتم إضافة رقم';
 
                   return Column(
@@ -152,21 +157,24 @@ class ProfileInfoScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
+          // 1. Edit Profile Button
           Container(
+            height: 60, // Strictly enforced height
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               gradient: const LinearGradient(
                 colors: [Color(0xFF181059), Color(0xFF1773CF)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
+              // Added subtle border so it has the exact same box-model dimensions as the Outlined button
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.25),
                 width: 1.5,
               ),
             ),
-            child: TextButton.icon(
+            child: ElevatedButton.icon(
               onPressed: onEdit,
               icon: const Icon(LucideIcons.edit2, color: Colors.white, size: 20),
               label: const Text(
@@ -178,35 +186,41 @@ class ProfileInfoScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent, // Allow the gradient to show
+                shadowColor: Colors.transparent, // Remove shadow
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
           ),
           const SizedBox(height: 15),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (context) => const SettingsScreen())
-              );
-            },
-            icon: const Icon(LucideIcons.settings, color: NabeehColors.dark, size: 20), 
-            label: const Text(
-              'الإعدادات',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                color: NabeehColors.dark 
+          
+          // 2. Settings Button
+          SizedBox(
+            height: 60, // Strictly enforced height via SizedBox to match Container perfectly
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => const SettingsScreen())
+                );
+              },
+              icon: const Icon(LucideIcons.settings, color: NabeehColors.dark, size: 20), 
+              label: const Text(
+                'الإعدادات',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: NabeehColors.dark 
+                ),
               ),
-            ),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 60),
-              side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
             ),
           ),
         ],
