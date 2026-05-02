@@ -185,7 +185,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         backgroundColor: Colors.white,
         body: Column(
           children: [
-            _buildHeader(context),      // Custom header matching EditProfileScreen
+            _buildHeader(context), // Custom header matching EditProfileScreen
             Expanded(
               child: DefaultTextStyle.merge(
                 style: const TextStyle(
@@ -196,7 +196,10 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                   child: Column(
                     children: [
                       BentoCard(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -220,13 +223,14 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                           duration: 250.ms,
                           switchInCurve: Curves.easeOutCubic,
                           switchOutCurve: Curves.easeInCubic,
-                          layoutBuilder: (currentChild, previousChildren) => Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ...previousChildren,
-                              if (currentChild case final child?) child,
-                            ],
-                          ),
+                          layoutBuilder: (currentChild, previousChildren) =>
+                              Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ...previousChildren,
+                                  if (currentChild case final child?) child,
+                                ],
+                              ),
                           child: _isSttMode
                               ? KeyedSubtree(
                                   key: const ValueKey('stt'),
@@ -273,11 +277,18 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white.withValues(alpha: 0.15),
-                    border: Border.all(color: const Color(0xFF181059), width: 1.5),
+                    border: Border.all(
+                      color: const Color(0xFF181059),
+                      width: 1.5,
+                    ),
                   ),
                   child: const Directionality(
                     textDirection: TextDirection.ltr,
-                    child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF181059), size: 18),
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF181059),
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -301,12 +312,19 @@ class _SttTtsScreenState extends State<SttTtsScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                  colors: [
+                    NabeehColors.darkNavy,
+                    NabeehColors.darkNavy,
+                    NabeehColors.lightBlue,
+                  ],
                   stops: [0.09, 0.30, 1.0],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.5,
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -401,7 +419,11 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16, color: isSelected ? Colors.white : NabeehColors.slate400),
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : NabeehColors.slate400,
+            ),
             const SizedBox(width: 8),
             Text(
               title,
@@ -438,7 +460,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                   Expanded(
                     child: Center(
                       child: Text(
-                        _isRecording ? 'ابدأ التحدث الآن...' : 'اضغط على المايك للبدء',
+                        _isRecording
+                            ? 'ابدأ التحدث الآن...'
+                            : 'اضغط على المايك للبدء',
                         style: const TextStyle(
                           color: NabeehColors.slate500,
                           fontWeight: FontWeight.w400,
@@ -471,11 +495,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                         
-                          const SizedBox(height: 6),
-                    
-                        ],
+                        children: [const SizedBox(height: 6)],
                       ),
                     ),
                   ),
@@ -519,9 +539,14 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                       end: Alignment.bottomRight,
                     )
                   : null,
-              color: _isRecording ? null : NabeehColors.slate200.withValues(alpha: 0.5),
+              color: _isRecording
+                  ? null
+                  : NabeehColors.slate200.withValues(alpha: 0.5),
               border: _isRecording
-                  ? Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5)
+                  ? Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1.5,
+                    )
                   : null,
               boxShadow: _isRecording
                   ? [
@@ -589,12 +614,22 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: ['مرحباً بك', 'كيف حالك؟', 'أنا بحاجة لمساعدة', 'شكراً لك']
-                          .map((phrase) => Padding(
-                                padding: const EdgeInsetsDirectional.only(start: 8),
-                                child: _buildPhrase(phrase),
-                              ))
-                          .toList(),
+                      children:
+                          [
+                                'مرحباً بك',
+                                'كيف حالك؟',
+                                'أنا بحاجة لمساعدة',
+                                'شكراً لك',
+                              ]
+                              .map(
+                                (phrase) => Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                    start: 8,
+                                  ),
+                                  child: _buildPhrase(phrase),
+                                ),
+                              )
+                              .toList(),
                     ),
                   ),
                 const SizedBox(height: 8),
@@ -649,7 +684,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
             onPressed: _speakText,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             child: Text(
               _isSpeaking ? 'جاري النطق...' : 'نطق النص',
@@ -681,13 +718,15 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: isActive ? NabeehColors.lightBlue : NabeehColors.slate300,
-              shape: BoxShape.circle,
-            ),
-          )
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? NabeehColors.lightBlue
+                      : NabeehColors.slate300,
+                  shape: BoxShape.circle,
+                ),
+              )
               .animate(
                 onPlay: (controller) => isActive ? controller.repeat() : null,
               )
@@ -736,8 +775,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
             children: List.generate(15, (index) {
               final offset = index * 0.4;
               final baseWave =
-                  (math.sin((_waveController.value * 2 * math.pi) + offset) + 1) /
-                      2;
+                  (math.sin((_waveController.value * 2 * math.pi) + offset) +
+                      1) /
+                  2;
               final liveLevel = isActive ? (0.35 + (_amplitude * 0.65)) : 0.0;
               final barHeight = 10 + (baseWave * 50 * liveLevel);
 
@@ -768,38 +808,39 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }) {
     double size = small ? 90 : 160;
     return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: isActive
-            ? activeColor.withValues(alpha: 0.12)
-            : NabeehColors.slate50,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isActive
-              ? activeColor.withValues(alpha: 0.18)
-              : NabeehColors.slate100,
-          width: 1.5,
-        ),
-        boxShadow: [
-          if (isActive)
-            BoxShadow(
-              color: activeColor.withValues(alpha: 0.18),
-              blurRadius: 26,
-              spreadRadius: 6,
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: isActive
+                ? activeColor.withValues(alpha: 0.12)
+                : NabeehColors.slate50,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isActive
+                  ? activeColor.withValues(alpha: 0.18)
+                  : NabeehColors.slate100,
+              width: 1.5,
             ),
-        ],
-      ),
-      child: Center(
-        child: Icon(
-          icon,
-          color: isActive ? activeColor : NabeehColors.slate400,
-          size: size * 0.4,
-        ),
-      ),
-    )
+            boxShadow: [
+              if (isActive)
+                BoxShadow(
+                  color: activeColor.withValues(alpha: 0.18),
+                  blurRadius: 26,
+                  spreadRadius: 6,
+                ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              color: isActive ? activeColor : NabeehColors.slate400,
+              size: size * 0.4,
+            ),
+          ),
+        )
         .animate(
-          onPlay: (controller) => isActive ? controller.repeat(reverse: true) : null,
+          onPlay: (controller) =>
+              isActive ? controller.repeat(reverse: true) : null,
         )
         .scale(
           begin: const Offset(0.95, 0.95),

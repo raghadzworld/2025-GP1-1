@@ -7,12 +7,12 @@ import 'stt_tts_screen.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
-  static const darkNavy  = Color(0xFF181059);
-  static const darkBlue  = Color(0xFF21277B);
+  static const darkNavy = Color(0xFF181059);
+  static const darkBlue = Color(0xFF21277B);
   static const lightBlue = Color(0xFF1773CF);
-  static const yellow    = Color(0xFFFFD350);
-  static const green     = Color(0xFF00AA5B);
-  static const gray      = Color(0xFFA4ACB0);
+  static const yellow = Color(0xFFFFD350);
+  static const green = Color(0xFF00AA5B);
+  static const gray = Color(0xFFA4ACB0);
   static const background = Color(0xFFFFFFFF);
   static const cardBorder = Color(0xFFA4ACB0);
 }
@@ -26,8 +26,8 @@ const _kBlueGradient = LinearGradient(
 
 class HomeScreen extends StatefulWidget {
   // إضافة هذا السطر لاستقبال وظيفة التنقل من الصفحة الرئيسية
-  final VoidCallback? onMoreInfoPressed; 
-  
+  final VoidCallback? onMoreInfoPressed;
+
   const HomeScreen({super.key, this.onMoreInfoPressed});
 
   @override
@@ -37,11 +37,20 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedFeature = 0;
   String _userName = '';
+  final PageController _featuresPageController = PageController(
+    viewportFraction: 0.58,
+  );
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
+  }
+
+  @override
+  void dispose() {
+    _featuresPageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchUserName() async {
@@ -76,19 +85,19 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Map<String, String>> _features = [
     {
       'title': 'المجموعات\nالصوتية',
-      'iconSelected':   'assets/images/icon_Ycato.png',
+      'iconSelected': 'assets/images/icon_Ycato.png',
       'iconUnselected': 'assets/images/icon_GCato.png',
-      'route': '/categories',          
+      'route': '/categories',
     },
     {
       'title': 'الاستشعار\nالصوتي',
-      'iconSelected':   'assets/images/icon_YReco.png',
+      'iconSelected': 'assets/images/icon_YReco.png',
       'iconUnselected': 'assets/images/icon_GReco.png',
       'route': 'custom_listening', // Connects to ListeningScreen
     },
     {
       'title': 'التواصل',
-      'iconSelected':   'assets/images/icon_YCom.png',
+      'iconSelected': 'assets/images/icon_YCom.png',
       'iconUnselected': 'assets/images/icon_GCom.png',
       'route': 'custom_communication', // 👇 Updated to intercept custom route
     },
@@ -112,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 14),
                   _buildFeaturesSection(),
                   const SizedBox(height: 12),
-                  _buildAlarmCard(), 
+                  _buildAlarmCard(),
                   const SizedBox(height: 12),
                 ],
               ),
@@ -147,31 +156,35 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-              stops: [0.09, 0.30, 1.0],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF181059),
+                  Color(0xFF181059),
+                  Color(0xFF1773CF),
+                ],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
             ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 1.5,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Image.asset(
-              'assets/images/icon_signLan.png',
-              color: Colors.white,
-              colorBlendMode: BlendMode.srcIn,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
         ],
       ),
     );
@@ -253,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
           GestureDetector(
-            onTap: widget.onMoreInfoPressed, 
+            onTap: widget.onMoreInfoPressed,
             child: const Center(
               child: Text(
                 'للمزيد من المعلومات',
@@ -295,8 +308,8 @@ class _HomeScreenState extends State<HomeScreen> {
         SizedBox(
           height: 260,
           child: PageView.builder(
-            padEnds: false, 
-            controller: PageController(viewportFraction: 0.58),
+            padEnds: false,
+            controller: _featuresPageController,
             onPageChanged: (i) {
               if (i < _features.length) {
                 setState(() => _selectedFeature = i);
@@ -313,39 +326,43 @@ class _HomeScreenState extends State<HomeScreen> {
               return GestureDetector(
                 onTap: () {
                   final route = f['route'];
-                  
+
                   // 👇 Custom routing for Listening and STT/TTS Screens
                   if (route == 'custom_listening') {
                     Navigator.push(
-                      context, 
-                      MaterialPageRoute(builder: (context) => const ListeningScreen())
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListeningScreen(),
+                      ),
                     );
-                  } 
-                  else if (route == 'custom_communication') {
+                  } else if (route == 'custom_communication') {
                     Navigator.push(
-                      context, 
-                      MaterialPageRoute(builder: (context) => const SttTtsScreen())
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SttTtsScreen(),
+                      ),
                     );
-                  }
-                  else if (route != null) {
+                  } else if (route != null) {
                     Navigator.pushNamed(context, route);
                   }
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.only(left: 15, bottom: 10),
+                  margin: const EdgeInsets.only(left: 15, bottom: 2),
                   decoration: BoxDecoration(
                     gradient: isSelected ? _kBlueGradient : null,
                     color: isSelected ? null : Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: isSelected 
-                          ? Colors.transparent 
+                      color: isSelected
+                          ? Colors.transparent
                           : NabeehColors.cardBorder.withValues(alpha: 0.5),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: isSelected ? 0.15 : 0.05),
+                        color: Colors.black.withValues(
+                          alpha: isSelected ? 0.15 : 0.05,
+                        ),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -357,7 +374,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         top: 20,
                         right: 20,
                         child: Image.asset(
-                          isSelected ? f['iconSelected']! : f['iconUnselected']!,
+                          isSelected
+                              ? f['iconSelected']!
+                              : f['iconUnselected']!,
                           width: 42,
                           height: 42,
                           fit: BoxFit.contain,
@@ -372,7 +391,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : NabeehColors.gray,
+                              color: isSelected
+                                  ? Colors.white
+                                  : NabeehColors.gray,
                               height: 1.3,
                             ),
                           ),
@@ -385,6 +406,25 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(_features.length, (i) {
+            final isActive = i == _selectedFeature;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: isActive ? 24 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? NabeehColors.darkNavy
+                    : NabeehColors.cardBorder.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            );
+          }),
+        ),
       ],
     );
   }
@@ -393,8 +433,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () {
         Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (context) => const RemindersScreen())
+          context,
+          MaterialPageRoute(builder: (context) => const RemindersScreen()),
         );
       },
       child: Container(
@@ -420,23 +460,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text(
                   'المنبّه',
                   style: TextStyle(
-                    fontSize: 18, 
-                    fontWeight: FontWeight.bold, 
-                    color: NabeehColors.yellow
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: NabeehColors.yellow,
                   ),
                 ),
-                const Spacer(), 
-                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+                const Spacer(),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ],
             ),
             const SizedBox(height: 10),
             const Text(
               'ابدأ يومك بطريقة مختلفة، تنبيه لطيف بالاهتزاز يمنحك استيقاظاً مريحاً بلا إزعاج',
               style: TextStyle(
-                fontSize: 15, 
-                color: Colors.white, 
+                fontSize: 15,
+                color: Colors.white,
                 height: 1.6,
-                fontWeight: FontWeight.w400
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],

@@ -78,7 +78,6 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
-
   @override
   void initState() {
     super.initState();
@@ -198,7 +197,8 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               .limit(1)
               .get();
           if (query.docs.isNotEmpty) {
-            userName = (query.docs.first.data()['FullName'] as String? ?? '').trim();
+            userName = (query.docs.first.data()['FullName'] as String? ?? '')
+                .trim();
           }
         }
       }
@@ -227,9 +227,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       }
 
       // 3. إرسال إيميل لكل جهة اتصال عبر EmailJS REST API
-      const emailjsServiceId  = 'service_z8s2iye';
+      const emailjsServiceId = 'service_z8s2iye';
       const emailjsTemplateId = 'template_5skt4yr';
-      const emailjsPublicKey  = 'iTX-OPPPTV27wvJyw';
+      const emailjsPublicKey = 'iTX-OPPPTV27wvJyw';
       const emailjsPrivateKey = '-cAevJ-wpLtQbsPtHHn6S';
 
       final hasLocation = latitude != null && longitude != null;
@@ -242,17 +242,17 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'service_id':  emailjsServiceId,
+            'service_id': emailjsServiceId,
             'template_id': emailjsTemplateId,
-            'user_id':     emailjsPublicKey,
+            'user_id': emailjsPublicKey,
             'accessToken': emailjsPrivateKey,
             'template_params': {
-              'to_email':   email,
-              'name':       userName,
-              'user_name':  userName,
-              'latitude':   latitude?.toString() ?? 'غير متاح',
-              'longitude':  longitude?.toString() ?? 'غير متاح',
-              'maps_link':  mapsLink,
+              'to_email': email,
+              'name': userName,
+              'user_name': userName,
+              'latitude': latitude?.toString() ?? 'غير متاح',
+              'longitude': longitude?.toString() ?? 'غير متاح',
+              'maps_link': mapsLink,
             },
           }),
         );
@@ -272,10 +272,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('فشل الإرسال: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('فشل الإرسال: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -309,161 +306,186 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: 24,
-            right: 24,
-            left: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: NabeehColors.cardBorder,
-                    borderRadius: BorderRadius.circular(2),
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: 24,
+              right: 24,
+              left: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: NabeehColors.cardBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'إضافة جهة اتصال:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF181059),
+                const SizedBox(height: 24),
+                const Text(
+                  'إضافة جهة اتصال:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF181059),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              _buildFormField(label: 'الاسم:', controller: nameCtrl, icon: Icons.person_outline),
-              const SizedBox(height: 20),
-              _buildFormField(
-                label: 'الايميل:',
-                controller: emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                icon: Icons.email_outlined,
-                errorText: emailCtrl.text.isNotEmpty && !_isValidEmail(emailCtrl.text)
-                    ? 'صيغة البريد الإلكتروني غير صحيحة'
-                    : null,
-              ),
-              const SizedBox(height: 20),
-              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl, icon: Icons.people_outline),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                const SizedBox(height: 24),
+                _buildFormField(
+                  label: 'الاسم:',
+                  controller: nameCtrl,
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'الايميل:',
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  icon: Icons.email_outlined,
+                  errorText:
+                      emailCtrl.text.isNotEmpty &&
+                          !_isValidEmail(emailCtrl.text)
+                      ? 'صيغة البريد الإلكتروني غير صحيحة'
+                      : null,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'جهة القرابة:',
+                  controller: relationCtrl,
+                  icon: Icons.people_outline,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
                         ),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          width: 1.5,
+                        child: TextButton(
+                          onPressed: () async {
+                            setSheetState(() {});
+                            if (nameCtrl.text.trim().isEmpty ||
+                                emailCtrl.text.trim().isEmpty ||
+                                relationCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('يرجى تعبئة جميع الحقول'),
+                                ),
+                              );
+                              return;
+                            }
+                            if (!_isValidEmail(emailCtrl.text)) return;
+                            try {
+                              final newContact = EmergencyContact(
+                                name: nameCtrl.text.trim(),
+                                email: emailCtrl.text.trim(),
+                                relation: relationCtrl.text.trim(),
+                              );
+                              final docRef = await _contactsRef!.add(
+                                newContact.toFirestore(),
+                              );
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              if (mounted) {
+                                setState(
+                                  () => _contacts.add(
+                                    EmergencyContact(
+                                      id: docRef.id,
+                                      name: newContact.name,
+                                      email: newContact.email,
+                                      relation: newContact.relation,
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('حدث خطأ: $e')),
+                              );
+                            }
+                          },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 52),
+                            alignment: Alignment.center,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add, color: Colors.white, size: 22),
+                              SizedBox(width: 8),
+                              Text(
+                                'إضافة',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: TextButton(
-                        onPressed: () async {
-                          setSheetState(() {});
-                          if (nameCtrl.text.trim().isEmpty ||
-                              emailCtrl.text.trim().isEmpty ||
-                              relationCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
-                            );
-                            return;
-                          }
-                          if (!_isValidEmail(emailCtrl.text)) return;
-                          try {
-                            final newContact = EmergencyContact(
-                              name: nameCtrl.text.trim(),
-                              email: emailCtrl.text.trim(),
-                              relation: relationCtrl.text.trim(),
-                            );
-                            final docRef = await _contactsRef!.add(newContact.toFirestore());
-                            if (!ctx.mounted) return;
-                            Navigator.pop(ctx);
-                            if (mounted) {
-                              setState(() => _contacts.add(EmergencyContact(
-                                id: docRef.id,
-                                name: newContact.name,
-                                email: newContact.email,
-                                relation: newContact.relation,
-                              )));
-                            }
-                          } catch (e) {
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('حدث خطأ: $e')),
-                            );
-                          }
-                        },
-                        style: TextButton.styleFrom(
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 52),
-                          alignment: Alignment.center,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 200, 198, 195),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add, color: Colors.white, size: 22),
+                            Icon(Icons.close, color: Colors.grey, size: 18),
                             SizedBox(width: 8),
                             Text(
-                              'إضافة',
+                              'إلغاء',
                               style: TextStyle(
                                 fontFamily: 'IBMPlexSansArabic',
+                                color: Colors.grey,
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 52),
-                        side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.close, color: Colors.grey, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'إلغاء',
-                            style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic',
-                              color: Colors.grey,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -482,10 +504,12 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       _showEditContactSheet(_contacts.first, 0);
       return;
     }
-    _showContactSelectorSheet(onSelect: (index) {
-      Navigator.pop(context);
-      _showEditContactSheet(_contacts[index], index);
-    });
+    _showContactSelectorSheet(
+      onSelect: (index) {
+        Navigator.pop(context);
+        _showEditContactSheet(_contacts[index], index);
+      },
+    );
   }
 
   Future<void> _confirmDeleteContact(int index) async {
@@ -495,7 +519,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
@@ -515,7 +541,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             'هل أنت متأكد من رغبتك في حذف جهة الاتصال هذه نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
             style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 15),
           ),
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
           actions: [
             Row(
               children: [
@@ -524,13 +553,22 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                     onPressed: () => Navigator.pop(dialogContext, true),
                     style: OutlinedButton.styleFrom(
                       fixedSize: const Size.fromHeight(50),
-                      side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(
+                        color: Colors.redAccent,
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                        Icon(
+                          LucideIcons.trash2,
+                          color: Colors.redAccent,
+                          size: 18,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'حذف نهائي',
@@ -553,7 +591,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                       fixedSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
+                        side: const BorderSide(
+                          color: Color.fromARGB(255, 200, 198, 195),
+                        ),
                       ),
                     ),
                     child: const Row(
@@ -590,10 +630,12 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       _confirmDeleteContact(0);
       return;
     }
-    _showContactSelectorSheet(onSelect: (index) {
-      Navigator.pop(context);
-      _confirmDeleteContact(index);
-    });
+    _showContactSelectorSheet(
+      onSelect: (index) {
+        Navigator.pop(context);
+        _confirmDeleteContact(index);
+      },
+    );
   }
 
   void _showContactSelectorSheet({required void Function(int index) onSelect}) {
@@ -631,26 +673,41 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              ..._contacts.asMap().entries.map((entry) => ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: NabeehColors.lightBlueBg,
-                    shape: BoxShape.circle,
+              ..._contacts.asMap().entries.map(
+                (entry) => ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 0,
+                    vertical: 4,
                   ),
-                  child: const Icon(Icons.person_rounded, color: Color(0xFF181059), size: 22),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: NabeehColors.lightBlueBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: Color(0xFF181059),
+                      size: 22,
+                    ),
+                  ),
+                  title: Text(
+                    entry.value.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF181059),
+                    ),
+                  ),
+                  subtitle: Text(
+                    'جهة القرابة: ${entry.value.relation}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: NabeehColors.gray,
+                    ),
+                  ),
+                  onTap: () => onSelect(entry.key),
                 ),
-                title: Text(
-                  entry.value.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF181059)),
-                ),
-                subtitle: Text(
-                  'جهة القرابة: ${entry.value.relation}',
-                  style: const TextStyle(fontSize: 12, color: NabeehColors.gray),
-                ),
-                onTap: () => onSelect(entry.key),
-              )),
+              ),
               const SizedBox(height: 8),
             ],
           ),
@@ -673,150 +730,176 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: 24,
-            right: 24,
-            left: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: NabeehColors.cardBorder,
-                    borderRadius: BorderRadius.circular(2),
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: 24,
+              right: 24,
+              left: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: NabeehColors.cardBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'تعديل جهة الاتصال:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF181059),
+                const SizedBox(height: 24),
+                const Text(
+                  'تعديل جهة الاتصال:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF181059),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              _buildFormField(label: 'الاسم:', controller: nameCtrl, icon: Icons.person_outline),
-              const SizedBox(height: 20),
-              _buildFormField(
-                label: 'الايميل:',
-                controller: emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                icon: Icons.email_outlined,
-                errorText: emailCtrl.text.isNotEmpty && !_isValidEmail(emailCtrl.text)
-                    ? 'صيغة البريد الإلكتروني غير صحيحة'
-                    : null,
-              ),
-              const SizedBox(height: 20),
-              _buildFormField(label: 'جهة القرابة:', controller: relationCtrl, icon: Icons.people_outline),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                const SizedBox(height: 24),
+                _buildFormField(
+                  label: 'الاسم:',
+                  controller: nameCtrl,
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'الايميل:',
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  icon: Icons.email_outlined,
+                  errorText:
+                      emailCtrl.text.isNotEmpty &&
+                          !_isValidEmail(emailCtrl.text)
+                      ? 'صيغة البريد الإلكتروني غير صحيحة'
+                      : null,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'جهة القرابة:',
+                  controller: relationCtrl,
+                  icon: Icons.people_outline,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
                         ),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          width: 1.5,
+                        child: TextButton(
+                          onPressed: () async {
+                            setSheetState(() {});
+                            if (nameCtrl.text.trim().isEmpty ||
+                                emailCtrl.text.trim().isEmpty ||
+                                relationCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('يرجى تعبئة جميع الحقول'),
+                                ),
+                              );
+                              return;
+                            }
+                            if (!_isValidEmail(emailCtrl.text)) return;
+                            final updated = EmergencyContact(
+                              id: contact.id,
+                              name: nameCtrl.text.trim(),
+                              email: emailCtrl.text.trim(),
+                              relation: relationCtrl.text.trim(),
+                            );
+                            if (contact.id.isNotEmpty) {
+                              await _contactsRef
+                                  ?.doc(contact.id)
+                                  .update(updated.toFirestore());
+                            }
+                            if (!ctx.mounted) return;
+                            Navigator.pop(ctx);
+                            if (mounted)
+                              setState(() => _contacts[index] = updated);
+                          },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 52),
+                            alignment: Alignment.center,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                LucideIcons.save,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'حفظ',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: TextButton(
-                        onPressed: () async {
-                          setSheetState(() {});
-                          if (nameCtrl.text.trim().isEmpty ||
-                              emailCtrl.text.trim().isEmpty ||
-                              relationCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('يرجى تعبئة جميع الحقول')),
-                            );
-                            return;
-                          }
-                          if (!_isValidEmail(emailCtrl.text)) return;
-                          final updated = EmergencyContact(
-                            id: contact.id,
-                            name: nameCtrl.text.trim(),
-                            email: emailCtrl.text.trim(),
-                            relation: relationCtrl.text.trim(),
-                          );
-                          if (contact.id.isNotEmpty) {
-                            await _contactsRef?.doc(contact.id).update(updated.toFirestore());
-                          }
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (mounted) setState(() => _contacts[index] = updated);
-                        },
-                        style: TextButton.styleFrom(
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 52),
-                          alignment: Alignment.center,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 200, 198, 195),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(LucideIcons.save, color: Colors.white, size: 18),
+                            Icon(Icons.close, color: Colors.grey, size: 18),
                             SizedBox(width: 8),
                             Text(
-                              'حفظ',
+                              'إلغاء',
                               style: TextStyle(
                                 fontFamily: 'IBMPlexSansArabic',
+                                color: Colors.grey,
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 52),
-                        side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.close, color: Colors.grey, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'إلغاء',
-                            style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic',
-                              color: Colors.grey,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -875,7 +958,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             focusedErrorBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: Colors.red, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 0,
+            ),
           ),
         ),
       ],
@@ -912,19 +998,33 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                         ),
                         const Spacer(),
                         OutlinedButton(
-                          onPressed: _contacts.isNotEmpty ? _selectContactForEdit : null,
+                          onPressed: _contacts.isNotEmpty
+                              ? _selectContactForEdit
+                              : null,
                           style: OutlinedButton.styleFrom(
                             backgroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
                             minimumSize: const Size(90, 44),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(color: Color(0xFF181059), width: 1.2),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: const BorderSide(
+                              color: Color(0xFF181059),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.edit_outlined, size: 20, color: Color(0xFF181059)),
+                              Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                                color: Color(0xFF181059),
+                              ),
                               SizedBox(width: 6),
                               Text(
                                 'تعديل',
@@ -939,28 +1039,45 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton(
-                          onPressed: _contacts.isNotEmpty ? _selectContactForDelete : null,
+                          onPressed: _contacts.isNotEmpty
+                              ? _selectContactForDelete
+                              : null,
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
                             minimumSize: const Size(90, 44),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             side: BorderSide(
-                              color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade300,
+                              color: _contacts.isNotEmpty
+                                  ? Colors.redAccent
+                                  : Colors.grey.shade300,
                               width: 1.2,
                             ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(LucideIcons.trash2, size: 20, color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade400),
+                              Icon(
+                                LucideIcons.trash2,
+                                size: 20,
+                                color: _contacts.isNotEmpty
+                                    ? Colors.redAccent
+                                    : Colors.grey.shade400,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'حذف',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: _contacts.isNotEmpty ? Colors.redAccent : Colors.grey.shade400,
+                                  color: _contacts.isNotEmpty
+                                      ? Colors.redAccent
+                                      : Colors.grey.shade400,
                                 ),
                               ),
                             ],
@@ -1016,37 +1133,40 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               color: Color(0xFF181059),
             ),
           ),
-         Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-              stops: [0.09, 0.30, 1.0],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF181059),
+                  Color(0xFF181059),
+                  Color(0xFF1773CF),
+                ],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
             ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 1.5,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Image.asset(
-              'assets/images/icon_signLan.png',
-              color: Colors.white,
-              colorBlendMode: BlendMode.srcIn,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
         ],
       ),
     );
   }
-
 
   // ── Contact Tile ──────────────────────────────────────────────────────────
   Widget _buildContactTile(EmergencyContact contact) {
