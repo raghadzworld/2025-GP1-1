@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -44,33 +45,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _saveProfile() async {
     FocusScope.of(context).unfocus();
+
+    // --- 1. PHONE NUMBER VALIDATION ---
+    final phone = _phoneController.text.trim();
+    if (!phone.startsWith('05') || phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return; 
+    }
+
     setState(() => _isLoading = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final newEmail = _emailController.text.trim();
+        bool emailChanged = false; 
 
-        // 1. Update Firestore Data
-        await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
-          'FullName': _nameController.text.trim(),
-          'PhoneNumber': _phoneController.text.trim(),
-          'Email': newEmail,
-        }, SetOptions(merge: true));
-
-        // 2. Attempt to update Firebase Auth Email
+        // --- 2. EMAIL UPDATE ---
         if (user.email != newEmail && newEmail.isNotEmpty) {
           try {
-            await user.updateEmail(newEmail); 
-          } catch (e) {
-            debugPrint("Auth email update warning: $e");
+            await user.verifyBeforeUpdateEmail(newEmail);
+            emailChanged = true; 
+          } on FirebaseAuthException catch (e) {
+            if (e.code == 'requires-recent-login') {
+              throw 'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير البريد الإلكتروني.';
+            } else if (e.code == 'email-already-in-use') {
+              throw 'البريد الإلكتروني مستخدم بالفعل لحساب آخر.';
+            } else {
+              throw 'فشل تحديث البريد الإلكتروني: ${e.message}';
+            }
           }
         }
+
+        // --- 3. FIRESTORE UPDATE ---
+        await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
+          'FullName': _nameController.text.trim(),
+          'PhoneNumber': phone,
+          'Email': newEmail,
+        }, SetOptions(merge: true));
         
         if (mounted) {
+          // --- 4. DYNAMIC SUCCESS MESSAGE ---
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم تحديث الملف الشخصي بنجاح', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+            SnackBar(
+              content: Text(
+                emailChanged 
+                  ? 'تم الحفظ. يرجى مراجعة بريدك الجديد لتأكيد التغيير قبل تسجيل الدخول به.' 
+                  : 'تم تحديث الملف الشخصي بنجاح', 
+                style: const TextStyle(fontFamily: 'IBMPlexSansArabic')
+              ),
               backgroundColor: Colors.green,
+              duration: emailChanged ? const Duration(seconds: 6) : const Duration(seconds: 3),
             ),
           );
           Navigator.pop(context); 
@@ -79,8 +108,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('حدث خطأ أثناء التحديث', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+          SnackBar(
+            content: Text(e.toString(), style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
             backgroundColor: Colors.red,
           ),
         );
@@ -133,17 +162,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       const SizedBox(height: 20),
                       
+                      // --- PHONE FIELD WITH FORMATTERS ---
                       _buildTextField(
                         controller: _phoneController,
                         label: 'رقم الهاتف',
                         icon: LucideIcons.phone,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly, 
+                          LengthLimitingTextInputFormatter(10),   
+                        ],
                       ),
                       const SizedBox(height: 60),
 
-                      // Updated Save Button
                       Container(
-                        height: 60, // Enforced height
+                        height: 60, 
                         width: double.infinity,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
@@ -160,7 +193,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         child: TextButton(
                           onPressed: _isLoading ? null : _saveProfile,
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero, // Removed padding to respect the 60 height
+                            padding: EdgeInsets.zero, 
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           child: _isLoading
@@ -209,24 +242,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 1. Grouped Back Button and Text (Anchored to the Right in RTL)
           Row(
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  width: 44, // Matched size
+                  width: 44, 
                   height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.15), // Login screen glass style
+                    color: Colors.white.withValues(alpha: 0.15), 
                     border: Border.all(
-                      color: const Color(0xFF181059), // 👈 Changed the border to dark blue!
+                      color: const Color(0xFF181059), 
                       width: 1.5,
                     ),
                   ),
                   child: const Directionality(
-                    textDirection: TextDirection.ltr, // Ensures arrow points Right
+                    textDirection: TextDirection.ltr, 
                     child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF181059), size: 18),
                   ),
                 ),
@@ -245,13 +277,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ],
           ),
 
-          // 2. Sign Language Gesture Button (Left Side)
           GestureDetector(
             onTap: () {
                // Add your gesture button action here
             },
             child: Container(
-              width: 44, // Matched size
+              width: 44, 
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -264,7 +295,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(10), // Matched padding
+                padding: const EdgeInsets.all(10), 
                 child: Image.asset(
                   'assets/images/icon_signLan.png',
                   color: NabeehColors.background,
@@ -279,15 +310,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  // --- UPDATED TEXT FIELD METHOD ---
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters, 
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters, 
       style: const TextStyle(
         fontFamily: 'IBMPlexSansArabic', 
         fontSize: 16,
