@@ -20,8 +20,17 @@ class _WatchScreenState extends State<WatchScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Column(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFDDEEF8), Color(0xFFF2F9FE), Colors.white],
+              stops: [0.0, 0.35, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Column(
           children: [
             _buildHeader(context),
             Expanded(
@@ -44,6 +53,7 @@ class _WatchScreenState extends State<WatchScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -52,14 +62,7 @@ class _WatchScreenState extends State<WatchScreen> {
   // ─── Custom Header ──────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
         children: [
           // العنوان
@@ -67,7 +70,7 @@ class _WatchScreenState extends State<WatchScreen> {
             child: Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Text(
-                'معلومات الساعة',
+                ' الساعة',
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
@@ -121,7 +124,7 @@ class _WatchScreenState extends State<WatchScreen> {
     return BentoCard(
       padding: const EdgeInsets.all(24),
       borderRadius: 16,
-      border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
+      border: Border.all(color: const Color(0xFFB8D4F0)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -172,13 +175,13 @@ class _WatchScreenState extends State<WatchScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFFFD350), Color(0xFF1773CF)],
+                          colors: [Color(0xFF1773CF), Color(0xFF1773CF)],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: NabeehColors.accent.withValues(alpha: 0.18),
+                            color: Color(0xFFB8D4F0),
                             blurRadius: 40,
                             spreadRadius: 2,
                           ),
@@ -211,7 +214,7 @@ class _WatchScreenState extends State<WatchScreen> {
                   child: const Icon(
                     Icons.watch_rounded,
                     size: 80,
-                    color: NabeehColors.darkBlue,
+                    color: Color(0xFF1773CF),
                   ),
                 ),
               ],
@@ -257,7 +260,7 @@ class _WatchScreenState extends State<WatchScreen> {
       height: 200,
       child: BentoCard(
         borderRadius: 16,
-        border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
+        border: Border.all(color: const Color(0xFFB8D4F0)),
         padding: const EdgeInsets.all(20),
         child: Stack(
           children: [
@@ -315,7 +318,7 @@ class _WatchScreenState extends State<WatchScreen> {
       height: 200,
       child: BentoCard(
         borderRadius: 16,
-        border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
+        border: Border.all(color: const Color(0xFFB8D4F0)),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
