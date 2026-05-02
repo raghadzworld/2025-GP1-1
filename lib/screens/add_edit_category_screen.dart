@@ -118,125 +118,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     }
   }
 
-  Future<void> _handleDelete() async {
-    final confirm = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.delete_outline_rounded,
-                    color: Colors.red, size: 24),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'حذف المجموعة',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.dark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 13,
-                  color: NabeehColors.slate400,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 28),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: const BorderSide(color: NabeehColors.slate100),
-                        ),
-                      ),
-                      child: const Text(
-                        'إلغاء',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontWeight: FontWeight.w900,
-                          color: NabeehColors.slate400,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'حذف',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final id = widget.category!.id;
-      final activatedId = await _service.deleteCategory(
-        id,
-        currentCategories: widget.existingCategories,
-      );
-      if (mounted) Navigator.pop(context, DeletedCategoryResult(id, activatedId: activatedId));
-    } on StateError {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('لا يمكن حذف الفئة الوحيدة'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   void _showPatternSheet(int soundIndex) {
     final current = _sounds[soundIndex].vibrationPattern;
     showModalBottomSheet(
@@ -333,7 +214,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, bottom: 24, right: 24, left: 24),
+      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
@@ -344,36 +225,59 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Text(
-              isEditing ? 'تعديل الفئة' : 'إضافة فئة',
-              style: const TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF181059),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(color: const Color(0xFF181059), width: 1.5),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF181059), size: 18),
+                  ),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              const SizedBox(width: 12),
+              Text(
+                isEditing ? 'تعديل الفئة' : 'إضافة فئة',
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+              ),
+            ],
           ),
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {},
             child: Container(
               width: 44,
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
                   stops: [0.09, 0.30, 1.0],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
-              child: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Image.asset(
+                  'assets/images/icon_signLan.png',
+                  color: NabeehColors.background,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -389,10 +293,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         const Text(
           'اسم الفئة',
           style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
             color: NabeehColors.slate400,
-            letterSpacing: 2,
           ),
         ),
         const SizedBox(height: 8),
@@ -431,7 +334,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               ),
             ),
           ),
-          style: const TextStyle(fontWeight: FontWeight.w900),
+          style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.w900),
         ),
         if (_nameError != null) ...[
           const SizedBox(height: 10),
@@ -471,10 +374,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         const Text(
           'الأصوات والاهتزاز',
           style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
             color: NabeehColors.slate400,
-            letterSpacing: 2,
           ),
         ),
         const SizedBox(height: 16),
@@ -488,6 +390,17 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     );
   }
 
+  IconData _soundIcon(String soundId) {
+    switch (soundId) {
+      case 'fire_alarm': return LucideIcons.flame;
+      case 'door_bell':  return LucideIcons.bell;
+      case 'door_knock': return Icons.sensor_door;
+      case 'baby_cry':   return LucideIcons.baby;
+      case 'adhan':      return Icons.mosque;
+      default:           return LucideIcons.volume2;
+    }
+  }
+
   Widget _buildSoundItem(int index) {
     final sound = _sounds[index];
     final isFireAlarm = sound.soundId == 'fire_alarm';
@@ -496,29 +409,45 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color:
-            sound.isEnabled ? const Color(0xFFEFF6FF) : NabeehColors.slate50,
-        borderRadius: BorderRadius.circular(32),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: sound.isEnabled
-              ? const Color(0xFFDBEAFE)
-              : Colors.transparent,
+              ? const Color(0xFF181059)
+              : const Color.fromARGB(255, 235, 233, 229),
+          width: sound.isEnabled ? 2 : 1,
         ),
       ),
       child: Column(
         children: [
           Row(
             children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: sound.isEnabled
+                      ? const Color(0xFF181059).withValues(alpha: 0.08)
+                      : NabeehColors.slate50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  _soundIcon(sound.soundId),
+                  size: 18,
+                  color: sound.isEnabled ? const Color(0xFF181059) : NabeehColors.slate300,
+                ),
+              ),
+              const SizedBox(width: 12),
               if (isFireAlarm) ...[
                 const Icon(Icons.lock_outline_rounded,
                     size: 14, color: NabeehColors.slate300),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
               ],
               Expanded(
                 child: Text(
                   sound.name,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w900,
                     color: sound.isEnabled
                         ? NabeehColors.dark
@@ -529,12 +458,14 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               Switch(
                 value: sound.isEnabled,
                 onChanged: isFireAlarm
-                    ? null
+                    ? (_) {}
                     : (val) => setState(
                         () => _sounds[index] = sound.copyWith(isEnabled: val)),
-                activeThumbColor: NabeehColors.accent,
-                inactiveThumbColor: NabeehColors.slate300,
-                inactiveTrackColor: NabeehColors.slate100,
+                activeThumbColor: NabeehColors.background,
+                activeTrackColor: const Color(0xFF181059),
+                inactiveThumbColor: NabeehColors.slate400,
+                inactiveTrackColor: NabeehColors.slate200,
+                trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
               ),
             ],
           ),
@@ -573,7 +504,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 'قوة الاهتزاز',
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w900,
                   color: NabeehColors.dark,
                 ),
@@ -588,8 +519,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   color: NabeehColors.slate400,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               Expanded(
@@ -621,8 +552,8 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   color: NabeehColors.slate400,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -656,7 +587,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                   'نمط الاهتزاز',
                   style: TextStyle(
                     fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     color: NabeehColors.dark,
                   ),
@@ -669,7 +600,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                   _intensityLabel(sound.vibrationPattern),
                   style: const TextStyle(
                     fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: NabeehColors.darkBlue,
                   ),
@@ -698,21 +629,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           Row(
             children: [
               Expanded(
-                child: TextButton(
-                  onPressed: _isSaving ? null : () => Navigator.pop(context),
-                  child: const Text(
-                    'إلغاء',
-                    style: TextStyle(
-                      color: NabeehColors.slate400,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
@@ -737,35 +653,37 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                       style: const TextStyle(
                         fontFamily: 'IBMPlexSansArabic',
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w900,
                         color: Colors.white,
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-          if (isEditing) ...[
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: _isSaving ? null : _handleDelete,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 52),
-                side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text(
-                'حذف الفئة',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.redAccent,
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextButton(
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.5),
+                    ),
+                  ),
+                  child: const Text(
+                    'إلغاء',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 16,
+                      color: NabeehColors.slate400,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ],
       ),
     );
