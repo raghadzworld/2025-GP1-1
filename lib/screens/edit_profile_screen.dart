@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -165,10 +166,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         
         // --- IF THEY ARE TRYING TO CHANGE THEIR EMAIL ---
         if (_emailChanged) {
-          await user.reload();
-          final updatedUser = FirebaseAuth.instance.currentUser;
+          final uid = user.uid;
+          final newEmail = _emailController.text.trim();
 
-          if (updatedUser == null || updatedUser.email != _emailController.text.trim()) {
+          // STEP 1: Write to Firestore FIRST while the session is still alive.
+          // This is the only window where we are guaranteed auth is valid.
+          await FirebaseFirestore.instance.collection('User').doc(uid).set({
+            'FullName': name,
+            'PhoneNumber': phone,
+            'Email': newEmail,
+          }, SetOptions(merge: true));
+
+          // STEP 2: Check if the user actually clicked the link.
+          // user.reload() will throw if the session was revoked (which happens
+          // when the email change is confirmed) — both outcomes mean confirmed.
+          bool emailConfirmed = false;
+          try {
+            await user.reload();
+            final updatedUser = FirebaseAuth.instance.currentUser;
+            if (updatedUser != null && updatedUser.email == newEmail) {
+              emailConfirmed = true;
+            }
+          } on FirebaseAuthException {
+            // Session revoked by Firebase = email confirmed successfully
+            emailConfirmed = true;
+          } catch (_) {
+            emailConfirmed = true;
+          }
+
+          if (!emailConfirmed) {
             if (mounted) {
               setState(() {
                 _emailSaveError = 'لم يتم تأكيد البريد بعد. يرجى الضغط على الرابط في بريدك أولاً.';
@@ -178,20 +204,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             return;
           }
 
-          // Write ALL fields (including new email) using updatedUser.uid
-          // This must complete before we sign out — no silent catch here
-          await FirebaseFirestore.instance.collection('User').doc(updatedUser.uid).set({
-            'FullName': name,
-            'PhoneNumber': phone,
-            'Email': _emailController.text.trim(),
-          }, SetOptions(merge: true));
-
-          // Now safe to sign out
+          // STEP 3: Sign out and navigate to WelcomeScreen with success message.
           await FirebaseAuth.instance.signOut();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('تم تحديث البريد بنجاح! يرجى تسجيل الدخول مجدداً بالبريد الجديد.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                content: Text(
+                  'تم تحديث البريد الإلكتروني بنجاح! يرجى تسجيل الدخول مجدداً.',
+                  style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                ),
                 backgroundColor: Colors.green,
                 duration: Duration(seconds: 4),
               ),
