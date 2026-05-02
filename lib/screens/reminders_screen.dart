@@ -24,22 +24,36 @@ class _RemindersScreenState extends State<RemindersScreen> {
           .collection('Reminders')
           .doc(reminderId)
           .delete();
-          
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حذف المنبه بنجاح', style: TextStyle(fontFamily: 'IBMPlexSansArabic'))),
+          const SnackBar(
+            backgroundColor: Colors.green,
+            content: Text(
+              'تم حذف المنبه بنجاح',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحذف: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic'))),
+          SnackBar(
+            content: Text(
+              'حدث خطأ أثناء الحذف: $e',
+              style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+          ),
         );
       }
     }
   }
 
-  Future<void> _toggleReminderStatus(String reminderId, bool currentStatus) async {
+  Future<void> _toggleReminderStatus(
+    String reminderId,
+    bool currentStatus,
+  ) async {
     if (currentUser == null) return;
     try {
       await FirebaseFirestore.instance
@@ -61,14 +75,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             title: const Row(
               children: [
                 Icon(LucideIcons.alertTriangle, color: Colors.red),
                 SizedBox(width: 10),
                 Text(
                   'حذف المنبه',
-                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.red),
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
                 ),
               ],
             ),
@@ -76,7 +96,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
               'هل أنت متأكد من رغبتك في حذف هذا المنبه؟',
               style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
             ),
-            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            actionsPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
             actions: [
               Row(
                 children: [
@@ -84,25 +107,34 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        Navigator.pop(context); 
-                        _deleteReminder(reminderId); 
+                        Navigator.pop(context);
+                        _deleteReminder(reminderId);
                       },
                       style: OutlinedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
                         padding: EdgeInsets.zero,
-                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(
+                          color: Colors.redAccent,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                          Icon(
+                            LucideIcons.trash2,
+                            color: Colors.redAccent,
+                            size: 18,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'حذف',
                             style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic', 
-                              fontWeight: FontWeight.bold, 
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontWeight: FontWeight.bold,
                               color: Colors.redAccent,
                               fontSize: 16,
                             ),
@@ -121,19 +153,25 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)), 
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 235, 233, 229),
+                          ),
                         ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          Icon(
+                            LucideIcons.x,
+                            color: NabeehColors.slate500,
+                            size: 18,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'إلغاء',
                             style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic', 
-                              color: NabeehColors.slate500, 
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: NabeehColors.slate500,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -153,13 +191,13 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   void _editAlarm(String reminderId, Map<String, dynamic> currentData) {
     Navigator.push(
-      context, 
+      context,
       MaterialPageRoute(
         builder: (context) => AddReminderScreen(
           reminderId: reminderId,
           existingData: currentData,
-        )
-      )
+        ),
+      ),
     );
   }
 
@@ -178,7 +216,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
               Expanded(
                 child: currentUser == null
-                    ? const Center(child: Text('الرجاء تسجيل الدخول لعرض المنبهات', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
+                    ? const Center(
+                        child: Text(
+                          'الرجاء تسجيل الدخول لعرض المنبهات',
+                          style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                        ),
+                      )
                     : StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('User')
@@ -186,11 +229,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
                             .collection('Reminders')
                             .snapshots(),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator(color: NabeehColors.darkBlue));
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: NabeehColors.darkBlue,
+                              ),
+                            );
                           }
 
-                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
                             return _buildEmptyState();
                           }
 
@@ -201,7 +250,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
                             child: Column(
                               children: [
                                 ...reminders.map((doc) {
-                                  final data = doc.data() as Map<String, dynamic>;
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
                                   return _buildAlarmCard(doc.id, data);
                                 }),
                                 const SizedBox(height: 8),
@@ -231,7 +281,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
           const SizedBox(height: 20),
           const Text(
             'لا توجد منبهات حالياً',
-            style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 18, color: NabeehColors.slate500, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 18,
+              color: NabeehColors.slate500,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 40),
           _buildAddButton(),
@@ -270,11 +325,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ),
                   ),
                   child: const Directionality(
-                    textDirection: TextDirection.ltr, 
+                    textDirection: TextDirection.ltr,
                     child: Icon(
-                      Icons.arrow_forward_ios_rounded, 
-                      color: Color(0xFF181059), 
-                      size: 18),
+                      Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF181059),
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -298,12 +354,19 @@ class _RemindersScreenState extends State<RemindersScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
+                  colors: [
+                    NabeehColors.darkNavy,
+                    NabeehColors.darkNavy,
+                    NabeehColors.lightBlue,
+                  ],
                   stops: [0.09, 0.30, 1.0],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.25),
+                  width: 1.5,
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -325,12 +388,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final bool isActive = alarm['isEnabled'] ?? false;
     final String timeString = alarm['time'] ?? '00:00';
     final String label = alarm['label'] ?? 'منبه';
-    
+
     final List<dynamic> daysArray = alarm['daysActive'] ?? [];
-    
+
     // 👇 Returns empty string if no days, avoiding "مرة واحدة"
     final String daysText = daysArray.isEmpty ? '' : daysArray.join('، ');
-    
+
     // 👇 If daysText is empty, just show the label. Otherwise show Label • Days
     final String bottomText = daysText.isEmpty ? label : '$label • $daysText';
 
@@ -353,7 +416,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   color: NabeehColors.lightBlue.withOpacity(0.15),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
-                )
+                ),
               ]
             : null,
       ),
@@ -374,7 +437,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: isActive ? NabeehColors.lightBlue : NabeehColors.slate400,
+                      color: isActive
+                          ? NabeehColors.lightBlue
+                          : NabeehColors.slate400,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -382,12 +447,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        timeString.replaceAll('ص', '').replaceAll('م', '').trim(),
+                        timeString
+                            .replaceAll('ص', '')
+                            .replaceAll('م', '')
+                            .trim(),
                         style: TextStyle(
                           fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 36,
+                          fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: isActive ? NabeehColors.darkBlue : NabeehColors.slate400,
+                          color: isActive
+                              ? NabeehColors.darkBlue
+                              : NabeehColors.slate400,
                           letterSpacing: -2,
                           height: 1.1,
                         ),
@@ -396,7 +466,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       Icon(
                         isAm ? LucideIcons.sun : LucideIcons.moon,
                         size: 22,
-                        color: isActive ? (isAm ? NabeehColors.yellow : NabeehColors.darkBlue) : NabeehColors.slate300,
+                        color: isActive
+                            ? (isAm
+                                  ? NabeehColors.yellow
+                                  : NabeehColors.darkBlue)
+                            : NabeehColors.slate300,
                       ),
                     ],
                   ),
@@ -422,15 +496,26 @@ class _RemindersScreenState extends State<RemindersScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: isActive ? NabeehColors.lightBlue.withOpacity(0.05) : NabeehColors.slate100,
+                  color: isActive
+                      ? NabeehColors.lightBlue.withOpacity(0.05)
+                      : NabeehColors.slate100,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.bellRing, size: 13, color: isActive ? NabeehColors.lightBlue : NabeehColors.slate500),
+                    Icon(
+                      LucideIcons.bellRing,
+                      size: 13,
+                      color: isActive
+                          ? NabeehColors.lightBlue
+                          : NabeehColors.slate500,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       daysText,
@@ -438,7 +523,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         fontFamily: 'IBMPlexSansArabic',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isActive ? const Color(0xFF181059) : NabeehColors.slate500,
+                        color: isActive
+                            ? const Color(0xFF181059)
+                            : NabeehColors.slate500,
                       ),
                     ),
                   ],
@@ -457,12 +544,19 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: NabeehColors.darkBlue, width: 1.2),
+                      border: Border.all(
+                        color: NabeehColors.darkBlue,
+                        width: 1.2,
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(LucideIcons.edit2, size: 16, color: NabeehColors.darkBlue),
+                        const Icon(
+                          LucideIcons.edit2,
+                          size: 16,
+                          color: NabeehColors.darkBlue,
+                        ),
                         const SizedBox(width: 6),
                         const Text(
                           'تعديل',
@@ -492,7 +586,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(LucideIcons.trash2, size: 16, color: Colors.redAccent),
+                        Icon(
+                          LucideIcons.trash2,
+                          size: 16,
+                          color: Colors.redAccent,
+                        ),
                         SizedBox(width: 6),
                         Text(
                           'حذف',
@@ -534,8 +632,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
       child: TextButton.icon(
         onPressed: () {
           Navigator.push(
-            context, 
-            MaterialPageRoute(builder: (context) => const AddReminderScreen())
+            context,
+            MaterialPageRoute(builder: (context) => const AddReminderScreen()),
           );
         },
         icon: const Icon(LucideIcons.plus, color: Colors.white),
@@ -551,7 +649,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ),
         style: TextButton.styleFrom(
           padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
     );

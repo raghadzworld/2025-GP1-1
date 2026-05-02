@@ -33,6 +33,7 @@ class _SignupScreenState extends State<SignupScreen>
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
+  String _phoneError = '';
 
   @override
   void initState() {
@@ -96,6 +97,13 @@ class _SignupScreenState extends State<SignupScreen>
       return;
     }
 
+    if (_phoneController.text.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رقم الجوال يجب أن يكون 10 أرقام')),
+      );
+      return;
+    }
+
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(
         context,
@@ -113,12 +121,12 @@ class _SignupScreenState extends State<SignupScreen>
           );
 
       await FirebaseFirestore.instance
-          .collection('User') // غيرنا من users إلى User
+          .collection('User')
           .doc(credential.user!.uid)
           .set({
-            'FullName': _nameController.text.trim(), // غيرنا name
+            'FullName': _nameController.text.trim(),
             'Email': _emailController.text.trim(),
-            'PhoneNumber': _phoneController.text.trim(), // غيرنا phone
+            'PhoneNumber': _phoneController.text.trim(),
             'createdAt': FieldValue.serverTimestamp(),
           });
 
@@ -328,12 +336,110 @@ class _SignupScreenState extends State<SignupScreen>
                                   controller: _emailController,
                                 ),
                                 const SizedBox(height: 11),
-                                _buildInputField(
-                                  hint: 'رقم الجوال',
-                                  icon: Icons.phone_android_rounded,
-                                  keyboardType: TextInputType.phone,
-                                  controller: _phoneController,
+
+                                // ── حقل الجوال مع real-time validation ──
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    TextField(
+                                      controller: _phoneController,
+                                      keyboardType: TextInputType.number,
+                                      textDirection: TextDirection.rtl,
+                                      maxLength: 10,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          if (value.isEmpty) {
+                                            _phoneError = '';
+                                          } else if (!RegExp(
+                                            r'^[0-9]+$',
+                                          ).hasMatch(value)) {
+                                            _phoneError = 'أدخلي أرقاماً فقط';
+                                          } else if (value.length < 10) {
+                                            _phoneError =
+                                                'رقم الجوال يجب أن يكون 10 أرقام';
+                                          } else {
+                                            _phoneError = '';
+                                          }
+                                        });
+                                      },
+                                      style: const TextStyle(
+                                        fontFamily: 'IBMPlexSansArabic',
+                                        fontSize: 14,
+                                        color: Color(0xFF181059),
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: 'رقم الجوال',
+                                        hintStyle: const TextStyle(
+                                          fontFamily: 'IBMPlexSansArabic',
+                                          fontSize: 14,
+                                          color: Color(0xFF9CA3AF),
+                                        ),
+                                        counterText: '',
+                                        suffixIcon: const Icon(
+                                          Icons.phone_android_rounded,
+                                          color: Color(0xFF9CA3AF),
+                                          size: 18,
+                                        ),
+                                        filled: true,
+                                        fillColor: const Color(0xFFF3F4F6),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: _phoneError.isNotEmpty
+                                                ? Colors.red
+                                                : const Color(0xFFD1D5DB),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: _phoneError.isNotEmpty
+                                                ? Colors.red
+                                                : const Color(0xFFD1D5DB),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: _phoneError.isNotEmpty
+                                                ? Colors.red
+                                                : const Color(0xFF1773CF),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (_phoneError.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 6,
+                                          right: 4,
+                                        ),
+                                        child: Text(
+                                          _phoneError,
+                                          style: const TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 12,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
+
                                 const SizedBox(height: 11),
                                 _buildInputField(
                                   hint: 'كلمة المرور',
