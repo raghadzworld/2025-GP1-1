@@ -3,61 +3,380 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
-import 'settings_screen.dart';
+import '../features/categories/data/services/category_service.dart';
+import 'settings_screen.dart'; 
 
 class ProfileInfoScreen extends StatelessWidget {
   final VoidCallback onEdit;
   const ProfileInfoScreen({super.key, required this.onEdit});
 
+  // --- Firebase Logout Logic ---
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      await CategoryService.withDefaults().logout(); 
+
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ أثناء تسجيل الخروج: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // --- Firebase Delete Account Logic ---
+  Future<void> _deleteAccount(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingContext) => const Center(child: CircularProgressIndicator(color: Colors.red)),
+    );
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final uid = user.uid;
+        
+        await FirebaseFirestore.instance.collection('User').doc(uid).delete();
+        await user.delete();
+
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); 
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم حذف الحساب بنجاح. نتمنى رؤيتك قريباً!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+        }
+      } else {
+        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      }
+    } on FirebaseAuthException catch (e) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop(); 
+
+      if (e.code == 'requires-recent-login') {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('حدث خطأ: ${e.message}', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      debugPrint('Error deleting account: $e');
+    }
+  }
+
+  void _confirmDeleteAccount(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) { 
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(LucideIcons.alertTriangle, color: Colors.red),
+                SizedBox(width: 10),
+                Text(
+                  'حذف الحساب',
+                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.red),
+                ),
+              ],
+            ),
+            content: const Text(
+              'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        Navigator.pop(dialogContext);
+                        await _deleteAccount(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        padding: EdgeInsets.zero,
+                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'حذف نهائي',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.redAccent,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: TextButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: NabeehColors.slate500,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) { 
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(LucideIcons.logOut, color: NabeehColors.darkBlue),
+                SizedBox(width: 10),
+                Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: NabeehColors.darkBlue),
+                ),
+              ],
+            ),
+            content: const Text(
+              'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext); 
+                          _logout(context); 
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(LucideIcons.logOut, color: Colors.white, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'تأكيد',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: TextButton.styleFrom(
+                        fixedSize: const Size.fromHeight(50),
+                        backgroundColor: Colors.white,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'إلغاء',
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              color: NabeehColors.slate500,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Get the current logged-in user's ID
-    final User? currentUser = FirebaseAuth.instance.currentUser;
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
           top: false,
-          child: currentUser == null
-            ? const Center(child: Text('الرجاء تسجيل الدخول أولاً', style: TextStyle(fontFamily: 'IBMPlexSansArabic')))
-            : StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('User').doc(currentUser.uid).snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: Color(0xFF181059)));
-                  }
-
-                  final userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
-                  final String name = userData['FullName'] ?? 'مستخدم جديد';
-                  final String firestoreEmail = userData['Email'] ?? '';
-                  
-                  // 👇 2. Prioritize Firestore email. Fall back to Auth email ONLY if Firestore is empty.
-                  final String email = firestoreEmail.isNotEmpty 
-                      ? firestoreEmail 
-                      : (currentUser.email ?? 'لا يوجد بريد إلكتروني');
-                  final String phone = userData['PhoneNumber'] ?? 'لم يتم إضافة رقم';
-
-                  return Column(
-                    children: [
-                      _buildHeader(context, name),
-                      const SizedBox(height: 24),
-                      _buildInfoRow(Icons.email, 'الايميل', email),
-                      _buildInfoRow(Icons.phone_android, 'رقم الهاتف', phone),
-                      const Spacer(),
-                      _buildCommandButtons(context),
-                      const SizedBox(height: 40),
-                    ],
+          child: Column(
+            children: [
+              _buildHeader(context),
+              const SizedBox(height: 30),
+              
+              _buildSettingsTile(
+                icon: LucideIcons.edit2,
+                title: 'تعديل الملف الشخصي',
+                borderColor: const Color(0xFF181059), 
+                onTap: onEdit, 
+              ),
+              _buildSettingsTile(
+                icon: LucideIcons.lock,
+                title: 'تغيير كلمة المرور',
+                borderColor: const Color(0xFF181059), 
+                onTap: () {
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => const SettingsScreen())
                   );
                 },
               ),
+              _buildSettingsTile(
+                icon: LucideIcons.trash2,
+                title: 'حذف الحساب',
+                titleColor: Colors.red,
+                iconColor: Colors.red,
+                borderColor: Colors.red, 
+                onTap: () => _confirmDeleteAccount(context),
+              ),
+              
+              const Spacer(),
+              
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: ElevatedButton.icon(
+                    onPressed: () => _confirmLogout(context), 
+                    icon: const Icon(LucideIcons.logOut, color: Colors.white, size: 20), 
+                    label: const Text(
+                      'تسجيل الخروج',
+                      style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white 
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent, 
+                      shadowColor: Colors.transparent, 
+                      minimumSize: const Size(double.infinity, 60),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, String name) {
+  Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
@@ -71,10 +390,10 @@ class ProfileInfoScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
+          const Expanded(
             child: Text(
-              name,
-              style: const TextStyle(
+              'حسابي',
+              style: TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -84,146 +403,78 @@ class ProfileInfoScreen extends StatelessWidget {
             ),
           ),
           Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-              stops: [0.09, 0.30, 1.0],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 1.5,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Image.asset(
-              'assets/images/icon_signLan.png',
-              color: Colors.white,
-              colorBlendMode: BlendMode.srcIn,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 45, vertical: 15),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label, 
-            style: const TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              color: Colors.grey, 
-              fontSize: 14
-            )
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(icon, color: const Color(0xFF181059), size: 22),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: NabeehColors.darkBlue,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 30, thickness: 0.5),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommandButtons(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        children: [
-          // 1. Edit Profile Button
-          Container(
-            height: 60, // Strictly enforced height
-            width: double.infinity,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              // Added subtle border so it has the exact same box-model dimensions as the Outlined button
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.25),
                 width: 1.5,
               ),
             ),
-            child: ElevatedButton.icon(
-              onPressed: onEdit,
-              icon: const Icon(LucideIcons.edit2, color: Colors.white, size: 20),
-              label: const Text(
-                'تعديل الملف الشخصي',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent, // Allow the gradient to show
-                shadowColor: Colors.transparent, // Remove shadow
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 15),
-          
-          // 2. Settings Button
-          SizedBox(
-            height: 60, // Strictly enforced height via SizedBox to match Container perfectly
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const SettingsScreen())
-                );
-              },
-              icon: const Icon(LucideIcons.settings, color: NabeehColors.dark, size: 20), 
-              label: const Text(
-                'الإعدادات',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: NabeehColors.dark 
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.white,
-                side: const BorderSide(color: NabeehColors.dark, width: 1.5), 
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color titleColor = NabeehColors.darkBlue,
+    Color iconColor = NabeehColors.darkBlue,
+    required Color borderColor, 
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.2), 
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor, size: 24),
+              const SizedBox(width: 16),
+              Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: titleColor,
+                ),
+              ),
+              const Spacer(),
+              // 👇 Removed const so the arrow color can match the dynamic borderColor
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: borderColor), 
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -16,14 +16,12 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _emailController = TextEditingController(); 
   
   bool _isLoading = false;
 
   // --- Inline error ribbon state ---
   String? _nameError;
-  String? _phoneError;
   String? _emailSaveError;
 
   // --- Dynamic Email State Variables ---
@@ -31,16 +29,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSendingLink = false;
   bool _linkSent = false;
   String _lastSentEmail = '';
-  String _originalEmail = ''; // The email as loaded from Firestore
+  String _originalEmail = ''; 
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUserData();
     
-    // Clear inline errors as user types
     _nameController.addListener(() { if (_nameError != null) setState(() => _nameError = null); });
-    _phoneController.addListener(() { if (_phoneError != null) setState(() => _phoneError = null); });
   }
 
   Future<void> _loadCurrentUserData() async {
@@ -52,14 +48,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           final data = doc.data()!;
           setState(() {
             _nameController.text = data['FullName'] ?? '';
-            _phoneController.text = data['PhoneNumber'] ?? '';
             final loadedEmail = data['Email']?.isNotEmpty == true
                 ? data['Email'] as String
                 : (user.email ?? '');
             _emailController.text = loadedEmail;
-            _originalEmail = loadedEmail; // snapshot of what was loaded
+            _originalEmail = loadedEmail; 
           });
-          // Attach listener AFTER _originalEmail is set so it never false-triggers on load
           _emailController.addListener(_onEmailTextChanged);
         }
       } catch (e) {
@@ -68,18 +62,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // --- Real-time listener specifically for Email logic ---
   void _onEmailTextChanged() {
     final currentInput = _emailController.text.trim();
-
-    // Compare against what was originally loaded (Firestore email), not Auth email
     final hasChanged = currentInput != _originalEmail && currentInput.isNotEmpty;
 
     if (_emailChanged != hasChanged) {
       setState(() => _emailChanged = hasChanged);
     }
 
-    // If the user modifies the text AFTER sending a link, reset the UI
     if (_linkSent && currentInput != _lastSentEmail) {
       setState(() {
         _linkSent = false;
@@ -91,42 +81,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // --- Send the verification link ---
+  // --- Send the verification link (Mirrors SignupScreen error handling) ---
   Future<void> _sendVerificationLink() async {
-    setState(() => _isSendingLink = true);
+    setState(() {
+      _isSendingLink = true;
+      _emailSaveError = null; 
+    });
+    
     try {
       final user = FirebaseAuth.instance.currentUser;
       final newEmail = _emailController.text.trim();
       
       if (user != null) {
-        // --- SAVE NAME AND PHONE FIRST ---
+        // SAVE NAME FIRST
         try {
           await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
             'FullName': _nameController.text.trim(),
-            'PhoneNumber': _phoneController.text.trim(),
           }, SetOptions(merge: true));
         } catch (_) {}
 
-        // Send the actual link
+        // SEND THE LINK
         await user.verifyBeforeUpdateEmail(newEmail);
+        
         setState(() {
           _linkSent = true;
           _lastSentEmail = newEmail;
         });
       }
     } on FirebaseAuthException catch (e) {
-      String errorMessage = 'فشل إرسال الرابط: ${e.message}';
-      
+      // Logic extracted from SignupScreen
+      String message = 'حدث خطأ، حاولي مرة أخرى';
+      if (e.code == 'email-already-in-use') message = 'البريد مستخدم مسبقاً';
+      if (e.code == 'invalid-email') message = 'البريد الإلكتروني غير صحيح';
       if (e.code == 'requires-recent-login' || (e.message?.contains('valid') ?? false)) {
-        errorMessage = 'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
-      } else if (e.code == 'email-already-in-use') {
-        errorMessage = 'البريد الإلكتروني مستخدم بالفعل لحساب آخر.';
+        message = 'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
       }
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')), backgroundColor: Colors.red),
-        );
+        setState(() {
+          _emailSaveError = message;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _emailSaveError = 'حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.';
+        });
       }
     } finally {
       if (mounted) setState(() => _isSendingLink = false);
@@ -137,23 +137,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _saveProfile() async {
     FocusScope.of(context).unfocus();
 
-    // 1. NAME VALIDATION — show inline ribbon, button stays blue
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       setState(() {
         _nameError = 'الاسم الكامل مطلوب';
-        _phoneError = null;
-        _emailSaveError = null;
-      });
-      return;
-    }
-
-    // 2. PHONE VALIDATION — show inline ribbon, button stays blue
-    final phone = _phoneController.text.trim();
-    if (!phone.startsWith('05') || phone.length != 10) {
-      setState(() {
-        _phoneError = 'رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام';
-        _nameError = null;
         _emailSaveError = null;
       });
       return;
@@ -164,22 +151,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         
-        // --- IF THEY ARE TRYING TO CHANGE THEIR EMAIL ---
         if (_emailChanged) {
           final uid = user.uid;
           final newEmail = _emailController.text.trim();
 
-          // STEP 1: Write to Firestore FIRST while the session is still alive.
-          // This is the only window where we are guaranteed auth is valid.
           await FirebaseFirestore.instance.collection('User').doc(uid).set({
             'FullName': name,
-            'PhoneNumber': phone,
             'Email': newEmail,
           }, SetOptions(merge: true));
 
-          // STEP 2: Check if the user actually clicked the link.
-          // user.reload() will throw if the session was revoked (which happens
-          // when the email change is confirmed) — both outcomes mean confirmed.
           bool emailConfirmed = false;
           try {
             await user.reload();
@@ -188,7 +168,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               emailConfirmed = true;
             }
           } on FirebaseAuthException {
-            // Session revoked by Firebase = email confirmed successfully
             emailConfirmed = true;
           } catch (_) {
             emailConfirmed = true;
@@ -204,7 +183,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             return;
           }
 
-          // STEP 3: Sign out and navigate to WelcomeScreen with success message.
           await FirebaseAuth.instance.signOut();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -226,11 +204,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           return;
         }
 
-        // --- NORMAL SAVE (Name/Phone/Email) ---
+        // --- NORMAL SAVE (Name Only) ---
         await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
           'FullName': name,
-          'PhoneNumber': phone,
-          'Email': _emailController.text.trim(),
         }, SetOptions(merge: true));
         
         if (mounted) {
@@ -258,7 +234,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _emailController.removeListener(_onEmailTextChanged);
     _nameController.dispose();
-    _phoneController.dispose();
     _emailController.dispose(); 
     super.dispose();
   }
@@ -266,9 +241,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     bool isPendingEmail = _emailChanged && !_linkSent;
-
-    // The button ONLY disables if it's loading or waiting for the email link.
-    // Name and phone number validation happens when they click the button instead!
     bool isSaveDisabled = _isLoading || isPendingEmail;
 
     return Directionality(
@@ -317,7 +289,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.', 
                                 style: TextStyle(
                                   fontFamily: 'IBMPlexSansArabic', 
-                                  color: Color(0xFF1773CF), // Blue instructional text
+                                  color: Color(0xFF1773CF), 
                                   fontSize: 13, 
                                   fontWeight: FontWeight.w600
                                 ),
@@ -344,19 +316,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       if (_emailSaveError != null) _buildErrorRibbon(_emailSaveError!),
                       
-                      const SizedBox(height: 20),
-                      
-                      _buildTextField(
-                        controller: _phoneController,
-                        label: 'رقم الهاتف',
-                        icon: LucideIcons.phone,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly, 
-                          LengthLimitingTextInputFormatter(10),   
-                        ],
-                      ),
-                      if (_phoneError != null) _buildErrorRibbon(_phoneError!),
                       const SizedBox(height: 60),
 
                       // --- MAIN SAVE BUTTON ---
@@ -365,7 +324,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         width: double.infinity,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
-                          // Turns perfectly gray ONLY if disabled by the Email or Loading rule
                           gradient: isSaveDisabled 
                             ? const LinearGradient(colors: [Color(0xFFD1D5DB), Color(0xFF9CA3AF)])
                             : const LinearGradient(
