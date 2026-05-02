@@ -299,8 +299,17 @@ class ProfileInfoScreen extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFDDEEF8), Color(0xFFF2F9FE), Colors.white],
+              stops: [0.0, 0.35, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
           top: false,
           child: Column(
             children: [
@@ -372,6 +381,7 @@ class ProfileInfoScreen extends StatelessWidget {
             ],
           ),
         ),
+        ),
       ),
     );
   }
@@ -379,14 +389,7 @@ class ProfileInfoScreen extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
