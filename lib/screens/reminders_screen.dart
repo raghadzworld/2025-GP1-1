@@ -206,15 +206,24 @@ class _RemindersScreenState extends State<RemindersScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 40),
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFDDEEF8), Color(0xFFF2F9FE), Colors.white],
+              stops: [0.0, 0.35, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 40),
 
-              Expanded(
+                Expanded(
                 child: currentUser == null
                     ? const Center(
                         child: Text(
@@ -265,6 +274,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
@@ -298,14 +308,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
