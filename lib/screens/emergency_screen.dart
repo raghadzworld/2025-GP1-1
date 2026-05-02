@@ -553,6 +553,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                     onPressed: () => Navigator.pop(dialogContext, true),
                     style: OutlinedButton.styleFrom(
                       fixedSize: const Size.fromHeight(50),
+                      padding: EdgeInsets.zero,
                       side: const BorderSide(
                         color: Colors.redAccent,
                         width: 1.2,
@@ -569,14 +570,14 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                           color: Colors.redAccent,
                           size: 18,
                         ),
-                        SizedBox(width: 8),
+                        SizedBox(width: 6),
                         Text(
                           'حذف نهائي',
                           style: TextStyle(
                             fontFamily: 'IBMPlexSansArabic',
                             fontWeight: FontWeight.bold,
                             color: Colors.redAccent,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
                         ),
                       ],
