@@ -159,57 +159,67 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 40),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildCustomTimePicker(),
-                      const SizedBox(height: 32),
-                      _buildSettingCard(
-                        icon: LucideIcons.calendarDays,
-                        title: 'التكرار',
-                        value: repeat,
-                        onTap: _showRepeatPicker,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingCard(
-                        icon: LucideIcons.tag,
-                        title: 'التسمية',
-                        value: label,
-                        onTap: _showLabelDialog,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingCard(
-                        icon: LucideIcons.activity,
-                        title: 'نمط الاهتزاز',
-                        value: vibrationPattern,
-                        onTap: () {
-                          _showOptionsSheet(
-                            'نمط الاهتزاز',
-                            ['متصل', 'نبضات', 'متقطع', 'تصاعدي'],
-                            vibrationPattern,
-                            (val) => setState(() => vibrationPattern = val),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSliderCard(),
-                      const SizedBox(height: 40),
-                    ],
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFDDEEF8), Color(0xFFF2F9FE), Colors.white],
+              stops: [0.0, 0.35, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 40),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildCustomTimePicker(),
+                        const SizedBox(height: 32),
+                        _buildSettingCard(
+                          icon: LucideIcons.calendarDays,
+                          title: 'التكرار',
+                          value: repeat,
+                          onTap: _showRepeatPicker,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSettingCard(
+                          icon: LucideIcons.tag,
+                          title: 'التسمية',
+                          value: label,
+                          onTap: _showLabelDialog,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSettingCard(
+                          icon: LucideIcons.activity,
+                          title: 'نمط الاهتزاز',
+                          value: vibrationPattern,
+                          onTap: () {
+                            _showOptionsSheet(
+                              'نمط الاهتزاز',
+                              ['متصل', 'نبضات', 'متقطع', 'تصاعدي'],
+                              vibrationPattern,
+                              (val) => setState(() => vibrationPattern = val),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSliderCard(),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              _buildBottomActions(),
-            ],
+                _buildBottomActions(),
+              ],
+            ),
           ),
         ),
       ),
@@ -219,14 +229,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
