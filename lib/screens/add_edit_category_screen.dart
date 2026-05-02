@@ -182,30 +182,40 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildNameInput(),
-                      const SizedBox(height: 32),
-                      _buildSoundsSection(),
-                      const SizedBox(height: 24),
-                    ],
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFDDEEF8), Color(0xFFF2F9FE), Colors.white],
+              stops: [0.0, 0.35, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        _buildNameInput(),
+                        const SizedBox(height: 32),
+                        _buildSoundsSection(),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            _buildBottomActions(),
-          ],
+              _buildBottomActions(),
+            ],
+          ),
         ),
       ),
     );
@@ -214,14 +224,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 52, bottom: 20, right: 20, left: 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB8D4F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
