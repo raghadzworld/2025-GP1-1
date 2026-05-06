@@ -23,6 +23,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // --- Inline error ribbon state ---
   String? _nameError;
   String? _emailSaveError;
+  String? _emailFormatError;
 
   // --- Dynamic Email State Variables ---
   bool _emailChanged = false;
@@ -79,15 +80,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_emailSaveError != null && !_linkSent) {
       setState(() => _emailSaveError = null);
     }
+
+    // real-time format validation
+    if (hasChanged) {
+      final isValid = RegExp(
+        r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$',
+      ).hasMatch(currentInput);
+      final newError = isValid ? null : 'صيغة البريد الإلكتروني غير صحيحة';
+      if (_emailFormatError != newError) {
+        setState(() => _emailFormatError = newError);
+      }
+    } else if (_emailFormatError != null) {
+      setState(() => _emailFormatError = null);
+    }
   }
 
   // --- Send the verification link (Mirrors SignupScreen error handling) ---
   Future<void> _sendVerificationLink() async {
+    if (_emailFormatError != null) return;
+
     setState(() {
       _isSendingLink = true;
-      _emailSaveError = null; 
+      _emailSaveError = null;
     });
-    
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       final newEmail = _emailController.text.trim();
@@ -323,6 +339,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                             ) : const SizedBox.shrink()),
                       ),
+                      if (_emailFormatError != null) _buildErrorRibbon(_emailFormatError!),
                       if (_emailSaveError != null) _buildErrorRibbon(_emailSaveError!),
                       
                       const SizedBox(height: 60),

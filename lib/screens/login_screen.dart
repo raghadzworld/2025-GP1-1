@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -23,14 +25,20 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool _obscurePassword = true;
 
-  // Controllers
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _isLoading = false;
+  bool _rememberMe = false;
+  String _emailError = '';
+  String _passwordError = '';
 
   @override
   void initState() {
     super.initState();
+    _loadSavedCredentials();
     _wave1Controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 7),
@@ -64,6 +72,19 @@ class _LoginScreenState extends State<LoginScreen>
         .animate(
           CurvedAnimation(parent: _wave4Controller, curve: Curves.easeInOut),
         );
+
+    _emailFocus.addListener(() {
+      if (!_emailFocus.hasFocus) _validateEmail(_emailController.text);
+    });
+    _passwordFocus.addListener(() {
+      if (!_passwordFocus.hasFocus) {
+        setState(
+          () => _passwordError = _passwordController.text.isEmpty
+              ? 'كلمة المرور مطلوبة'
+              : '',
+        );
+      }
+    });
   }
 
   @override
@@ -74,33 +95,98 @@ class _LoginScreenState extends State<LoginScreen>
     _wave4Controller.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('يرجى تعبئة جميع الحقول')));
-      return;
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('remember_me') ?? false;
+    if (rememberMe) {
+      final savedEmail = prefs.getString('saved_email') ?? '';
+      setState(() {
+        _rememberMe = rememberMe;
+        _emailController.text = savedEmail;
+      });
     }
+  }
+
+  void _validateEmail(String val) {
+    setState(() {
+      _emailError = val.trim().isEmpty
+          ? 'البريد الإلكتروني مطلوب'
+          : !RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(val.trim())
+          ? 'صيغة البريد الإلكتروني غير صحيحة'
+          : '';
+    });
+  }
+
+  Future<void> _login() async {
+    _validateEmail(_emailController.text);
+    setState(
+      () => _passwordError = _passwordController.text.isEmpty
+          ? 'كلمة المرور مطلوبة'
+          : '',
+    );
+
+    if (_emailError.isNotEmpty || _passwordError.isNotEmpty) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberMe) {
+        await prefs.setBool('remember_me', true);
+        await prefs.setString('saved_email', _emailController.text.trim());
+      } else {
+        await prefs.remove('remember_me');
+        await prefs.remove('saved_email');
+      }
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.main);
+        String welcomeName = '';
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('User')
+              .doc(credential.user!.uid)
+              .get();
+          welcomeName = doc.data()?['FullName'] ?? '';
+        } catch (_) {}
+        if (mounted) {
+          Navigator.pushReplacementNamed(
+            context,
+            AppRoutes.main,
+            arguments: {'welcomeName': welcomeName},
+          );
+        }
       }
     } on FirebaseAuthException {
-      // رسالة عامة للحماية — لا نكشف سبب الخطأ
       if (mounted) {
+        FocusScope.of(context).unfocus();
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('البريد أو كلمة المرور غير صحيحة')),
+          SnackBar(
+            content: const Text(
+              'البريد الإلكتروني أو كلمة المرور غير صحيحة، يرجى التحقق والمحاولة مجدداً',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         );
       }
     } finally {
@@ -113,6 +199,7 @@ class _LoginScreenState extends State<LoginScreen>
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFF1a1760),
       body: Stack(
         children: [
@@ -168,7 +255,6 @@ class _LoginScreenState extends State<LoginScreen>
           SafeArea(
             child: Column(
               children: [
-                // ── شريط العلوي ──────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -178,7 +264,6 @@ class _LoginScreenState extends State<LoginScreen>
                     height: 50,
                     child: Stack(
                       children: [
-                        // زر لغة الإشارة — يسار
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Container(
@@ -212,7 +297,6 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
-                        // زر رجوع — يمين
                         Align(
                           alignment: Alignment.centerRight,
                           child: GestureDetector(
@@ -241,11 +325,9 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
 
-                // ─── المنطقة البيضاء ──────────────────────────────────────
                 Expanded(
                   child: Stack(
                     children: [
-                      // الأبيض الكامل
                       Positioned(
                         top: 80,
                         left: 0,
@@ -254,7 +336,6 @@ class _LoginScreenState extends State<LoginScreen>
                         child: Container(color: Colors.white),
                       ),
 
-                      // الموجة العلوية
                       Positioned(
                         top: 0,
                         left: 0,
@@ -266,7 +347,6 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
 
-                      // المحتوى
                       Positioned(
                         top: 80,
                         left: 0,
@@ -290,32 +370,102 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 const SizedBox(height: 18),
 
-                                // ── البريد الإلكتروني ─────────────────────
                                 _buildInputField(
                                   hint: 'البريد الإلكتروني',
                                   icon: Icons.email_outlined,
                                   keyboardType: TextInputType.emailAddress,
                                   controller: _emailController,
+                                  focusNode: _emailFocus,
+                                  onChanged: (val) => _validateEmail(val),
                                 ),
+                                _buildErrorText(_emailError),
                                 const SizedBox(height: 11),
 
-                                // ── كلمة المرور ───────────────────────────
                                 _buildInputField(
                                   hint: 'كلمة المرور',
                                   icon: Icons.lock_outline_rounded,
                                   obscure: _obscurePassword,
                                   controller: _passwordController,
+                                  focusNode: _passwordFocus,
                                   onToggleObscure: () => setState(
                                     () => _obscurePassword = !_obscurePassword,
                                   ),
+                                  onChanged: (val) => setState(
+                                    () => _passwordError = val.isEmpty
+                                        ? 'كلمة المرور مطلوبة'
+                                        : '',
+                                  ),
                                 ),
-                                const SizedBox(height: 10),
+                                _buildErrorText(_passwordError),
+                                const SizedBox(height: 6),
 
-                                // ── نسيت كلمة المرور؟ ─────────────────────
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => setState(
+                                        () => _rememberMe = !_rememberMe,
+                                      ),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          gradient: _rememberMe
+                                              ? const LinearGradient(
+                                                  colors: [
+                                                    Color(0xFF181059),
+                                                    Color(0xFF1773CF),
+                                                  ],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                )
+                                              : null,
+                                          color: _rememberMe
+                                              ? null
+                                              : Colors.transparent,
+                                          border: _rememberMe
+                                              ? null
+                                              : Border.all(
+                                                  color: const Color(
+                                                    0xFF181059,
+                                                  ),
+                                                  width: 1.5,
+                                                ),
+                                        ),
+                                        child: _rememberMe
+                                            ? const Icon(
+                                                Icons.check_rounded,
+                                                color: Colors.white,
+                                                size: 16,
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'تذكــرنـــي',
+                                      style: TextStyle(
+                                        fontFamily: 'IBMPlexSansArabic',
+                                        fontSize: 14,
+                                        color: Color(0xFF181059),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: GestureDetector(
-                                    onTap: () {},
+                                    onTap: () => Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.forgotPassword,
+                                    ),
                                     child: const Text(
                                       'هل نسيـت كلمــة المـرور؟ ',
                                       style: TextStyle(
@@ -330,7 +480,6 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 const SizedBox(height: 20),
 
-                                // ── زر تسجيل الدخول ───────────────────────
                                 Container(
                                   width: double.infinity,
                                   decoration: BoxDecoration(
@@ -370,77 +519,13 @@ class _LoginScreenState extends State<LoginScreen>
                                               fontFamily: 'IBMPlexSansArabic',
                                               fontSize: 16,
                                               fontWeight: FontWeight.w600,
-                                              color: Color(0xFFFFD350),
+                                              color: Colors.white,
                                             ),
                                           ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),
 
-                                // ── فاصل ──────────────────────────────────
-                                const Row(
-                                  children: [
-                                    Expanded(
-                                      child: Divider(
-                                        color: Color(0xFFE5E7EB),
-                                        thickness: 1,
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                      child: Text(
-                                        '  أو سجّــل بـــ',
-                                        style: TextStyle(
-                                          fontFamily: 'IBMPlexSansArabic',
-                                          fontSize: 12,
-                                          color: Color(0xFF9CA3AF),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Divider(
-                                        color: Color(0xFFE5E7EB),
-                                        thickness: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-
-                                // ── زر Google ─────────────────────────────
-                                Center(
-                                  child: Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFE5E7EB),
-                                        width: 1.5,
-                                      ),
-                                      color: Colors.white,
-                                    ),
-                                    child: IconButton(
-                                      onPressed: () {},
-                                      icon: Image.asset(
-                                        'assets/images/icon_google.png',
-                                        width: 22,
-                                        height: 22,
-                                        errorBuilder: (_, __, ___) =>
-                                            const Icon(
-                                              Icons.g_mobiledata_rounded,
-                                              color: Color(0xFF4285F4),
-                                              size: 28,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-
-                                // ── ليس لديك حساب؟ ────────────────────────
                                 Center(
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -477,7 +562,6 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
 
-                      // الموجة السفلية
                       Positioned(
                         bottom: 0,
                         left: 0,
@@ -524,19 +608,46 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  Widget _buildErrorText(String error) {
+    if (error.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, right: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.cancel_rounded, size: 16, color: Colors.red),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              error,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 12,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInputField({
     required String hint,
     required IconData icon,
     required TextEditingController controller,
+    FocusNode? focusNode,
     TextInputType keyboardType = TextInputType.text,
     bool obscure = false,
     VoidCallback? onToggleObscure,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       obscureText: obscure,
       textDirection: TextDirection.rtl,
+      onChanged: onChanged,
       style: const TextStyle(
         fontFamily: 'IBMPlexSansArabic',
         fontSize: 14,

@@ -250,22 +250,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           textAlign: TextAlign.center,
                           text: const TextSpan(
                             children: [
-                              /* TextSpan(
-                                text: 'مرحباً بك في ',
-                                style: TextStyle(
-                                  fontFamily: 'IBMPlexSansArabic',
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w400,
-                                  color: Colors.white,
-                                ),
-                              ),*/
                               TextSpan(
                                 text: 'مرحباً بك',
                                 style: TextStyle(
                                   fontFamily: 'IBMPlexSansArabic',
                                   fontSize: 28,
                                   fontWeight: FontWeight.w700,
-                                  color: Color.fromARGB(255, 255, 255, 255),
+                                  color: Color(0xFFFFD350),
                                 ),
                               ),
                             ],
@@ -323,7 +314,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               children: [
                                 Icon(
                                   Icons.account_circle_outlined,
-                                  color: Color(0xFFFFD350),
+                                  color: Colors.white,
                                   size: 22,
                                 ),
                                 SizedBox(width: 8),
@@ -333,7 +324,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     fontFamily: 'IBMPlexSansArabic',
                                     fontSize: 17,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFFFFD350),
+                                    color: Colors.white,
                                   ),
                                 ),
                               ],

@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
 import '../features/categories/data/services/category_service.dart';
-import 'settings_screen.dart'; 
+import 'settings_screen.dart';
 
 class ProfileInfoScreen extends StatelessWidget {
   final VoidCallback onEdit;
@@ -14,16 +14,45 @@ class ProfileInfoScreen extends StatelessWidget {
   Future<void> _logout(BuildContext context) async {
     try {
       await FirebaseAuth.instance.signOut();
-      await CategoryService.withDefaults().logout(); 
+      await CategoryService.withDefaults().logout();
 
       if (context.mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+        final messenger = ScaffoldMessenger.of(context);
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/welcome',
+          (route) => false,
+        );
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text(
+              'تم تسجيل خروجك بنجاح!',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('حدث خطأ أثناء تسجيل الخروج: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+            content: Text(
+              'حدث خطأ أثناء تسجيل الخروج: $e',
+              style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -36,39 +65,50 @@ class ProfileInfoScreen extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (loadingContext) => const Center(child: CircularProgressIndicator(color: Colors.red)),
+      builder: (loadingContext) =>
+          const Center(child: CircularProgressIndicator(color: Colors.red)),
     );
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final uid = user.uid;
-        
+
         await FirebaseFirestore.instance.collection('User').doc(uid).delete();
         await user.delete();
 
         if (context.mounted) {
-          Navigator.of(context, rootNavigator: true).pop(); 
+          Navigator.of(context, rootNavigator: true).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم حذف الحساب بنجاح. نتمنى رؤيتك قريباً!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              content: Text(
+                'تم حذف حسابك بنجاح. نأمل أن تعود إلينا قريباً.',
+                style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+              ),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 4),
             ),
           );
-          Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/welcome',
+            (route) => false,
+          );
         }
       } else {
         if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       }
     } on FirebaseAuthException catch (e) {
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop(); 
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
 
       if (e.code == 'requires-recent-login') {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              content: Text(
+                'لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.',
+                style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
@@ -78,7 +118,10 @@ class ProfileInfoScreen extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('حدث خطأ: ${e.message}', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              content: Text(
+                'حدث خطأ: ${e.message}',
+                style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -93,19 +136,25 @@ class ProfileInfoScreen extends StatelessWidget {
   void _confirmDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) { 
+      builder: (BuildContext dialogContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             title: const Row(
               children: [
                 Icon(LucideIcons.alertTriangle, color: Colors.red),
                 SizedBox(width: 10),
                 Text(
                   'حذف الحساب',
-                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.red),
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
                 ),
               ],
             ),
@@ -113,7 +162,10 @@ class ProfileInfoScreen extends StatelessWidget {
               'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
               style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
             ),
-            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            actionsPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
             actions: [
               Row(
                 children: [
@@ -126,13 +178,22 @@ class ProfileInfoScreen extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
                         padding: EdgeInsets.zero,
-                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(
+                          color: Colors.redAccent,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                          Icon(
+                            LucideIcons.trash2,
+                            color: Colors.redAccent,
+                            size: 18,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'حذف نهائي',
@@ -156,13 +217,19 @@ class ProfileInfoScreen extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195)),
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 200, 198, 195),
+                          ),
                         ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          Icon(
+                            LucideIcons.x,
+                            color: NabeehColors.slate500,
+                            size: 18,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'إلغاء',
@@ -189,19 +256,25 @@ class ProfileInfoScreen extends StatelessWidget {
   void _confirmLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) { 
+      builder: (BuildContext dialogContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             title: const Row(
               children: [
                 Icon(LucideIcons.logOut, color: NabeehColors.darkBlue),
                 SizedBox(width: 10),
                 Text(
                   'تسجيل الخروج',
-                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: NabeehColors.darkBlue),
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontWeight: FontWeight.bold,
+                    color: NabeehColors.darkBlue,
+                  ),
                 ),
               ],
             ),
@@ -209,7 +282,10 @@ class ProfileInfoScreen extends StatelessWidget {
               'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
               style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
             ),
-            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            actionsPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
             actions: [
               Row(
                 children: [
@@ -226,19 +302,25 @@ class ProfileInfoScreen extends StatelessWidget {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pop(dialogContext); 
-                          _logout(context); 
+                          Navigator.pop(dialogContext);
+                          _logout(context);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                           padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(LucideIcons.logOut, color: Colors.white, size: 18),
+                            Icon(
+                              LucideIcons.logOut,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                             SizedBox(width: 6),
                             Text(
                               'تأكيد',
@@ -264,13 +346,19 @@ class ProfileInfoScreen extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 235, 233, 229),
+                          ),
                         ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.x, color: NabeehColors.slate500, size: 18),
+                          Icon(
+                            LucideIcons.x,
+                            color: NabeehColors.slate500,
+                            size: 18,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'إلغاء',
@@ -310,77 +398,85 @@ class ProfileInfoScreen extends StatelessWidget {
             ),
           ),
           child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 30),
-              
-              _buildSettingsTile(
-                icon: LucideIcons.edit2,
-                title: 'تعديل الملف الشخصي',
-                borderColor: const Color(0xFF181059), 
-                onTap: onEdit, 
-              ),
-              _buildSettingsTile(
-                icon: LucideIcons.lock,
-                title: 'تغيير كلمة المرور',
-                borderColor: const Color(0xFF181059), 
-                onTap: () {
-                  Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (context) => const SettingsScreen())
-                  );
-                },
-              ),
-              _buildSettingsTile(
-                icon: LucideIcons.trash2,
-                title: 'حذف الحساب',
-                titleColor: Colors.red,
-                iconColor: Colors.red,
-                borderColor: Colors.red, 
-                onTap: () => _confirmDeleteAccount(context),
-              ),
-              
-              const Spacer(),
-              
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Container(
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: ElevatedButton.icon(
-                    onPressed: () => _confirmLogout(context), 
-                    icon: const Icon(LucideIcons.logOut, color: Colors.white, size: 20), 
-                    label: const Text(
-                      'تسجيل الخروج',
-                      style: TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white 
+            top: false,
+            child: Column(
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 30),
+
+                _buildSettingsTile(
+                  icon: LucideIcons.edit2,
+                  title: 'تعديل الملف الشخصي',
+                  borderColor: const Color(0xFF181059),
+                  onTap: onEdit,
+                ),
+                _buildSettingsTile(
+                  icon: LucideIcons.lock,
+                  title: 'تغيير كلمة المرور',
+                  borderColor: const Color(0xFF181059),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildSettingsTile(
+                  icon: LucideIcons.trash2,
+                  title: 'حذف الحساب',
+                  titleColor: Colors.red,
+                  iconColor: Colors.red,
+                  borderColor: Colors.red,
+                  onTap: () => _confirmDeleteAccount(context),
+                ),
+
+                const Spacer(),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Container(
+                    height: 60,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent, 
-                      shadowColor: Colors.transparent, 
-                      minimumSize: const Size(double.infinity, 60),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: ElevatedButton.icon(
+                      onPressed: () => _confirmLogout(context),
+                      icon: const Icon(
+                        LucideIcons.logOut,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      label: const Text(
+                        'تسجيل الخروج',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        minimumSize: const Size(double.infinity, 60),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
-            ],
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -411,7 +507,11 @@ class ProfileInfoScreen extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                colors: [
+                  Color(0xFF181059),
+                  Color(0xFF181059),
+                  Color(0xFF1773CF),
+                ],
                 stops: [0.09, 0.30, 1.0],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -442,7 +542,7 @@ class ProfileInfoScreen extends StatelessWidget {
     required VoidCallback onTap,
     Color titleColor = NabeehColors.darkBlue,
     Color iconColor = NabeehColors.darkBlue,
-    required Color borderColor, 
+    required Color borderColor,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -454,7 +554,7 @@ class ProfileInfoScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor, width: 1.2), 
+            border: Border.all(color: borderColor, width: 1.2),
           ),
           child: Row(
             children: [
@@ -473,7 +573,11 @@ class ProfileInfoScreen extends StatelessWidget {
               // 👇 Removed const so the arrow color can match the dynamic borderColor
               Directionality(
                 textDirection: TextDirection.ltr,
-                child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: borderColor), 
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 16,
+                  color: borderColor,
+                ),
               ),
             ],
           ),

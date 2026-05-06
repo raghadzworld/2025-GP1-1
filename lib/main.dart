@@ -2,6 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/main_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/add_edit_category_screen.dart';
@@ -11,6 +13,7 @@ import 'screens/stt_tts_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/forgot_password_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +32,7 @@ class AppRoutes {
   static const main = '/main';
   static const welcome = '/welcome';
   static const signup = '/signup';
-
+  static const forgotPassword = '/forgot-password';
   // مسارات شاشاتكِ الجديدة
   static const categories = '/categories';
   static const addCategory = '/add-category';
@@ -53,10 +56,8 @@ class NabeehApp extends StatelessWidget {
           final category = args?['category'] as CategoryModel?;
           final service = args?['service'] as CategoryService?;
           return MaterialPageRoute(
-            builder: (context) => AddEditCategoryScreen(
-              category: category,
-              service: service,
-            ),
+            builder: (context) =>
+                AddEditCategoryScreen(category: category, service: service),
           );
         }
 
@@ -71,11 +72,18 @@ class NabeehApp extends StatelessWidget {
           case AppRoutes.login:
             return MaterialPageRoute(builder: (_) => const LoginScreen());
           case AppRoutes.main:
-            return MaterialPageRoute(builder: (_) => const MainScreen());
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const MainScreen(),
+            );
           case AppRoutes.categories:
             return MaterialPageRoute(builder: (_) => const CategoriesScreen());
           case AppRoutes.sttTts:
             return MaterialPageRoute(builder: (_) => const SttTtsScreen());
+          case AppRoutes.forgotPassword:
+            return MaterialPageRoute(
+              builder: (_) => const ForgotPasswordScreen(),
+            );
           default:
             return MaterialPageRoute(builder: (_) => const SplashScreen());
         }
@@ -159,8 +167,17 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
     _ctrl.forward();
-    Future.delayed(Duration.zero, () {
-      if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+    Future.delayed(const Duration(milliseconds: 1200), () async {
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final rememberMe = prefs.getBool('remember_me') ?? false;
+      final user = FirebaseAuth.instance.currentUser;
+      if (!mounted) return;
+      if (rememberMe && user != null) {
+        Navigator.pushReplacementNamed(context, AppRoutes.main);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+      }
     });
   }
 

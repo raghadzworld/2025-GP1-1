@@ -22,18 +22,28 @@ class _SignupScreenState extends State<SignupScreen>
   late Animation<Offset> _wave3Anim;
   late Animation<Offset> _wave4Anim;
 
-  bool _rememberMe = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _passwordFieldFocused = false;
 
-  // Controllers
+  String _passwordStrength = '';
+  Color _passwordStrengthColor = Colors.transparent;
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  final _nameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
+
   bool _isLoading = false;
-  String _phoneError = '';
+  String _confirmPasswordStatus = '';
+  String _nameError = '';
+  String _emailError = '';
+  String _passwordError = '';
 
   @override
   void initState() {
@@ -71,6 +81,23 @@ class _SignupScreenState extends State<SignupScreen>
         .animate(
           CurvedAnimation(parent: _wave4Controller, curve: Curves.easeInOut),
         );
+
+    _nameFocus.addListener(() {
+      if (!_nameFocus.hasFocus) _validateName(_nameController.text);
+    });
+    _emailFocus.addListener(() {
+      if (!_emailFocus.hasFocus) _validateEmail(_emailController.text);
+    });
+    _passwordFocus.addListener(() {
+      if (!_passwordFocus.hasFocus) _validatePassword(_passwordController.text);
+    });
+    _confirmPasswordFocus.addListener(() {
+      if (!_confirmPasswordFocus.hasFocus) {
+        if (_confirmPasswordController.text.isEmpty) {
+          setState(() => _confirmPasswordStatus = 'empty');
+        }
+      }
+    });
   }
 
   @override
@@ -81,33 +108,111 @@ class _SignupScreenState extends State<SignupScreen>
     _wave4Controller.dispose();
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _nameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
-  Future<void> _signUp() async {
-    if (_nameController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('يرجى تعبئة جميع الحقول')));
+  // ✅ يحدث تأكيد كلمة المرور تلقائياً لما يتغير الباسورد
+  void _checkPasswordStrength(String password) {
+    if (password.isEmpty) {
+      setState(() {
+        _passwordStrength = '';
+        _passwordStrengthColor = Colors.transparent;
+        if (_confirmPasswordController.text.isNotEmpty) {
+          _confirmPasswordStatus = 'nomatch';
+        }
+      });
       return;
     }
+    bool hasUpper = password.contains(RegExp(r'[A-Z]'));
+    bool hasLower = password.contains(RegExp(r'[a-z]'));
+    bool hasDigit = password.contains(RegExp(r'[0-9]'));
+    bool hasSpecial = password.contains(RegExp(r'[!@#\$&*~%^]'));
+    bool hasLength = password.length >= 8;
+    int score = [
+      hasUpper,
+      hasLower,
+      hasDigit,
+      hasSpecial,
+      hasLength,
+    ].where((e) => e).length;
+    setState(() {
+      if (score <= 2) {
+        _passwordStrength = 'ضعيفة';
+        _passwordStrengthColor = Colors.red;
+      } else if (score == 3 || score == 4) {
+        _passwordStrength = 'متوسطة';
+        _passwordStrengthColor = Colors.orange;
+      } else {
+        _passwordStrength = 'قوية';
+        _passwordStrengthColor = Colors.green;
+      }
 
-    if (_phoneController.text.length != 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('رقم الجوال يجب أن يكون 10 أرقام')),
-      );
+      // تحديث تأكيد كلمة المرور تلقائياً
+      if (_confirmPasswordController.text.isNotEmpty) {
+        _confirmPasswordStatus = _confirmPasswordController.text == password
+            ? 'match'
+            : 'nomatch';
+      }
+    });
+  }
+
+  void _validateName(String val) {
+    setState(() {
+      _nameError = val.trim().isEmpty ? 'الاسم الكامل مطلوب' : '';
+    });
+  }
+
+  void _validateEmail(String val) {
+    setState(() {
+      _emailError = val.trim().isEmpty
+          ? 'البريد الإلكتروني مطلوب'
+          : !RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(val.trim())
+          ? 'صيغة البريد الإلكتروني غير صحيحة'
+          : '';
+    });
+  }
+
+  void _validatePassword(String val) {
+    setState(() {
+      _passwordError = val.isEmpty
+          ? 'كلمة المرور مطلوبة'
+          : val.length < 8
+          ? 'كلمة المرور يجب أن تكون 8 خانات على الأقل'
+          : !val.contains(RegExp(r'[A-Z]'))
+          ? 'يجب أن تحتوي على حرف كبير'
+          : !val.contains(RegExp(r'[a-z]'))
+          ? 'يجب أن تحتوي على حرف صغير'
+          : !val.contains(RegExp(r'[0-9]'))
+          ? 'يجب أن تحتوي على رقم'
+          : !val.contains(RegExp(r'[!@#\$&*~%^]'))
+          ? 'يجب أن تحتوي على رمز'
+          : '';
+    });
+  }
+
+  Future<void> _signUp() async {
+    _validateName(_nameController.text);
+    _validateEmail(_emailController.text);
+    _validatePassword(_passwordController.text);
+
+    if (_nameError.isNotEmpty ||
+        _emailError.isNotEmpty ||
+        _passwordError.isNotEmpty)
+      return;
+
+    if (_confirmPasswordController.text.isEmpty) {
+      setState(() => _confirmPasswordStatus = 'empty');
       return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('كلمة المرور غير متطابقة')));
+      setState(() => _confirmPasswordStatus = 'nomatch');
       return;
     }
 
@@ -126,23 +231,31 @@ class _SignupScreenState extends State<SignupScreen>
           .set({
             'FullName': _nameController.text.trim(),
             'Email': _emailController.text.trim(),
-            'PhoneNumber': _phoneController.text.trim(),
             'createdAt': FieldValue.serverTimestamp(),
           });
 
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.main);
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.main,
+          arguments: {
+            'welcomeName': _nameController.text.trim(),
+            'isNewUser': true,
+          },
+        );
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'حدث خطأ، حاولي مرة أخرى';
-      if (e.code == 'email-already-in-use') message = 'البريد مستخدم مسبقاً';
-      if (e.code == 'weak-password') message = 'كلمة المرور ضعيفة جداً';
-      if (e.code == 'invalid-email') message = 'البريد الإلكتروني غير صحيح';
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+      if (e.code == 'email-already-in-use') {
+        setState(() => _emailError = 'البريد الإلكتروني مستخدم مسبقاً');
+      } else if (e.code == 'invalid-email') {
+        setState(() => _emailError = 'البريد الإلكتروني غير صحيح');
+      } else if (e.code == 'weak-password') {
+        setState(() => _passwordError = 'كلمة المرور ضعيفة جداً');
+      } else {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('حدث خطأ، حاولي مرة أخرى')),
+          );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -152,8 +265,10 @@ class _SignupScreenState extends State<SignupScreen>
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final password = _passwordController.text;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFF1a1760),
       body: Stack(
         children: [
@@ -289,7 +404,6 @@ class _SignupScreenState extends State<SignupScreen>
                         bottom: 0,
                         child: Container(color: Colors.white),
                       ),
-
                       Positioned(
                         top: 0,
                         left: 0,
@@ -323,181 +437,243 @@ class _SignupScreenState extends State<SignupScreen>
                                   ),
                                 ),
                                 const SizedBox(height: 18),
+
                                 _buildInputField(
                                   hint: 'الاسم الكامل',
                                   icon: Icons.person_outline_rounded,
                                   controller: _nameController,
+                                  focusNode: _nameFocus,
+                                  onChanged: _validateName,
                                 ),
+                                _buildErrorText(_nameError),
                                 const SizedBox(height: 11),
+
                                 _buildInputField(
                                   hint: 'البريد الإلكتروني',
                                   icon: Icons.email_outlined,
                                   keyboardType: TextInputType.emailAddress,
                                   controller: _emailController,
+                                  focusNode: _emailFocus,
+                                  onChanged: _validateEmail,
                                 ),
+                                _buildErrorText(_emailError),
                                 const SizedBox(height: 11),
 
-                                // ── حقل الجوال مع real-time validation ──
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    TextField(
-                                      controller: _phoneController,
-                                      keyboardType: TextInputType.number,
-                                      textDirection: TextDirection.rtl,
-                                      maxLength: 10,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          if (value.isEmpty) {
-                                            _phoneError = '';
-                                          } else if (!RegExp(
-                                            r'^[0-9]+$',
-                                          ).hasMatch(value)) {
-                                            _phoneError = 'أدخلي أرقاماً فقط';
-                                          } else if (value.length < 10) {
-                                            _phoneError =
-                                                'رقم الجوال يجب أن يكون 10 أرقام';
-                                          } else {
-                                            _phoneError = '';
-                                          }
-                                        });
-                                      },
-                                      style: const TextStyle(
-                                        fontFamily: 'IBMPlexSansArabic',
-                                        fontSize: 14,
-                                        color: Color(0xFF181059),
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: 'رقم الجوال',
-                                        hintStyle: const TextStyle(
-                                          fontFamily: 'IBMPlexSansArabic',
-                                          fontSize: 14,
-                                          color: Color(0xFF9CA3AF),
-                                        ),
-                                        counterText: '',
-                                        suffixIcon: const Icon(
-                                          Icons.phone_android_rounded,
-                                          color: Color(0xFF9CA3AF),
-                                          size: 18,
-                                        ),
-                                        filled: true,
-                                        fillColor: const Color(0xFFF3F4F6),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 14,
-                                            ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: _phoneError.isNotEmpty
-                                                ? Colors.red
-                                                : const Color(0xFFD1D5DB),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: _phoneError.isNotEmpty
-                                                ? Colors.red
-                                                : const Color(0xFFD1D5DB),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: _phoneError.isNotEmpty
-                                                ? Colors.red
-                                                : const Color(0xFF1773CF),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                      ),
+                                // حقل كلمة المرور
+                                Focus(
+                                  onFocusChange: (hasFocus) {
+                                    setState(
+                                      () => _passwordFieldFocused = hasFocus,
+                                    );
+                                    if (!hasFocus)
+                                      _validatePassword(
+                                        _passwordController.text,
+                                      );
+                                  },
+                                  child: _buildInputField(
+                                    hint: 'كلمة المرور',
+                                    icon: Icons.lock_outline_rounded,
+                                    obscure: _obscurePassword,
+                                    controller: _passwordController,
+                                    focusNode: _passwordFocus,
+                                    onToggleObscure: () => setState(
+                                      () =>
+                                          _obscurePassword = !_obscurePassword,
                                     ),
-                                    if (_phoneError.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: 6,
-                                          right: 4,
-                                        ),
-                                        child: Text(
-                                          _phoneError,
-                                          style: const TextStyle(
-                                            fontFamily: 'IBMPlexSansArabic',
-                                            fontSize: 12,
-                                            color: Colors.red,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 11),
-                                _buildInputField(
-                                  hint: 'كلمة المرور',
-                                  icon: Icons.lock_outline_rounded,
-                                  obscure: _obscurePassword,
-                                  controller: _passwordController,
-                                  onToggleObscure: () => setState(
-                                    () => _obscurePassword = !_obscurePassword,
+                                    onChanged: (val) {
+                                      _checkPasswordStrength(val);
+                                      _validatePassword(val);
+                                    },
                                   ),
                                 ),
+
+                                if (_passwordFieldFocused)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 10,
+                                      right: 4,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Text(
+                                              'قوة كلمة المرور: ',
+                                              style: TextStyle(
+                                                fontFamily: 'IBMPlexSansArabic',
+                                                fontSize: 12,
+                                                color: Color(0xFF6B7280),
+                                              ),
+                                            ),
+                                            if (_passwordStrength.isNotEmpty)
+                                              Text(
+                                                _passwordStrength,
+                                                style: TextStyle(
+                                                  fontFamily:
+                                                      'IBMPlexSansArabic',
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _passwordStrengthColor,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            _buildStrengthBar(
+                                              _passwordStrength == 'ضعيفة' ||
+                                                  _passwordStrength ==
+                                                      'متوسطة' ||
+                                                  _passwordStrength == 'قوية',
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _buildStrengthBar(
+                                              _passwordStrength == 'متوسطة' ||
+                                                  _passwordStrength == 'قوية',
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _buildStrengthBar(
+                                              _passwordStrength == 'قوية',
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        _buildRequirement(
+                                          '8 خانات على الأقل',
+                                          password.length >= 8,
+                                        ),
+                                        _buildRequirement(
+                                          'حرف كبير (A-Z)',
+                                          password.contains(RegExp(r'[A-Z]')),
+                                        ),
+                                        _buildRequirement(
+                                          'حرف صغير (a-z)',
+                                          password.contains(RegExp(r'[a-z]')),
+                                        ),
+                                        _buildRequirement(
+                                          'رقم (0-9)',
+                                          password.contains(RegExp(r'[0-9]')),
+                                        ),
+                                        _buildRequirement(
+                                          'رمز (!@#\$&*~%^)',
+                                          password.contains(
+                                            RegExp(r'[!@#\$&*~%^]'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                _buildErrorText(_passwordError),
                                 const SizedBox(height: 11),
+
+                                // ✅ حقل تأكيد كلمة المرور
                                 _buildInputField(
                                   hint: 'تأكيد كلمة المرور',
                                   icon: Icons.lock_outline_rounded,
                                   obscure: _obscureConfirmPassword,
                                   controller: _confirmPasswordController,
+                                  focusNode: _confirmPasswordFocus,
                                   onToggleObscure: () => setState(
                                     () => _obscureConfirmPassword =
                                         !_obscureConfirmPassword,
                                   ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val.isEmpty) {
+                                        _confirmPasswordStatus = 'empty';
+                                      } else if (val ==
+                                          _passwordController.text) {
+                                        _confirmPasswordStatus = 'match';
+                                      } else {
+                                        _confirmPasswordStatus = 'nomatch';
+                                      }
+                                    });
+                                  },
                                 ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Checkbox(
-                                      value: _rememberMe,
-                                      onChanged: (v) => setState(
-                                        () => _rememberMe = v ?? false,
-                                      ),
-                                      activeColor: const Color(0xFF1773CF),
-                                      side: const BorderSide(
-                                        color: Color(0xFF9CA3AF),
-                                      ),
-                                      materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
+
+                                if (_confirmPasswordStatus == 'match' &&
+                                    _confirmPasswordFocus.hasFocus)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 6,
+                                      right: 4,
                                     ),
-                                    GestureDetector(
-                                      onTap: () => setState(
-                                        () => _rememberMe = !_rememberMe,
-                                      ),
-                                      child: const Text(
-                                        'تذكرنـــي',
-                                        style: TextStyle(
-                                          fontFamily: 'IBMPlexSansArabic',
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color.fromARGB(
-                                            255,
-                                            17,
-                                            58,
-                                            134,
+                                    child: Row(
+                                      children: const [
+                                        Icon(
+                                          Icons.check_circle_rounded,
+                                          size: 16,
+                                          color: Colors.green,
+                                        ),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'كلمة المرور متطابقة',
+                                          style: TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 12,
+                                            color: Colors.green,
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
+                                  ),
+                                if (_confirmPasswordStatus == 'nomatch')
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 6,
+                                      right: 4,
+                                    ),
+                                    child: Row(
+                                      children: const [
+                                        Icon(
+                                          Icons.cancel_rounded,
+                                          size: 16,
+                                          color: Colors.red,
+                                        ),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'كلمة المرور غير متطابقة',
+                                          style: TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 12,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                if (_confirmPasswordStatus == 'empty')
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 6,
+                                      right: 4,
+                                    ),
+                                    child: Row(
+                                      children: const [
+                                        Icon(
+                                          Icons.cancel_rounded,
+                                          size: 16,
+                                          color: Colors.red,
+                                        ),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'تأكيد كلمة المرور مطلوب',
+                                          style: TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 12,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                const SizedBox(height: 20),
+
                                 Container(
                                   width: double.infinity,
                                   decoration: BoxDecoration(
@@ -537,71 +713,13 @@ class _SignupScreenState extends State<SignupScreen>
                                               fontFamily: 'IBMPlexSansArabic',
                                               fontSize: 16,
                                               fontWeight: FontWeight.w600,
-                                              color: Color(0xFFFFD350),
+                                              color: Colors.white,
                                             ),
                                           ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),
-                                const Row(
-                                  children: [
-                                    Expanded(
-                                      child: Divider(
-                                        color: Color(0xFFE5E7EB),
-                                        thickness: 1,
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                      child: Text(
-                                        ' أو سجّــل بــــــ',
-                                        style: TextStyle(
-                                          fontFamily: 'IBMPlexSansArabic',
-                                          fontSize: 12,
-                                          color: Color(0xFF9CA3AF),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Divider(
-                                        color: Color(0xFFE5E7EB),
-                                        thickness: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                Center(
-                                  child: Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFE5E7EB),
-                                        width: 1.5,
-                                      ),
-                                      color: Colors.white,
-                                    ),
-                                    child: IconButton(
-                                      onPressed: () {},
-                                      icon: Image.asset(
-                                        'assets/images/icon_google.png',
-                                        width: 22,
-                                        height: 22,
-                                        errorBuilder: (_, __, ___) =>
-                                            const Icon(
-                                              Icons.g_mobiledata_rounded,
-                                              color: Color(0xFF4285F4),
-                                              size: 28,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
+
                                 Center(
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -684,19 +802,82 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
+  Widget _buildErrorText(String error) {
+    if (error.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, right: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.cancel_rounded, size: 16, color: Colors.red),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              error,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 12,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirement(String text, bool met) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 16,
+            color: met ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 12,
+              color: met ? Colors.green : Colors.red,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStrengthBar(bool active) {
+    return Expanded(
+      child: Container(
+        height: 4,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(2),
+          color: active ? _passwordStrengthColor : const Color(0xFFE5E7EB),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInputField({
     required String hint,
     required IconData icon,
     required TextEditingController controller,
+    FocusNode? focusNode,
     TextInputType keyboardType = TextInputType.text,
     bool obscure = false,
     VoidCallback? onToggleObscure,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       obscureText: obscure,
       textDirection: TextDirection.rtl,
+      onChanged: onChanged,
       style: const TextStyle(
         fontFamily: 'IBMPlexSansArabic',
         fontSize: 14,

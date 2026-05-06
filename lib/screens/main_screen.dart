@@ -27,7 +27,43 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0; 
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args['welcomeName'] != null) {
+        final name = args['welcomeName'] as String;
+        final isNew = args['isNewUser'] == true;
+        final msg = isNew
+            ? (name.isNotEmpty ? 'يسعدنا انضمامك، $name!' : 'يسعدنا انضمامك!')
+            : (name.isNotEmpty ? 'أهلاً بعودتك، $name!' : 'أهلاً بعودتك!');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              msg,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+            duration: const Duration(seconds: 7),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    });
+  }
 
   // تحديث المسارات بناءً على الصور الجديدة في الـ Assets
   final List<_NavItem> _navItems = const [
