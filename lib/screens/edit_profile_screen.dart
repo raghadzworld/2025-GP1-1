@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'nabeeh_colors.dart';
 import 'welcome_screen.dart';
+import '../services/email_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -37,14 +38,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _loadCurrentUserData();
 
-    _nameController.addListener(() { if (_nameError != null) setState(() => _nameError = null); });
+    _nameController.addListener(() {
+      if (_nameError != null) setState(() => _nameError = null);
+    });
   }
 
   Future<void> _loadCurrentUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('User').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('User')
+            .doc(user.uid)
+            .get();
         if (doc.exists && doc.data() != null) {
           final data = doc.data()!;
           setState(() {
@@ -65,7 +71,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _onEmailTextChanged() {
     final currentInput = _emailController.text.trim();
-    final hasChanged = currentInput != _originalEmail && currentInput.isNotEmpty;
+    final hasChanged =
+        currentInput != _originalEmail && currentInput.isNotEmpty;
 
     if (_emailChanged != hasChanged) {
       setState(() => _emailChanged = hasChanged);
@@ -111,13 +118,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (user != null) {
         // SAVE NAME FIRST
         try {
-          await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
-            'FullName': _nameController.text.trim(),
-          }, SetOptions(merge: true));
+          await FirebaseFirestore.instance.collection('User').doc(user.uid).set(
+            {'FullName': _nameController.text.trim()},
+            SetOptions(merge: true),
+          );
         } catch (_) {}
 
-        // SEND THE LINK
-        await user.verifyBeforeUpdateEmail(newEmail);
+        // SEND THE LINK via custom Cloud Function (custom styled email)
+        await EmailService.sendVerifyNewEmail(newEmail);
 
         setState(() {
           _linkSent = true;
@@ -128,8 +136,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       String message = 'حدث خطأ، حاولي مرة أخرى';
       if (e.code == 'email-already-in-use') message = 'البريد مستخدم مسبقاً';
       if (e.code == 'invalid-email') message = 'البريد الإلكتروني غير صحيح';
-      if (e.code == 'requires-recent-login' || (e.message?.contains('valid') ?? false)) {
-        message = 'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
+      if (e.code == 'requires-recent-login' ||
+          (e.message?.contains('valid') ?? false)) {
+        message =
+            'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
       }
 
       if (mounted) {
@@ -165,38 +175,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-
         if (_emailChanged) {
           final uid = user.uid;
           final newEmail = _emailController.text.trim();
 
-          await FirebaseFirestore.instance.collection('User').doc(uid).set({
-            'FullName': name,
-            'Email': newEmail,
-          }, SetOptions(merge: true));
-
-          bool emailConfirmed = false;
-          try {
-            await user.reload();
-            final updatedUser = FirebaseAuth.instance.currentUser;
-            if (updatedUser != null && updatedUser.email == newEmail) {
-              emailConfirmed = true;
-            }
-          } on FirebaseAuthException {
-            emailConfirmed = true;
-          } catch (_) {
-            emailConfirmed = true;
-          }
-
-          if (!emailConfirmed) {
+          // تحقق أولاً قبل الحفظ
+          await user.reload();
+          final updatedUser = FirebaseAuth.instance.currentUser;
+          if (updatedUser?.email != newEmail) {
             if (mounted) {
               setState(() {
-                _emailSaveError = 'لم يتم تأكيد البريد بعد. يرجى الضغط على الرابط في بريدك أولاً.';
+                _emailSaveError = 'لم يتم تأكيد البريد بعد. يرجى فتح الرابط في إيميلك الجديد أولاً.';
                 _isLoading = false;
               });
             }
             return;
           }
+
+          // احفظ في Firestore فقط بعد التأكيد
+          await FirebaseFirestore.instance.collection('User').doc(uid).set({
+            'FullName': name,
+            'Email': newEmail,
+          }, SetOptions(merge: true));
 
           await FirebaseAuth.instance.signOut();
           if (mounted) {
@@ -227,7 +227,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم تحديث الملف الشخصي بنجاح', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+              content: Text(
+                'تم تحديث الملف الشخصي بنجاح',
+                style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -237,7 +240,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e', style: const TextStyle(fontFamily: 'IBMPlexSansArabic')), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(
+              'حدث خطأ: $e',
+              style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -278,121 +287,174 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _buildHeader(context),
                 const SizedBox(height: 30),
 
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
 
-                      _buildTextField(
-                        controller: _nameController,
-                        label: 'الاسم الكامل',
-                        icon: LucideIcons.user,
-                      ),
-                      if (_nameError != null) _buildErrorRibbon(_nameError!),
-                      const SizedBox(height: 20),
-
-                      _buildTextField(
-                        controller: _emailController,
-                        label: 'الايميل',
-                        icon: LucideIcons.mail,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-
-                      // --- DYNAMIC EMAIL STATUS UI ---
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        height: (_emailChanged || _linkSent) ? 45 : 0,
-                        margin: EdgeInsets.only(top: (_emailChanged || _linkSent) ? 8 : 0),
-                        child: _linkSent
-                          ? const Align(
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.',
-                                style: TextStyle(
-                                  fontFamily: 'IBMPlexSansArabic',
-                                  color: Color(0xFF1773CF),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600
-                                ),
-                              ),
-                            )
-                          : (_emailChanged ? Align(
-                              alignment: Alignment.centerRight,
-                              child: OutlinedButton(
-                                onPressed: _isSendingLink ? null : _sendVerificationLink,
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  side: const BorderSide(color: Color(0xFF181059), width: 1.5),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                child: _isSendingLink
-                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Color(0xFF181059), strokeWidth: 2))
-                                  : const Text(
-                                      'إرسال رابط التأكيد',
-                                      style: TextStyle(fontFamily: 'IBMPlexSansArabic', color: Color(0xFF181059), fontWeight: FontWeight.bold, fontSize: 13),
-                                    ),
-                              ),
-                            ) : const SizedBox.shrink()),
-                      ),
-                      if (_emailFormatError != null) _buildErrorRibbon(_emailFormatError!),
-                      if (_emailSaveError != null) _buildErrorRibbon(_emailSaveError!),
-
-                      const SizedBox(height: 60),
-
-                      // --- MAIN SAVE BUTTON ---
-                      Container(
-                        height: 60,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: isSaveDisabled
-                            ? const LinearGradient(colors: [Color(0xFFD1D5DB), Color(0xFF9CA3AF)])
-                            : const LinearGradient(
-                                colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            width: 1.5,
-                          ),
+                        _buildTextField(
+                          controller: _nameController,
+                          label: 'الاسم الكامل',
+                          icon: LucideIcons.user,
                         ),
-                        child: TextButton(
-                          onPressed: isSaveDisabled ? null : _saveProfile,
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        if (_nameError != null) _buildErrorRibbon(_nameError!),
+                        const SizedBox(height: 20),
+
+                        _buildTextField(
+                          controller: _emailController,
+                          label: 'الايميل',
+                          icon: LucideIcons.mail,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+
+                        // --- DYNAMIC EMAIL STATUS UI ---
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          height: (_emailChanged || _linkSent) ? 45 : 0,
+                          margin: EdgeInsets.only(
+                            top: (_emailChanged || _linkSent) ? 8 : 0,
                           ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(LucideIcons.save, color: isSaveDisabled ? Colors.white70 : Colors.white, size: 20),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'حفظ التغييرات',
-                                      style: TextStyle(
-                                        fontFamily: 'IBMPlexSansArabic',
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: isSaveDisabled ? Colors.white70 : Colors.white,
+                          child: _linkSent
+                              ? const Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.',
+                                    style: TextStyle(
+                                      fontFamily: 'IBMPlexSansArabic',
+                                      color: Color(0xFF1773CF),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                )
+                              : (_emailChanged
+                                    ? Align(
+                                        alignment: Alignment.centerRight,
+                                        child: OutlinedButton(
+                                          onPressed: _isSendingLink
+                                              ? null
+                                              : _sendVerificationLink,
+                                          style: OutlinedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            side: const BorderSide(
+                                              color: Color(0xFF181059),
+                                              width: 1.5,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: _isSendingLink
+                                              ? const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        color: Color(
+                                                          0xFF181059,
+                                                        ),
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : const Text(
+                                                  'إرسال رابط التأكيد',
+                                                  style: TextStyle(
+                                                    fontFamily:
+                                                        'IBMPlexSansArabic',
+                                                    color: Color(0xFF181059),
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink()),
+                        ),
+                        if (_emailFormatError != null)
+                          _buildErrorRibbon(_emailFormatError!),
+                        if (_emailSaveError != null)
+                          _buildErrorRibbon(_emailSaveError!),
+
+                        const SizedBox(height: 60),
+
+                        // --- MAIN SAVE BUTTON ---
+                        Container(
+                          height: 60,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: isSaveDisabled
+                                ? const LinearGradient(
+                                    colors: [
+                                      Color(0xFFD1D5DB),
+                                      Color(0xFF9CA3AF),
+                                    ],
+                                  )
+                                : const LinearGradient(
+                                    colors: [
+                                      Color(0xFF181059),
+                                      Color(0xFF1773CF),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: TextButton(
+                            onPressed: isSaveDisabled ? null : _saveProfile,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        LucideIcons.save,
+                                        color: isSaveDisabled
+                                            ? Colors.white70
+                                            : Colors.white,
+                                        size: 20,
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'حفظ التغييرات',
+                                        style: TextStyle(
+                                          fontFamily: 'IBMPlexSansArabic',
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSaveDisabled
+                                              ? Colors.white70
+                                              : Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 40),
-                    ],
+                        const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
             ),
           ),
         ),
@@ -412,7 +474,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFD32F2F), size: 18),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Color(0xFFD32F2F),
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -454,7 +520,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   child: const Directionality(
                     textDirection: TextDirection.ltr,
-                    child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF181059), size: 18),
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF181059),
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -480,12 +550,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                  colors: [
+                    Color(0xFF181059),
+                    Color(0xFF181059),
+                    Color(0xFF1773CF),
+                  ],
                   stops: [0.09, 0.30, 1.0],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.5,
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -522,21 +599,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontWeight: FontWeight.normal),
+        labelStyle: const TextStyle(
+          fontFamily: 'IBMPlexSansArabic',
+          color: NabeehColors.slate500,
+          fontWeight: FontWeight.normal,
+        ),
         prefixIcon: Icon(icon, color: const Color(0xFF181059), size: 22),
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
+          borderSide: const BorderSide(
+            color: Color.fromARGB(255, 235, 233, 229),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
+          borderSide: const BorderSide(
+            color: Color.fromARGB(255, 235, 233, 229),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color.fromARGB(255, 235, 233, 229)),
+          borderSide: const BorderSide(
+            color: Color.fromARGB(255, 235, 233, 229),
+          ),
         ),
       ),
     );

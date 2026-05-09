@@ -1,51 +1,37 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
 import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 
 admin.initializeApp();
 
-const EMAIL_USER = defineSecret("EMAIL_USER");
-const EMAIL_PASS = defineSecret("EMAIL_PASS");
-
 // ─── sendSosEmail ─────────────────────────────────────────────────────────────
-export const sendSosEmail = onCall(
-  { secrets: [EMAIL_USER, EMAIL_PASS] },
-  async (request) => {
-    const { emails, latitude, longitude } = request.data;
+export const sendSosEmail = onCall(async (request) => {
+  const { emails, latitude, longitude } = request.data;
 
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً");
-    }
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً");
+  }
 
-    if (!emails || !Array.isArray(emails) || emails.length === 0) {
-      throw new HttpsError("invalid-argument", "لا توجد إيميلات لإرسال النداء إليها");
-    }
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    throw new HttpsError("invalid-argument", "لا توجد إيميلات لإرسال النداء إليها");
+  }
 
-    const hasLocation = latitude != null && longitude != null;
-    const mapsLink = hasLocation
-      ? `https://www.google.com/maps?q=${latitude},${longitude}`
-      : null;
+  const hasLocation = latitude != null && longitude != null;
+  const mapsLink = hasLocation
+    ? `https://www.google.com/maps?q=${latitude},${longitude}`
+    : null;
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS,
-    },
-  });
+  const locationSection = hasLocation
+    ? `
+      <p style="margin:8px 0;">
+        <strong>📍 الموقع الحالي:</strong><br/>
+        خط العرض: ${latitude}<br/>
+        خط الطول: ${longitude}<br/>
+        <a href="${mapsLink}" style="color:#1773CF;">عرض على خرائط Google</a>
+      </p>`
+    : `<p style="color:#888;margin:8px 0;">تعذّر الحصول على الموقع</p>`;
 
-    const locationSection = hasLocation
-      ? `
-        <p style="margin:8px 0;">
-          <strong>📍 الموقع الحالي:</strong><br/>
-          خط العرض: ${latitude}<br/>
-          خط الطول: ${longitude}<br/>
-          <a href="${mapsLink}" style="color:#1773CF;">عرض على خرائط Google</a>
-        </p>`
-      : `<p style="color:#888;margin:8px 0;">تعذّر الحصول على الموقع</p>`;
-
-  const mailOptions = {
+  await getTransporter().sendMail({
     from: `"تطبيق نبيه 🚨" <${process.env.GMAIL_USER}>`,
     to: emails.join(","),
     subject: "🚨 نداء استغاثة عاجل - تطبيق نبيه",
@@ -54,10 +40,12 @@ export const sendSosEmail = onCall(
         <div style="background:#e53935;padding:20px;text-align:center;">
           <h1 style="color:white;margin:0;font-size:26px;">🚨 نداء استغاثة</h1>
         </div>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
+        <div style="padding:24px;background:#fff;">
+          ${locationSection}
+        </div>
+      </div>
+    `,
+  });
 
   return { success: true, sent: emails.length };
 });
@@ -211,8 +199,11 @@ export const sendVerifyNewEmail = onCall(async (request) => {
 
   // توليد رابط تحقق للإيميل الجديد
   let verifyLink;
+  const currentEmail = request.auth.token.email;
+  if (!currentEmail) throw new HttpsError("internal", "تعذّر تحديد البريد الحالي");
+
   try {
-    verifyLink = await admin.auth().generateEmailVerificationLink(newEmail);
+    verifyLink = await admin.auth().generateVerifyAndChangeEmailLink(currentEmail, newEmail);
   } catch (err) {
     throw new HttpsError("internal", err.message);
   }
@@ -271,7 +262,17 @@ export const sendWelcomeEmail = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "يجب تسجيل الدخول");
 
   const { email, displayName } = request.data;
-  const name = displayName || "بك";
+  const name = displayName || "";
+
+  const now = new Date();
+  const registrationTime = now.toLocaleString("ar-SA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   const html = `<!doctype html><html lang="ar" dir="rtl"><head>
     <meta charset="utf-8">
@@ -282,29 +283,33 @@ export const sendWelcomeEmail = onCall(async (request) => {
     <div class="card">
       ${heroHtml()}
       <div class="pad">
-        <h1>مرحباً ${name}، يسعدنا انضمامك إلى نبيه</h1>
+        <h1>مرحباً ${name}، يسعدنا انضمامك إلى نبيــه </h1>
         <p class="lead">
-          تم إنشاء حسابك بنجاح وأصبحت جاهزاً لتجربة
-          <strong style="color:#1B1F2A;font-weight:600;">نبيه</strong> —
-          رفيقك الذكي في كل لحظة.
+          لاحظنا إنشاء حساب جديد في تطبيق
+          <strong style="color:#1B1F2A;font-weight:600;">نبيــه</strong>
+          باستخدام هذا البريد الإلكترونـي.
         </p>
       </div>
-      <div class="btnwrap-welcome">
-        <a class="btn" href="nabeeh://open" style="color:#ffffff !important;">افتح نبيه ←</a>
+
+      <div class="note" style="margin-top:16px;">
+        <b>إذا كنت من أنشأ الحساب</b>
+        <span>لا داعي لأي إجراء، حسابك آمن ويمكنك البدء باستخدام نبيه.</span>
       </div>
-      <div class="note">
-        <b>نحن هنا لمساعدتك</b>
-        <span>أي استفسار أو ملاحظة؟ نسعد بسماعها على
-          <a href="mailto:Nabeeh.appl@gmail.com" style="color:#3A4290;border-bottom:1px solid #C9A36B;text-decoration:none;">Nabeeh.appl@gmail.com</a>.
+      <div class="warn">
+        <b>إذا لم تكن أنت من أنشأ هذا الحساب، نوصي بشدة بـ:</b>
+        <span>
+          • تغيير كلمة المرور فوراً<br/>
+          • مراجعة النشاط الأخير في حسابك
         </span>
       </div>
+
       ${FOOTER_HTML}
   </body></html>`;
 
   await getTransporter().sendMail({
     from: `"نبيه" <${process.env.GMAIL_USER}>`,
     to: email,
-    subject: "مرحباً بك في نبيه 🎉",
+    subject: "مرحباً بك في نبيه — تأكيد إنشاء الحساب",
     html,
   });
 
