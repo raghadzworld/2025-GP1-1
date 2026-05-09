@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../main.dart';
+import '../services/email_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -119,16 +120,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
-      );
+      await EmailService.sendPasswordReset(_emailController.text.trim());
       if (mounted) {
         setState(() => _emailSent = true);
         _startCountdown();
       }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseFunctionsException catch (e) {
       if (mounted) {
-        if (e.code == 'user-not-found') {
+        if (e.code == 'not-found') {
           FocusScope.of(context).unfocus();
           await Future.delayed(const Duration(milliseconds: 200));
           if (!mounted) return;
@@ -441,7 +440,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFFFD350),
+                      color: Colors.white,
                     ),
                   ),
           ),

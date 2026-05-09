@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'nabeeh_colors.dart';
-import 'welcome_screen.dart'; 
+import 'welcome_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -16,8 +16,8 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController(); 
-  
+  final _emailController = TextEditingController();
+
   bool _isLoading = false;
 
   // --- Inline error ribbon state ---
@@ -30,13 +30,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSendingLink = false;
   bool _linkSent = false;
   String _lastSentEmail = '';
-  String _originalEmail = ''; 
+  String _originalEmail = '';
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUserData();
-    
+
     _nameController.addListener(() { if (_nameError != null) setState(() => _nameError = null); });
   }
 
@@ -53,7 +53,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ? data['Email'] as String
                 : (user.email ?? '');
             _emailController.text = loadedEmail;
-            _originalEmail = loadedEmail; 
+            _originalEmail = loadedEmail;
           });
           _emailController.addListener(_onEmailTextChanged);
         }
@@ -95,7 +95,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // --- Send the verification link (Mirrors SignupScreen error handling) ---
+  // --- Send the verification link ---
   Future<void> _sendVerificationLink() async {
     if (_emailFormatError != null) return;
 
@@ -107,7 +107,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       final newEmail = _emailController.text.trim();
-      
+
       if (user != null) {
         // SAVE NAME FIRST
         try {
@@ -118,14 +118,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         // SEND THE LINK
         await user.verifyBeforeUpdateEmail(newEmail);
-        
+
         setState(() {
           _linkSent = true;
           _lastSentEmail = newEmail;
         });
       }
     } on FirebaseAuthException catch (e) {
-      // Logic extracted from SignupScreen
       String message = 'حدث خطأ، حاولي مرة أخرى';
       if (e.code == 'email-already-in-use') message = 'البريد مستخدم مسبقاً';
       if (e.code == 'invalid-email') message = 'البريد الإلكتروني غير صحيح';
@@ -166,7 +165,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        
+
         if (_emailChanged) {
           final uid = user.uid;
           final newEmail = _emailController.text.trim();
@@ -224,7 +223,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await FirebaseFirestore.instance.collection('User').doc(user.uid).set({
           'FullName': name,
         }, SetOptions(merge: true));
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -232,7 +231,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context); 
+          Navigator.pop(context);
         }
       }
     } catch (e) {
@@ -250,7 +249,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _emailController.removeListener(_onEmailTextChanged);
     _nameController.dispose();
-    _emailController.dispose(); 
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -278,15 +277,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               children: [
                 _buildHeader(context),
                 const SizedBox(height: 30),
-                  
+
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, 
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
-                      
+
                       _buildTextField(
                         controller: _nameController,
                         label: 'الاسم الكامل',
@@ -301,27 +300,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         icon: LucideIcons.mail,
                         keyboardType: TextInputType.emailAddress,
                       ),
-                      
+
                       // --- DYNAMIC EMAIL STATUS UI ---
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        height: (_emailChanged || _linkSent) ? 45 : 0, 
+                        height: (_emailChanged || _linkSent) ? 45 : 0,
                         margin: EdgeInsets.only(top: (_emailChanged || _linkSent) ? 8 : 0),
-                        child: _linkSent 
+                        child: _linkSent
                           ? const Align(
                               alignment: Alignment.centerRight,
                               child: Text(
-                                'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.', 
+                                'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.',
                                 style: TextStyle(
-                                  fontFamily: 'IBMPlexSansArabic', 
-                                  color: Color(0xFF1773CF), 
-                                  fontSize: 13, 
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  color: Color(0xFF1773CF),
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600
                                 ),
                               ),
                             )
                           : (_emailChanged ? Align(
-                              alignment: Alignment.centerRight, 
+                              alignment: Alignment.centerRight,
                               child: OutlinedButton(
                                 onPressed: _isSendingLink ? null : _sendVerificationLink,
                                 style: OutlinedButton.styleFrom(
@@ -333,7 +332,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 child: _isSendingLink
                                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Color(0xFF181059), strokeWidth: 2))
                                   : const Text(
-                                      'إرسال رابط التأكيد', 
+                                      'إرسال رابط التأكيد',
                                       style: TextStyle(fontFamily: 'IBMPlexSansArabic', color: Color(0xFF181059), fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                               ),
@@ -341,16 +340,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       if (_emailFormatError != null) _buildErrorRibbon(_emailFormatError!),
                       if (_emailSaveError != null) _buildErrorRibbon(_emailSaveError!),
-                      
+
                       const SizedBox(height: 60),
 
                       // --- MAIN SAVE BUTTON ---
                       Container(
-                        height: 60, 
+                        height: 60,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
-                          gradient: isSaveDisabled 
+                          gradient: isSaveDisabled
                             ? const LinearGradient(colors: [Color(0xFFD1D5DB), Color(0xFF9CA3AF)])
                             : const LinearGradient(
                                 colors: [Color(0xFF181059), Color(0xFF1773CF)],
@@ -365,7 +364,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         child: TextButton(
                           onPressed: isSaveDisabled ? null : _saveProfile,
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero, 
+                            padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           child: _isLoading
@@ -388,7 +387,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 40), 
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -443,18 +442,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  width: 44, 
+                  width: 44,
                   height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.15), 
+                    color: Colors.white.withValues(alpha: 0.15),
                     border: Border.all(
-                      color: const Color(0xFF181059), 
+                      color: const Color(0xFF181059),
                       width: 1.5,
                     ),
                   ),
                   child: const Directionality(
-                    textDirection: TextDirection.ltr, 
+                    textDirection: TextDirection.ltr,
                     child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF181059), size: 18),
                   ),
                 ),
@@ -476,7 +475,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           GestureDetector(
             onTap: () {},
             child: Container(
-              width: 44, 
+              width: 44,
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -489,7 +488,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(10), 
+                padding: const EdgeInsets.all(10),
                 child: Image.asset(
                   'assets/images/icon_signLan.png',
                   color: NabeehColors.background,
@@ -509,14 +508,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
-    List<TextInputFormatter>? inputFormatters, 
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      inputFormatters: inputFormatters, 
+      inputFormatters: inputFormatters,
       style: const TextStyle(
-        fontFamily: 'IBMPlexSansArabic', 
+        fontFamily: 'IBMPlexSansArabic',
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: NabeehColors.darkBlue,
