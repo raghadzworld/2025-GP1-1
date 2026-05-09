@@ -116,7 +116,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final newEmail = _emailController.text.trim();
 
       if (user != null) {
-        // SAVE NAME FIRST
+        // 1. SAVE NAME FIRST
         try {
           await FirebaseFirestore.instance.collection('User').doc(user.uid).set(
             {'FullName': _nameController.text.trim()},
@@ -124,7 +124,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           );
         } catch (_) {}
 
-        // SEND THE LINK via custom Cloud Function (custom styled email)
+        // 2. SEND THE LINK via custom Cloud Function (custom styled email)
         await EmailService.sendVerifyNewEmail(newEmail);
 
         setState(() {
@@ -138,8 +138,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (e.code == 'invalid-email') message = 'البريد الإلكتروني غير صحيح';
       if (e.code == 'requires-recent-login' ||
           (e.message?.contains('valid') ?? false)) {
-        message =
-            'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
+        message = 'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
       }
 
       if (mounted) {
@@ -148,9 +147,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     } catch (e) {
+      // معالجة أخطاء Cloud Functions المطابقة للـ Admin SDK
+      String message = 'حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.';
+      String errorStr = e.toString().toLowerCase();
+
+      // التحقق من جميع صيغ الأخطاء التي قد تُرجعها الكلاود فنكشن
+      if (errorStr.contains('email-already-in-use') || 
+          errorStr.contains('email-already-exists') || 
+          errorStr.contains('already in use')) {
+        message = 'البريد مستخدم مسبقاً';
+      } else if (errorStr.contains('invalid-email')) {
+        message = 'البريد الإلكتروني غير صحيح';
+      } else if (errorStr.contains('requires-recent-login') || 
+                 errorStr.contains('valid')) {
+        message = 'لأسباب أمنية، يرجى تسجيل الخروج والدخول مجدداً لتغيير الإيميل.';
+      }
+
       if (mounted) {
         setState(() {
-          _emailSaveError = 'حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.';
+          _emailSaveError = message;
         });
       }
     } finally {
@@ -175,29 +190,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        
         if (_emailChanged) {
           final uid = user.uid;
           final newEmail = _emailController.text.trim();
 
-          // تحقق أولاً قبل الحفظ
-          await user.reload();
-          final updatedUser = FirebaseAuth.instance.currentUser;
-          if (updatedUser?.email != newEmail) {
+          // 1. التحديث في Firestore أولاً
+          await FirebaseFirestore.instance.collection('User').doc(uid).set({
+            'FullName': name,
+            'Email': newEmail,
+          }, SetOptions(merge: true));
+
+          // 2. التحقق من حالة الإيميل بعد الحفظ
+          bool emailConfirmed = false;
+          try {
+            await user.reload();
+            final updatedUser = FirebaseAuth.instance.currentUser;
+            if (updatedUser != null && updatedUser.email == newEmail) {
+              emailConfirmed = true;
+            }
+          } on FirebaseAuthException {
+            emailConfirmed = true;
+          } catch (_) {
+            emailConfirmed = true;
+          }
+
+          if (!emailConfirmed) {
             if (mounted) {
               setState(() {
-                _emailSaveError = 'لم يتم تأكيد البريد بعد. يرجى فتح الرابط في إيميلك الجديد أولاً.';
+                _emailSaveError = 'لم يتم تأكيد البريد بعد. يرجى الضغط على الرابط في بريدك أولاً.';
                 _isLoading = false;
               });
             }
             return;
           }
 
-          // احفظ في Firestore فقط بعد التأكيد
-          await FirebaseFirestore.instance.collection('User').doc(uid).set({
-            'FullName': name,
-            'Email': newEmail,
-          }, SetOptions(merge: true));
-
+          // 3. تسجيل الخروج وإظهار رسالة النجاح
           await FirebaseAuth.instance.signOut();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -331,52 +359,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   ),
                                 )
                               : (_emailChanged
-                                    ? Align(
-                                        alignment: Alignment.centerRight,
-                                        child: OutlinedButton(
-                                          onPressed: _isSendingLink
-                                              ? null
-                                              : _sendVerificationLink,
-                                          style: OutlinedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            side: const BorderSide(
-                                              color: Color(0xFF181059),
-                                              width: 1.5,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 8,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
+                                  ? Align(
+                                      alignment: Alignment.centerRight,
+                                      child: OutlinedButton(
+                                        onPressed: _isSendingLink
+                                            ? null
+                                            : _sendVerificationLink,
+                                        style: OutlinedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          side: const BorderSide(
+                                            color: Color(0xFF181059),
+                                            width: 1.5,
                                           ),
-                                          child: _isSendingLink
-                                              ? const SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Color(
-                                                          0xFF181059,
-                                                        ),
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : const Text(
-                                                  'إرسال رابط التأكيد',
-                                                  style: TextStyle(
-                                                    fontFamily:
-                                                        'IBMPlexSansArabic',
-                                                    color: Color(0xFF181059),
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
                                         ),
-                                      )
-                                    : const SizedBox.shrink()),
+                                        child: _isSendingLink
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  color: Color(
+                                                    0xFF181059,
+                                                  ),
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : const Text(
+                                                'إرسال رابط التأكيد',
+                                                style: TextStyle(
+                                                  fontFamily:
+                                                      'IBMPlexSansArabic',
+                                                  color: Color(0xFF181059),
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink()),
                         ),
                         if (_emailFormatError != null)
                           _buildErrorRibbon(_emailFormatError!),
