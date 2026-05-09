@@ -1,25 +1,31 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 
 admin.initializeApp();
 
+const EMAIL_USER = defineSecret("EMAIL_USER");
+const EMAIL_PASS = defineSecret("EMAIL_PASS");
+
 // ─── sendSosEmail ─────────────────────────────────────────────────────────────
-export const sendSosEmail = onCall(async (request) => {
-  const { emails, latitude, longitude } = request.data;
+export const sendSosEmail = onCall(
+  { secrets: [EMAIL_USER, EMAIL_PASS] },
+  async (request) => {
+    const { emails, latitude, longitude } = request.data;
 
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً");
-  }
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً");
+    }
 
-  if (!emails || !Array.isArray(emails) || emails.length === 0) {
-    throw new HttpsError("invalid-argument", "لا توجد إيميلات لإرسال النداء إليها");
-  }
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      throw new HttpsError("invalid-argument", "لا توجد إيميلات لإرسال النداء إليها");
+    }
 
-  const hasLocation = latitude != null && longitude != null;
-  const mapsLink = hasLocation
-    ? `https://www.google.com/maps?q=${latitude},${longitude}`
-    : null;
+    const hasLocation = latitude != null && longitude != null;
+    const mapsLink = hasLocation
+      ? `https://www.google.com/maps?q=${latitude},${longitude}`
+      : null;
 
   const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -29,15 +35,15 @@ export const sendSosEmail = onCall(async (request) => {
     },
   });
 
-  const locationSection = hasLocation
-    ? `
-      <p style="margin:8px 0;">
-        <strong>📍 الموقع الحالي:</strong><br/>
-        خط العرض: ${latitude}<br/>
-        خط الطول: ${longitude}<br/>
-        <a href="${mapsLink}" style="color:#1773CF;">عرض على خرائط Google</a>
-      </p>`
-    : `<p style="color:#888;margin:8px 0;">تعذّر الحصول على الموقع</p>`;
+    const locationSection = hasLocation
+      ? `
+        <p style="margin:8px 0;">
+          <strong>📍 الموقع الحالي:</strong><br/>
+          خط العرض: ${latitude}<br/>
+          خط الطول: ${longitude}<br/>
+          <a href="${mapsLink}" style="color:#1773CF;">عرض على خرائط Google</a>
+        </p>`
+      : `<p style="color:#888;margin:8px 0;">تعذّر الحصول على الموقع</p>`;
 
   const mailOptions = {
     from: `"تطبيق نبيه 🚨" <${process.env.GMAIL_USER}>`,
@@ -48,25 +54,10 @@ export const sendSosEmail = onCall(async (request) => {
         <div style="background:#e53935;padding:20px;text-align:center;">
           <h1 style="color:white;margin:0;font-size:26px;">🚨 نداء استغاثة</h1>
         </div>
-        <div style="padding:24px;background:#fff;">
-          <p style="font-size:16px;color:#333;">
-            تلقّيت هذه الرسالة لأن مستخدم تطبيق <strong>نبيه</strong> أرسل نداء استغاثة.
-          </p>
-          <p style="font-size:15px;color:#555;">
-            يرجى التواصل مع المستخدم فوراً أو الاتصال بالجهات المختصة.
-          </p>
-          <hr style="border:1px solid #eee;margin:16px 0;"/>
-          ${locationSection}
-          <hr style="border:1px solid #eee;margin:16px 0;"/>
-          <p style="font-size:12px;color:#aaa;text-align:center;">
-            أُرسلت هذه الرسالة تلقائياً من تطبيق نبيه
-          </p>
-        </div>
-      </div>
-    `,
-  };
+      `,
+    };
 
-  await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
 
   return { success: true, sent: emails.length };
 });

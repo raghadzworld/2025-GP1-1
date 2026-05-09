@@ -256,7 +256,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   fontFamily: 'IBMPlexSansArabic',
                                   fontSize: 28,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFFFFD350),
+                                  color: Colors.white,
                                 ),
                               ),
                             ],

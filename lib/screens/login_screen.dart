@@ -513,14 +513,27 @@ class _LoginScreenState extends State<LoginScreen>
                                         ? const CircularProgressIndicator(
                                             color: Colors.white,
                                           )
-                                        : const Text(
-                                            'تسـجيــل الدخـــول',
-                                            style: TextStyle(
-                                              fontFamily: 'IBMPlexSansArabic',
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
+                                        : const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.login,
+                                                color: Colors.white,
+                                                size: 22,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'تسـجيــل الدخـــول',
+                                                style: TextStyle(
+                                                  fontFamily:
+                                                      'IBMPlexSansArabic',
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                   ),
                                 ),

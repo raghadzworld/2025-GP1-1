@@ -495,7 +495,7 @@ class _SignupScreenState extends State<SignupScreen>
                                   ),
                                 ),
 
-                                if (_passwordFieldFocused)
+                                if (_passwordFieldFocused || _passwordController.text.isNotEmpty)
                                   Padding(
                                     padding: const EdgeInsets.only(
                                       top: 10,
@@ -715,14 +715,27 @@ class _SignupScreenState extends State<SignupScreen>
                                         ? const CircularProgressIndicator(
                                             color: Colors.white,
                                           )
-                                        : const Text(
-                                            'إنشـــــاء حســاب',
-                                            style: TextStyle(
-                                              fontFamily: 'IBMPlexSansArabic',
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
+                                        : const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.account_circle_outlined,
+                                                color: Colors.white,
+                                                size: 22,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'إنشـــــاء حسـاب',
+                                                style: TextStyle(
+                                                  fontFamily:
+                                                      'IBMPlexSansArabic',
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                   ),
                                 ),

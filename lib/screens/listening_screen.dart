@@ -10,12 +10,13 @@ class ListeningScreen extends StatefulWidget {
   State<ListeningScreen> createState() => _ListeningScreenState();
 }
 
-class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProviderStateMixin {
+class _ListeningScreenState extends State<ListeningScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _waveController;
-  
+
   // State variables for mic toggle and detection
   bool isListening = true;
-  String detectedSound = 'جاري الاستماع للبيئة...'; 
+  String detectedSound = 'جاري الاستماع للبيئة...';
 
   @override
   void initState() {
@@ -80,7 +81,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
     );
   }
 
- Widget _buildHeader() {
+  Widget _buildHeader() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
@@ -99,22 +100,25 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
                     shape: BoxShape.circle,
                     color: Colors.white.withValues(alpha: 0.15),
                     border: Border.all(
-                      color: const Color(0xFF181059), // 👈 Changed the border to dark blue!
+                      color: const Color(
+                        0xFF181059,
+                      ), // 👈 Changed the border to dark blue!
                       width: 1.5,
                     ),
                   ),
                   child: const Directionality(
-                    textDirection: TextDirection.ltr, 
+                    textDirection: TextDirection.ltr,
                     child: Icon(
-                      Icons.arrow_forward_ios_rounded, 
-                      color: Color(0xFF181059), 
-                      size: 18),
+                      Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF181059),
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               const Text(
-                'الاستماع النشط',
+                'الاستشعــار الصـوتي',
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 24,
@@ -128,7 +132,7 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
           // 2. Sign Language Gesture Button (Anchored to the Left in RTL)
           GestureDetector(
             onTap: () {
-               // Add your gesture button action here
+              // Add your gesture button action here
             },
             child: Container(
               width: 44, // 👈 Consistently sized to 44
@@ -136,15 +140,24 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
+                  colors: [
+                    Color(0xFF181059),
+                    Color(0xFF181059),
+                    Color(0xFF1773CF),
+                  ],
                   stops: [0.09, 0.30, 1.0],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.5,
+                ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(10), // 👈 Consistently padded to 10
+                padding: const EdgeInsets.all(
+                  10,
+                ), // 👈 Consistently padded to 10
                 child: Image.asset(
                   'assets/images/icon_signLan.png',
                   color: NabeehColors.background,
@@ -172,30 +185,32 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isListening 
-                  ? NabeehColors.lightBlue.withValues(alpha: 0.1) 
+              color: isListening
+                  ? NabeehColors.lightBlue.withValues(alpha: 0.1)
                   : NabeehColors.slate200.withValues(alpha: 0.5),
-              boxShadow: isListening 
-                ? [
-                    BoxShadow(
-                      color: NabeehColors.lightBlue.withValues(alpha: 0.2),
-                      blurRadius: 40,
-                      spreadRadius: 10,
-                    ),
-                  ]
-                : [],
+              boxShadow: isListening
+                  ? [
+                      BoxShadow(
+                        color: NabeehColors.lightBlue.withValues(alpha: 0.2),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ]
+                  : [],
             ),
             child: Center(
               child: Icon(
                 isListening ? LucideIcons.mic : LucideIcons.micOff,
                 size: 50,
-                color: isListening ? NabeehColors.lightBlue : NabeehColors.slate400,
+                color: isListening
+                    ? NabeehColors.lightBlue
+                    : NabeehColors.slate400,
               ),
             ),
           ),
         ),
         const SizedBox(height: 40),
-        
+
         // Animated Sound Waves (stops when mic is off)
         SizedBox(
           height: 60,
@@ -208,19 +223,24 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
                 children: List.generate(15, (index) {
                   final offset = index * 0.4;
                   // If not listening, flatline the waves
-                  final heightVal = isListening 
-                      ? (math.sin((_waveController.value * 2 * math.pi) + offset) + 1) / 2 
+                  final heightVal = isListening
+                      ? (math.sin(
+                                  (_waveController.value * 2 * math.pi) +
+                                      offset,
+                                ) +
+                                1) /
+                            2
                       : 0.0;
-                  final barHeight = 10 + (heightVal * 50); 
-                  
+                  final barHeight = 10 + (heightVal * 50);
+
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: 6,
                     height: barHeight,
                     decoration: BoxDecoration(
-                      color: isListening 
-                          ? NabeehColors.lightBlue.withValues(alpha: 0.8) 
+                      color: isListening
+                          ? NabeehColors.lightBlue.withValues(alpha: 0.8)
                           : NabeehColors.slate300,
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -232,7 +252,9 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
         ),
         const SizedBox(height: 20),
         Text(
-          isListening ? 'جاري تحليل الأصوات من حولك...' : 'الاستماع متوقف حالياً',
+          isListening
+              ? 'جاري تحليل الأصوات من حولك...'
+              : 'الاستماع متوقف حالياً',
           style: TextStyle(
             fontFamily: 'IBMPlexSansArabic',
             fontSize: 16,
@@ -260,9 +282,11 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
             Row(
               children: [
                 Icon(
-                  isListening ? LucideIcons.activity : LucideIcons.moon, 
-                  color: isListening ? const Color(0xFF181059) : NabeehColors.slate400,
-                  size: 20
+                  isListening ? LucideIcons.activity : LucideIcons.moon,
+                  color: isListening
+                      ? const Color(0xFF181059)
+                      : NabeehColors.slate400,
+                  size: 20,
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -287,7 +311,9 @@ class _ListeningScreenState extends State<ListeningScreen> with SingleTickerProv
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: isListening ? 22 : 18,
                       fontWeight: FontWeight.bold,
-                      color: isListening ? NabeehColors.darkBlue : NabeehColors.slate400,
+                      color: isListening
+                          ? NabeehColors.darkBlue
+                          : NabeehColors.slate400,
                     ),
                   ),
                 ),
