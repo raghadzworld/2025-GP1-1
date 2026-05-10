@@ -1,17 +1,37 @@
-# nabbeh
+# Nabeeh 
 
-A new Flutter project.
+## Introduction
+Nabeeh is a smart assistive system designed for deaf and hard-of-hearing (DHH) individuals. It combines an AI-powered wearable bracelet with an Android mobile application to detect critical environmental sounds — such as fire alarms, car horns, doorbells, and baby cries — and translate them into meaningful vibration alerts. The goal is to enhance personal safety, situational awareness, and independence for DHH users.
 
-## Getting Started
+## Technologies Used
+- **Flutter / Dart** – Mobile application development (Android)
+- **Python** – AI model development and audio data processing
+- **Machine Learning** – Sound classification using models such as YAMNet / VGGish / PANNs
+- **Firebase** – Backend services (Authentication, Firestore database)
+- **Bluetooth Low Energy (BLE)** – Communication between the bracelet and the mobile app
+- **IoT / Embedded Systems** – Wearable bracelet firmware
 
-This project is a starting point for a Flutter application.
+## Launch Instructions
+1. Clone the repository:
+```bash
+   git clone <repository-url>
+```
+2. Navigate to the Flutter project folder and install dependencies:
+```bash
+   flutter pub get
+```
+3. Connect an Android device or start an emulator.
+4. Run the application:
+```bash
+   flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Team Members
+- Abeer Alsahli – 444200825
+- Renad Alowais – 444200530
+- Ragad Alrashid – 444200498
+- Ruba Alrzouq – 444201522
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**Supervisor:** Dr. Noura Alhakbani  
+King Saud University – College of Computer and Information Sciences  
+IT496: Graduation Project 1 | Spring 2026
