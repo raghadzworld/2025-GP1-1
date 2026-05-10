@@ -1,7 +1,7 @@
 # Nabeeh 
 
 ## Introduction
-Nabeeh is a smart assistive system designed for deaf and hard-of-hearing (DHH) individuals. It combines an AI-powered wearable bracelet with an Android mobile application to detect critical environmental sounds — such as fire alarms, car horns, doorbells, and baby cries — and translate them into meaningful vibration alerts. The goal is to enhance personal safety, situational awareness, and independence for DHH users.
+Nabeeh is a smart assistive system designed for deaf and hard-of-hearing (DHH) individuals. It combines an AI-powered wearable bracelet with an Android mobile application to detect critical environmental sounds ( such as fire alarms, car horns, doorbells, and baby cries ) and translate them into meaningful vibration alerts. The goal is to enhance personal safety, situational awareness, and independence for DHH users.
 
 ## Technologies Used
 - **Flutter / Dart** – Mobile application development (Android)
