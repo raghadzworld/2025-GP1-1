@@ -60,83 +60,14 @@ class ProfileInfoScreen extends StatelessWidget {
     }
   }
 
-  // --- Firebase Delete Account Logic ---
-  Future<void> _deleteAccount(BuildContext context) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (loadingContext) =>
-          const Center(child: CircularProgressIndicator(color: Colors.red)),
-    );
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final uid = user.uid;
-
-        await FirebaseFirestore.instance.collection('User').doc(uid).delete();
-        await user.delete();
-
-        if (context.mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'تم حذف حسابك بنجاح. نأمل أن تعود إلينا قريباً.',
-                style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
-              ),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 4),
-            ),
-          );
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/welcome',
-            (route) => false,
-          );
-        }
-      } else {
-        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-      }
-    } on FirebaseAuthException catch (e) {
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-
-      if (e.code == 'requires-recent-login') {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.',
-                style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
-              ),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'حدث خطأ: ${e.message}',
-                style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-      debugPrint('Error deleting account: $e');
-    }
-  }
-
   void _confirmDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
+        bool isDeleting = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
@@ -171,38 +102,57 @@ class ProfileInfoScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () async {
-                        Navigator.pop(dialogContext);
-                        await _deleteAccount(context);
+                      onPressed: isDeleting ? null : () async {
+                        setDialogState(() => isDeleting = true);
+                        try {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user != null) {
+                            await FirebaseFirestore.instance.collection('User').doc(user.uid).delete();
+                            await user.delete();
+                            if (context.mounted) {
+                              Navigator.of(dialogContext).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('تم حذف حسابك بنجاح. نأمل أن تعود إلينا قريباً.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 4),
+                                ),
+                              );
+                              Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+                            }
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          setDialogState(() => isDeleting = false);
+                          String message = e.code == 'requires-recent-login'
+                              ? 'لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.'
+                              : 'حدث خطأ: ${e.message}';
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(message, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')), backgroundColor: Colors.red),
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() => isDeleting = false);
+                          debugPrint('Error deleting account: $e');
+                        }
                       },
                       style: OutlinedButton.styleFrom(
                         fixedSize: const Size.fromHeight(50),
                         padding: EdgeInsets.zero,
-                        side: const BorderSide(
-                          color: Colors.redAccent,
-                          width: 1.2,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            LucideIcons.trash2,
-                            color: Colors.redAccent,
-                            size: 18,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
+                          if (isDeleting)
+                            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2))
+                          else
+                            const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                          const SizedBox(width: 6),
+                          const Text(
                             'حذف نهائي',
-                            style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic',
-                              fontWeight: FontWeight.bold,
-                              color: Colors.redAccent,
-                              fontSize: 16,
-                            ),
+                            style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 16),
                           ),
                         ],
                       ),
@@ -249,6 +199,8 @@ class ProfileInfoScreen extends StatelessWidget {
             ],
           ),
         );
+      },
+    );
       },
     );
   }

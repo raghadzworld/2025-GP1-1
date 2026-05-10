@@ -15,6 +15,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final newPasswordCtrl = TextEditingController();
   final repeatPasswordCtrl = TextEditingController();
 
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureRepeat = true;
+  bool _isLoading = false;
+
   @override
   void dispose() {
     currentPasswordCtrl.dispose();
@@ -67,10 +72,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildPasswordField('كلمة المرور الحالية', currentPasswordCtrl, onChanged: _onTextChanged),
+                      _buildPasswordField('كلمة المرور الحالية', currentPasswordCtrl, obscureText: _obscureCurrent, onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent), onChanged: _onTextChanged),
                       const SizedBox(height: 20),
-                      
-                      _buildPasswordField('كلمة المرور الجديدة', newPasswordCtrl, onChanged: _onTextChanged),
+
+                      _buildPasswordField('كلمة المرور الجديدة', newPasswordCtrl, obscureText: _obscureNew, onToggle: () => setState(() => _obscureNew = !_obscureNew), onChanged: _onTextChanged),
                       const SizedBox(height: 16),
                       
                       // 👇 Live Rule Indicators
@@ -79,7 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildValidationRow('رمز خاص واحد على الأقل (!@#...)', hasSpecialChar),
                       
                       const SizedBox(height: 20),
-                      _buildPasswordField('تأكيد كلمة المرور الجديدة', repeatPasswordCtrl, onChanged: _onTextChanged),
+                      _buildPasswordField('تأكيد كلمة المرور الجديدة', repeatPasswordCtrl, obscureText: _obscureRepeat, onToggle: () => setState(() => _obscureRepeat = !_obscureRepeat), onChanged: _onTextChanged),
                       const SizedBox(height: 16),
                       
                       // 👇 Password Match Indicator
@@ -103,14 +108,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: isAllValid ? null : NabeehColors.slate300,
                         ),
                         child: ElevatedButton(
-                          onPressed: isAllValid ? () async {
+                          onPressed: (isAllValid && !_isLoading) ? () async {
+                            setState(() => _isLoading = true);
                             try {
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => const Center(child: CircularProgressIndicator(color: NabeehColors.lightBlue)),
-                              );
-
                               final user = FirebaseAuth.instance.currentUser;
                               if (user != null && user.email != null) {
                                 final credential = EmailAuthProvider.credential(
@@ -121,9 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 await user.updatePassword(newPasswordCtrl.text);
 
                                 if (context.mounted) {
-                                  Navigator.pop(context); // Close loading indicator
-                                  Navigator.pop(context); // Go back to profile info screen
-                                  
+                                  Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('تم تغيير كلمة المرور بنجاح!', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
@@ -133,15 +131,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 }
                               }
                             } on FirebaseAuthException catch (e) {
-                              if (context.mounted) Navigator.pop(context); // Close loading indicator on error
-                              
                               String message = 'حدث خطأ أثناء التغيير. الرجاء المحاولة لاحقاً.';
                               if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
                                 message = 'كلمة المرور الحالية غير صحيحة.';
                               } else if (e.code == 'network-request-failed') {
                                 message = 'تأكد من اتصالك بالإنترنت.';
                               }
-                              
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -151,8 +146,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 );
                               }
                             } catch (e) {
-                              if (context.mounted) Navigator.pop(context);
                               debugPrint('Error updating password: $e');
+                            } finally {
+                              if (mounted) setState(() => _isLoading = false);
                             }
                           } : null,
                           style: ElevatedButton.styleFrom(
@@ -161,16 +157,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             padding: EdgeInsets.zero,
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(LucideIcons.save, color: Colors.white, size: 20),
-                              SizedBox(width: 8),
-                              Text(
+                              if (_isLoading)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              else
+                                const Icon(LucideIcons.save, color: Colors.white, size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
                                 'حفظ التغييرات',
                                 style: TextStyle(
-                                  fontFamily: 'IBMPlexSansArabic', 
-                                  fontWeight: FontWeight.bold, 
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                   fontSize: 18,
                                 ),
@@ -293,10 +299,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildPasswordField(String label, TextEditingController controller, {Function(String)? onChanged}) {
+  Widget _buildPasswordField(String label, TextEditingController controller, {
+    required bool obscureText,
+    required VoidCallback onToggle,
+    Function(String)? onChanged,
+  }) {
     return TextField(
       controller: controller,
-      obscureText: true,
+      obscureText: obscureText,
       onChanged: onChanged,
       style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
       decoration: InputDecoration(
@@ -304,6 +314,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         labelStyle: const TextStyle(fontFamily: 'IBMPlexSansArabic', color: NabeehColors.slate500, fontSize: 14),
         filled: true,
         fillColor: NabeehColors.slate50,
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: NabeehColors.slate500,
+            size: 22,
+          ),
+          onPressed: onToggle,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: NabeehColors.slate200),

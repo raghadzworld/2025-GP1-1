@@ -361,47 +361,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               : (_emailChanged
                                   ? Align(
                                       alignment: Alignment.centerRight,
-                                      child: OutlinedButton(
-                                        onPressed: _isSendingLink
-                                            ? null
-                                            : _sendVerificationLink,
-                                        style: OutlinedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          side: const BorderSide(
-                                            color: Color(0xFF181059),
-                                            width: 1.5,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        child: _isSendingLink
-                                            ? const SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  color: Color(
-                                                    0xFF181059,
-                                                  ),
-                                                  strokeWidth: 2,
-                                                ),
-                                              )
-                                            : const Text(
-                                                'إرسال رابط التأكيد',
-                                                style: TextStyle(
-                                                  fontFamily:
-                                                      'IBMPlexSansArabic',
-                                                  color: Color(0xFF181059),
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
+                                      child: Builder(
+                                        builder: (context) {
+                                          final isDisabled = _isSendingLink || _emailFormatError != null;
+                                          return OutlinedButton(
+                                            onPressed: isDisabled ? null : _sendVerificationLink,
+                                            style: OutlinedButton.styleFrom(
+                                              backgroundColor: isDisabled ? const Color(0xFFF3F4F6) : Colors.white,
+                                              side: BorderSide(
+                                                color: isDisabled ? Colors.grey : const Color(0xFF181059),
+                                                width: 1.5,
                                               ),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 8,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            child: _isSendingLink
+                                                ? const SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child: CircularProgressIndicator(
+                                                      color: Color(0xFF181059),
+                                                      strokeWidth: 2,
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    'إرسال رابط التأكيد',
+                                                    style: TextStyle(
+                                                      fontFamily: 'IBMPlexSansArabic',
+                                                      color: isDisabled ? Colors.grey : const Color(0xFF181059),
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                          );
+                                        },
                                       ),
                                     )
                                   : const SizedBox.shrink()),
