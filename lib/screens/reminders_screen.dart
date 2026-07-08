@@ -438,7 +438,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     label,
                     style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 13,
+                      fontSize: 17,
                       fontWeight: FontWeight.w600,
                       color: isActive
                           ? NabeehColors.lightBlue
