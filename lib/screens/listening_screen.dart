@@ -72,7 +72,8 @@ class _ListeningScreenState extends State<ListeningScreen>
                 _buildMicAndWaves(),
                 const Spacer(),
                 _buildCurrentSoundCard(),
-                const SizedBox(height: 40),
+                // 👈 تم زيادة المسافة هنا ليرتفع الكارد أكثر
+                const SizedBox(height: 110), 
               ],
             ),
           ),
@@ -86,56 +87,51 @@ class _ListeningScreenState extends State<ListeningScreen>
       width: double.infinity,
       padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 1. Grouped Back Button and Title (Anchored to the Right in RTL)
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.15),
-                    border: Border.all(
-                      color: const Color(
-                        0xFF181059,
-                      ), // 👈 Changed the border to dark blue!
-                      width: 1.5,
-                    ),
-                  ),
-                  child: const Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      color: Color(0xFF181059),
-                      size: 18,
-                    ),
-                  ),
+          // زر الرجوع
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: const Color(0xFF181059),
+                  width: 1.5,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Text(
-                'الاستشعــار الصـوتي',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+              child: const Directionality(
+                textDirection: TextDirection.ltr,
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
                   color: Color(0xFF181059),
+                  size: 18,
                 ),
               ),
-            ],
+            ),
           ),
-
-          // 2. Sign Language Gesture Button (Anchored to the Left in RTL)
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'الاستشعار الصوتي',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF181059),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // زر لغة الإشارة
           GestureDetector(
             onTap: () {
               // Add your gesture button action here
             },
             child: Container(
-              width: 44, // 👈 Consistently sized to 44
+              width: 44,
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -155,9 +151,7 @@ class _ListeningScreenState extends State<ListeningScreen>
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(
-                  10,
-                ), // 👈 Consistently padded to 10
+                padding: const EdgeInsets.all(10),
                 child: Image.asset(
                   'assets/images/icon_signLan.png',
                   color: NabeehColors.background,
@@ -317,7 +311,6 @@ class _ListeningScreenState extends State<ListeningScreen>
                     ),
                   ),
                 ),
-                // Replaced the "Change" button with a live indicator
                 if (isListening)
                   Container(
                     width: 12,
