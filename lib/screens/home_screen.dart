@@ -302,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SttTtsScreen())),
             ),
             _buildGridCard(
-              title: 'المنبّه',
+              title: 'المنبّهات',
               icon: 'assets/images/icon_YRima.png',
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersScreen())),
             ),
