@@ -23,7 +23,10 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   late FixedExtentScrollController _minuteController;
   late FixedExtentScrollController _amPmController;
 
-  String label = "منبه"; // 👈 Default label set to "منبه"
+  // 👈 Added a dedicated list to securely hold the state of our selected days
+  List<String> selectedDays = []; 
+  
+  String label = "منبّه";
   String repeat = "مطلقاً";
   double vibrationPowerValue = 1.0;
   String vibrationPattern = "متصل";
@@ -37,15 +40,19 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
     if (widget.existingData != null) {
       final data = widget.existingData!;
-      label = data['label'] ?? "منبه";
+      label = data['label'] ?? "منبّه";
 
+      // 👈 Directly load the days from Firebase into our state list
       List<dynamic> daysArray = data['daysActive'] ?? [];
-      if (daysArray.isEmpty) {
+      selectedDays = List<String>.from(daysArray);
+
+      // 👈 Determine the display text based on our secure state list
+      if (selectedDays.isEmpty) {
         repeat = "مطلقاً";
-      } else if (daysArray.length == 7) {
-        repeat = "كل يوم";
+      } else if (selectedDays.length == 7) {
+        repeat = "يوميًا";
       } else {
-        repeat = daysArray.join('، ');
+        repeat = selectedDays.join('، ');
       }
 
       int vp = data['vibrationPower'] ?? 2;
@@ -89,21 +96,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       final timeString =
           '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')} ${isAm ? 'ص' : 'م'}';
 
-      List<String> daysActive = [];
-      if (repeat == "كل يوم") {
-        daysActive = [
-          'الأحد',
-          'الاثنين',
-          'الثلاثاء',
-          'الأربعاء',
-          'الخميس',
-          'الجمعة',
-          'السبت',
-        ];
-      } else if (repeat != "مطلقاً") {
-        daysActive = repeat.split('، ');
-      }
-
       int powerInt = vibrationPowerValue.toInt() + 1;
       int patternInt =
           ['متصل', 'نبضات', 'متقطع', 'تصاعدي'].indexOf(vibrationPattern) + 1;
@@ -112,7 +104,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       final reminderData = {
         'label': label,
         'time': timeString,
-        'daysActive': daysActive,
+        'daysActive': selectedDays, // 👈 Directly save the list, avoiding string parsing bugs!
         'isEnabled': widget.existingData?['isEnabled'] ?? true,
         'vibrationPower': powerInt,
         'vibrationPattern': patternInt,
@@ -192,7 +184,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                         const SizedBox(height: 12),
                         _buildSettingCard(
                           icon: LucideIcons.tag,
-                          title: 'التسمية',
+                          title: 'العنوان',
                           value: label,
                           onTap: _showLabelDialog,
                         ),
@@ -260,7 +252,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               ),
               const SizedBox(width: 12),
               Text(
-                widget.reminderId == null ? 'إضافة منبه' : 'تعديل منبه',
+                widget.reminderId == null ? 'إضافة منبّه' : 'تعديل منبّه',
                 style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 24,
@@ -596,7 +588,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       'الجمعة',
       'السبت',
     ];
-    List<String> selected = repeat == "مطلقاً" ? [] : repeat.split('، ');
 
     showModalBottomSheet(
       context: context,
@@ -628,7 +619,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                       itemCount: days.length,
                       itemBuilder: (context, index) {
                         final day = days[index];
-                        final isSelected = selected.contains(day);
+                        // 👈 Check against our secure list variable
+                        final isSelected = selectedDays.contains(day);
                         return CheckboxListTile(
                           title: Text(
                             day,
@@ -649,19 +641,22 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           ),
                           onChanged: (bool? val) {
                             setSheetState(() {
+                              // 👈 Update the list securely 
                               if (val == true) {
-                                selected.add(day);
+                                selectedDays.add(day);
                               } else {
-                                selected.remove(day);
+                                selectedDays.remove(day);
                               }
+                              // Keep the days in standard week order
+                              selectedDays.sort((a, b) => days.indexOf(a).compareTo(days.indexOf(b)));
                             });
                             setState(() {
-                              if (selected.isEmpty) {
+                              if (selectedDays.isEmpty) {
                                 repeat = "مطلقاً";
-                              } else if (selected.length == 7) {
-                                repeat = "كل يوم";
+                              } else if (selectedDays.length == 7) {
+                                repeat = "يوميًا";
                               } else {
-                                repeat = selected.join('، ');
+                                repeat = selectedDays.join('، ');
                               }
                             });
                           },
@@ -690,7 +685,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
             borderRadius: BorderRadius.circular(24),
           ),
           title: const Text(
-            'التسمية',
+            'العنوان',
             style: TextStyle(
               fontFamily: 'IBMPlexSansArabic',
               color: NabeehColors.dark,
@@ -728,10 +723,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           actions: [
             Row(
               children: [
-                // 1. SAVE BUTTON (Right Side in RTL)
                 Expanded(
                   child: Container(
-                    height: 52, // 👈 Strict height
+                    height: 52,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       gradient: const LinearGradient(
@@ -772,11 +766,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-
-                // 2. CANCEL BUTTON (Left Side in RTL)
                 Expanded(
                   child: Container(
-                    height: 52, // 👈 Exact same strict height
+                    height: 52, 
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
@@ -895,7 +887,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       ),
       child: Row(
         children: [
-          // 1. Add/Update Reminder Button (Right Side in RTL)
           Expanded(
             child: Container(
               height: 54,
@@ -939,8 +930,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           const SizedBox(width: 6),
                           Text(
                             widget.reminderId == null
-                                ? 'إضافة المنبه'
-                                : 'تحديث المنبه',
+                                ? 'إضافة المنبّه'
+                                : 'تحديث المنبّه',
                             style: const TextStyle(
                               fontFamily: 'IBMPlexSansArabic',
                               fontWeight: FontWeight.bold,
@@ -953,10 +944,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               ),
             ),
           ),
-
           const SizedBox(width: 16),
-
-          // 2. Cancel Button (Left Side in RTL)
           Expanded(
             child: Container(
               height: 54,
