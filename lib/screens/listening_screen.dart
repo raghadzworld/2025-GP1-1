@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:math' as math;
-import 'package:record/record.dart'; // 👈 Added this import
+import 'dart:async'; // 👈 Needed for Timer
+import 'package:record/record.dart';
 import 'nabeeh_colors.dart';
 
 class ListeningScreen extends StatefulWidget {
@@ -14,12 +15,13 @@ class ListeningScreen extends StatefulWidget {
 class _ListeningScreenState extends State<ListeningScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _waveController;
-  
-  // 👈 Initialize the audio recorder instance
   final _audioRecorder = AudioRecorder();
+  
+  // 👈 Replaced the StreamSubscription with a Timer
+  Timer? _amplitudeTimer;
+  double _audioLevel = 0.0;
 
-  // State variables for mic toggle and detection
-  bool isListening = false; // Changed initial state to false until permission is checked
+  bool isListening = false;
   String detectedSound = 'جاري التحقق من الميكروفون...';
 
   @override
@@ -30,16 +32,39 @@ class _ListeningScreenState extends State<ListeningScreen>
       duration: const Duration(milliseconds: 1500),
     );
     
-    // 👈 Start listening immediately on screen load if permitted
     _startInitialListening();
   }
 
-  // 👈 New method to handle initial mic startup
+  // 👈 New approach: manually poll the amplitude using a Timer
+  void _startAmplitudeTimer() {
+    // Cancel any existing timer just to be safe
+    _amplitudeTimer?.cancel(); 
+    
+    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) async {
+      // Only check if it is actively recording to prevent errors
+      if (await _audioRecorder.isRecording()) {
+        final amp = await _audioRecorder.getAmplitude();
+        
+        // Convert decibels (-50 to 0) into a 0.0 to 1.0 scale
+        final double minDb = -45.0; 
+        double normalized = (amp.current - minDb) / (0.0 - minDb);
+        
+        if (mounted) {
+          setState(() {
+            _audioLevel = normalized.clamp(0.0, 1.0);
+            print('Live Audio Level: $_audioLevel');
+          });
+        }
+      }
+    });
+  }
+
   Future<void> _startInitialListening() async {
     bool hasPermission = await _audioRecorder.hasPermission();
     if (hasPermission) {
-      // Starts a mic stream, activating the Android hardware mic
       await _audioRecorder.startStream(const RecordConfig());
+      _startAmplitudeTimer(); // 👈 Start the timer
+      
       setState(() {
         isListening = true;
         detectedSound = 'جاري الاستماع للبيئة...';
@@ -56,26 +81,28 @@ class _ListeningScreenState extends State<ListeningScreen>
   @override
   void dispose() {
     _waveController.dispose();
-    _audioRecorder.dispose(); // 👈 Always dispose the recorder to free up hardware
+    _amplitudeTimer?.cancel(); // 👈 Safely cancel the timer when leaving the screen
+    _audioRecorder.dispose();
     super.dispose();
   }
 
-  // 👈 Updated toggle function with actual hardware logic
   Future<void> _toggleListening() async {
     if (isListening) {
-      // Turn hardware mic off
+      // 👈 Stop the timer and flatline the waves
+      _amplitudeTimer?.cancel(); 
       await _audioRecorder.stop();
       
       setState(() {
         isListening = false;
+        _audioLevel = 0.0; 
         _waveController.stop();
         detectedSound = 'الميكروفون متوقف';
       });
     } else {
-      // Turn hardware mic on
       bool hasPermission = await _audioRecorder.hasPermission();
       if (hasPermission) {
         await _audioRecorder.startStream(const RecordConfig());
+        _startAmplitudeTimer(); // 👈 Restart the timer cleanly
         
         setState(() {
           isListening = true;
@@ -114,7 +141,6 @@ class _ListeningScreenState extends State<ListeningScreen>
                 _buildMicAndWaves(),
                 const Spacer(),
                 _buildCurrentSoundCard(),
-                // 👈 تم زيادة المسافة هنا ليرتفع الكارد أكثر
                 const SizedBox(height: 110), 
               ],
             ),
@@ -130,7 +156,6 @@ class _ListeningScreenState extends State<ListeningScreen>
       padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
       child: Row(
         children: [
-          // زر الرجوع
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
@@ -167,11 +192,8 @@ class _ListeningScreenState extends State<ListeningScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // زر لغة الإشارة
           GestureDetector(
-            onTap: () {
-              // Add your gesture button action here
-            },
+            onTap: () {},
             child: Container(
               width: 44,
               height: 44,
@@ -212,7 +234,6 @@ class _ListeningScreenState extends State<ListeningScreen>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Interactive Mic Icon
         GestureDetector(
           onTap: _toggleListening,
           child: AnimatedContainer(
@@ -247,7 +268,6 @@ class _ListeningScreenState extends State<ListeningScreen>
         ),
         const SizedBox(height: 40),
 
-        // Animated Sound Waves (stops when mic is off)
         SizedBox(
           height: 60,
           child: AnimatedBuilder(
@@ -258,19 +278,20 @@ class _ListeningScreenState extends State<ListeningScreen>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: List.generate(15, (index) {
                   final offset = index * 0.4;
-                  // If not listening, flatline the waves
-                  final heightVal = isListening
-                      ? (math.sin(
-                                  (_waveController.value * 2 * math.pi) +
-                                      offset,
-                                ) +
-                                1) /
-                            2
+                  
+                  final baseRipple = (math.sin(
+                              (_waveController.value * 2 * math.pi) + offset) +
+                          1) /
+                      2;
+                  
+                  final heightVal = isListening 
+                      ? baseRipple * (_audioLevel + 0.1) 
                       : 0.0;
+                      
                   final barHeight = 10 + (heightVal * 50);
 
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                    duration: const Duration(milliseconds: 50),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: 6,
                     height: barHeight,
