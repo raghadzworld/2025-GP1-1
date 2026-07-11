@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:math' as math;
+import 'package:record/record.dart'; // 👈 Added this import
 import 'nabeeh_colors.dart';
 
 class ListeningScreen extends StatefulWidget {
@@ -13,39 +14,80 @@ class ListeningScreen extends StatefulWidget {
 class _ListeningScreenState extends State<ListeningScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _waveController;
+  
+  // 👈 Initialize the audio recorder instance
+  final _audioRecorder = AudioRecorder();
 
   // State variables for mic toggle and detection
-  bool isListening = true;
-  String detectedSound = 'جاري الاستماع للبيئة...';
+  bool isListening = false; // Changed initial state to false until permission is checked
+  String detectedSound = 'جاري التحقق من الميكروفون...';
 
   @override
   void initState() {
     super.initState();
-    // Setup repeating animation for the soundwaves
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat();
+    );
+    
+    // 👈 Start listening immediately on screen load if permitted
+    _startInitialListening();
+  }
+
+  // 👈 New method to handle initial mic startup
+  Future<void> _startInitialListening() async {
+    bool hasPermission = await _audioRecorder.hasPermission();
+    if (hasPermission) {
+      // Starts a mic stream, activating the Android hardware mic
+      await _audioRecorder.startStream(const RecordConfig());
+      setState(() {
+        isListening = true;
+        detectedSound = 'جاري الاستماع للبيئة...';
+        _waveController.repeat();
+      });
+    } else {
+      setState(() {
+        isListening = false;
+        detectedSound = 'يرجى تفعيل صلاحية الميكروفون';
+      });
+    }
   }
 
   @override
   void dispose() {
     _waveController.dispose();
+    _audioRecorder.dispose(); // 👈 Always dispose the recorder to free up hardware
     super.dispose();
   }
 
-  // Toggle function for the microphone
-  void _toggleListening() {
-    setState(() {
-      isListening = !isListening;
-      if (isListening) {
-        _waveController.repeat();
-        detectedSound = 'جاري الاستماع للبيئة...';
-      } else {
+  // 👈 Updated toggle function with actual hardware logic
+  Future<void> _toggleListening() async {
+    if (isListening) {
+      // Turn hardware mic off
+      await _audioRecorder.stop();
+      
+      setState(() {
+        isListening = false;
         _waveController.stop();
         detectedSound = 'الميكروفون متوقف';
+      });
+    } else {
+      // Turn hardware mic on
+      bool hasPermission = await _audioRecorder.hasPermission();
+      if (hasPermission) {
+        await _audioRecorder.startStream(const RecordConfig());
+        
+        setState(() {
+          isListening = true;
+          _waveController.repeat();
+          detectedSound = 'جاري الاستماع للبيئة...';
+        });
+      } else {
+        setState(() {
+          detectedSound = 'يرجى تفعيل صلاحية الميكروفون';
+        });
       }
-    });
+    }
   }
 
   @override

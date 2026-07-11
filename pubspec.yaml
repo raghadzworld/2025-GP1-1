@@ -23,6 +23,7 @@ dependencies:
   geolocator: ^13.0.2
   shared_preferences: ^2.3.2
   cloud_functions: ^5.6.2
+  record: ^5.0.0
 
 dev_dependencies:
   flutter_test:
@@ -54,3 +55,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/logo_nabeeh_blue.png"
+
+dependency_overrides:
+  record_linux: ^1.0.0
+  record_platform_interface: ^1.6.0
