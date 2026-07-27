@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+import 'contacts_screen.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -23,13 +23,13 @@ class NabeehColors {
 class EmergencyContact {
   final String id;
   final String name;
-  final String email;
+  final String phone;
   final String relation;
 
   EmergencyContact({
     this.id = '',
     required this.name,
-    required this.email,
+    required this.phone,
     required this.relation,
   });
 
@@ -38,14 +38,14 @@ class EmergencyContact {
     return EmergencyContact(
       id: doc.id,
       name: data['Name'] ?? '',
-      email: data['Email'] ?? '',
+      phone: data['Phone'] ?? '',
       relation: data['Relation'] ?? '',
     );
   }
 
   Map<String, dynamic> toFirestore() => {
     'Name': name,
-    'Email': email,
+    'Phone': phone,
     'Relation': relation,
   };
 }
@@ -67,8 +67,6 @@ class EmergencyScreen extends StatefulWidget {
 
 class _EmergencyScreenState extends State<EmergencyScreen>
     with SingleTickerProviderStateMixin {
-  final List<EmergencyContact> _contacts = [];
-
   // SOS state
   bool _sosActive = false;
   int _sosCountdown = 5;
@@ -88,32 +86,6 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.18).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    _loadContacts();
-  }
-
-  CollectionReference<Map<String, dynamic>>? get _contactsRef {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return null;
-    return FirebaseFirestore.instance
-        .collection('User')
-        .doc(uid)
-        .collection('EmergencyContacts');
-  }
-
-  Future<void> _loadContacts() async {
-    try {
-      final ref = _contactsRef;
-      if (ref == null) return;
-      final snapshot = await ref.get();
-      if (!mounted) return;
-      setState(() {
-        _contacts
-          ..clear()
-          ..addAll(snapshot.docs.map(EmergencyContact.fromFirestore));
-      });
-    } catch (_) {
-      // تبقى القائمة فارغة إذا فشل الجلب
-    }
   }
 
   @override
@@ -152,7 +124,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('جاري إرسال نداء الاستغاثة...'),
+        content: Text('جاري تجهيز نداء الاستغاثة...'),
         backgroundColor: Colors.orange,
         duration: Duration(seconds: 2),
       ),
@@ -179,30 +151,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         longitude = position.longitude;
       }
 
-      // 2. جلب بيانات المستخدم والإيميلات من Firestore
+      // 2. جلب أرقام جهات الاتصال من Firestore
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('User')
-          .doc(uid)
-          .get();
-      String userName = (userDoc.data()?['FullName'] as String? ?? '').trim();
-      if (userName.isEmpty) {
-        final currentUser = FirebaseAuth.instance.currentUser;
-        if (currentUser?.email != null) {
-          final query = await FirebaseFirestore.instance
-              .collection('User')
-              .where('Email', isEqualTo: currentUser!.email)
-              .limit(1)
-              .get();
-          if (query.docs.isNotEmpty) {
-            userName = (query.docs.first.data()['FullName'] as String? ?? '')
-                .trim();
-          }
-        }
-      }
-      if (userName.isEmpty) userName = 'مستخدم نبيه';
 
       final snapshot = await FirebaseFirestore.instance
           .collection('User')
@@ -210,12 +161,13 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           .collection('EmergencyContacts')
           .get();
 
-      final emails = snapshot.docs
-          .map((doc) => doc.data()['Email'] as String?)
+      final phones = snapshot.docs
+          .map((doc) => doc.data()['Phone'] as String?)
           .whereType<String>()
+          .where((phone) => phone.isNotEmpty)
           .toList();
 
-      if (emails.isEmpty) {
+      if (phones.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -226,747 +178,37 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         return;
       }
 
-      // 3. إرسال إيميل لكل جهة اتصال عبر EmailJS REST API
-      const emailjsServiceId = 'service_z8s2iye';
-      const emailjsTemplateId = 'template_5skt4yr';
-      const emailjsPublicKey = 'iTX-OPPPTV27wvJyw';
-      const emailjsPrivateKey = '-cAevJ-wpLtQbsPtHHn6S';
-
+      // 3. بناء رسالة الاستغاثة مع رابط الموقع
       final hasLocation = latitude != null && longitude != null;
       final mapsLink = hasLocation
           ? 'https://www.google.com/maps?q=$latitude,$longitude'
           : 'غير متاح';
 
-      for (final email in emails) {
-        final response = await http.post(
-          Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'service_id': emailjsServiceId,
-            'template_id': emailjsTemplateId,
-            'user_id': emailjsPublicKey,
-            'accessToken': emailjsPrivateKey,
-            'template_params': {
-              'to_email': email,
-              'name': userName,
-              'user_name': userName,
-              'latitude': latitude?.toString() ?? 'غير متاح',
-              'longitude': longitude?.toString() ?? 'غير متاح',
-              'maps_link': mapsLink,
-            },
-          }),
-        );
+      final message =
+          'أنا في خطر أحتاج إلى المساعدة 🚨\n\nهذا الموقع الخاص بي:\n$mapsLink';
 
-        if (response.statusCode != 200) {
-          throw Exception('EmailJS error: ${response.body}');
-        }
-      }
+      // 4. فتح تطبيق الرسائل مع تعبئة الأرقام والرسالة مسبقاً
+      final separator = Platform.isIOS ? ';' : ',';
+      final smsUri = Uri(
+        scheme: 'sms',
+        path: phones.join(separator),
+        queryParameters: {'body': message},
+      );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم إرسال نداء الاستغاثة إلى جهات الاتصال'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      final launched = await launchUrl(smsUri);
+      if (!launched) {
+        throw Exception('تعذر فتح تطبيق الرسائل');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الإرسال: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(email.trim());
-  }
-
-  // ── Add Contact Sheet ──────────────────────────────────────────────────────
-  void _showAddContactSheet() {
-    if (_contacts.length >= 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لا يمكن إضافة أكثر من جهتَي اتصال'),
-          backgroundColor: Color(0xFF181059),
+        SnackBar(
+          content: Text('فشل تجهيز الرسالة: $e'),
+          backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final relationCtrl = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: 24,
-              right: 24,
-              left: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: NabeehColors.cardBorder,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'إضافة جهة اتصال:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF181059),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildFormField(
-                  label: 'الاسم:',
-                  controller: nameCtrl,
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 20),
-                _buildFormField(
-                  label: 'الايميل:',
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  icon: Icons.email_outlined,
-                  errorText:
-                      emailCtrl.text.isNotEmpty &&
-                          !_isValidEmail(emailCtrl.text)
-                      ? 'صيغة البريد الإلكتروني غير صحيحة'
-                      : null,
-                ),
-                const SizedBox(height: 20),
-                _buildFormField(
-                  label: 'جهة القرابة:',
-                  controller: relationCtrl,
-                  icon: Icons.people_outline,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: TextButton(
-                          onPressed: () async {
-                            setSheetState(() {});
-                            if (nameCtrl.text.trim().isEmpty ||
-                                emailCtrl.text.trim().isEmpty ||
-                                relationCtrl.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('يرجى تعبئة جميع الحقول'),
-                                ),
-                              );
-                              return;
-                            }
-                            if (!_isValidEmail(emailCtrl.text)) return;
-                            try {
-                              final newContact = EmergencyContact(
-                                name: nameCtrl.text.trim(),
-                                email: emailCtrl.text.trim(),
-                                relation: relationCtrl.text.trim(),
-                              );
-                              final docRef = await _contactsRef!.add(
-                                newContact.toFirestore(),
-                              );
-                              if (!ctx.mounted) return;
-                              Navigator.pop(ctx);
-                              if (mounted) {
-                                setState(
-                                  () => _contacts.add(
-                                    EmergencyContact(
-                                      id: docRef.id,
-                                      name: newContact.name,
-                                      email: newContact.email,
-                                      relation: newContact.relation,
-                                    ),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('حدث خطأ: $e')),
-                              );
-                            }
-                          },
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(0, 52),
-                            alignment: Alignment.center,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add, color: Colors.white, size: 22),
-                              SizedBox(width: 8),
-                              Text(
-                                'إضافة',
-                                style: TextStyle(
-                                  fontFamily: 'IBMPlexSansArabic',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 52),
-                          side: const BorderSide(
-                            color: Color.fromARGB(255, 200, 198, 195),
-                            width: 1.2,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.close, color: Colors.grey, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'إلغاء',
-                              style: TextStyle(
-                                fontFamily: 'IBMPlexSansArabic',
-                                color: Colors.grey,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _deleteContact(int index) async {
-    final contact = _contacts[index];
-    if (contact.id.isNotEmpty) {
-      await _contactsRef?.doc(contact.id).delete();
-    }
-    if (mounted) setState(() => _contacts.removeAt(index));
-  }
-
-  void _selectContactForEdit() {
-    if (_contacts.isEmpty) return;
-    if (_contacts.length == 1) {
-      _showEditContactSheet(_contacts.first, 0);
-      return;
-    }
-    _showContactSelectorSheet(
-      onSelect: (index) {
-        Navigator.pop(context);
-        _showEditContactSheet(_contacts[index], index);
-      },
-    );
-  }
-
-  Future<void> _confirmDeleteContact(int index) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-              SizedBox(width: 10),
-              Text(
-                'حذف جهة الاتصال',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontWeight: FontWeight.bold,
-                  color: Colors.redAccent,
-                  fontSize: 20,
-                ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'هل أنت متأكد من رغبتك في حذف جهة الاتصال هذه نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
-            style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 15),
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
-          actions: [
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(dialogContext, true),
-                    style: OutlinedButton.styleFrom(
-                      fixedSize: const Size.fromHeight(50),
-                      padding: EdgeInsets.zero,
-                      side: const BorderSide(
-                        color: Colors.redAccent,
-                        width: 1.2,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          LucideIcons.trash2,
-                          color: Colors.redAccent,
-                          size: 18,
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'حذف نهائي',
-                          style: TextStyle(
-                            fontFamily: 'IBMPlexSansArabic',
-                            fontWeight: FontWeight.bold,
-                            color: Colors.redAccent,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(dialogContext, false),
-                    style: TextButton.styleFrom(
-                      fixedSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(
-                          color: Color.fromARGB(255, 200, 198, 195),
-                        ),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.close, color: Colors.grey, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'إلغاء',
-                          style: TextStyle(
-                            fontFamily: 'IBMPlexSansArabic',
-                            color: Colors.grey,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        SizedBox(width: 22),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed == true) _deleteContact(index);
-  }
-
-  void _selectContactForDelete() {
-    if (_contacts.isEmpty) return;
-    if (_contacts.length == 1) {
-      _confirmDeleteContact(0);
-      return;
-    }
-    _showContactSelectorSheet(
-      onSelect: (index) {
-        Navigator.pop(context);
-        _confirmDeleteContact(index);
-      },
-    );
-  }
-
-  void _showContactSelectorSheet({required void Function(int index) onSelect}) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: NabeehColors.cardBorder,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'اختر جهة الاتصال:',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF181059),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ..._contacts.asMap().entries.map(
-                (entry) => ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 0,
-                    vertical: 4,
-                  ),
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: NabeehColors.lightBlueBg,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      color: Color(0xFF181059),
-                      size: 22,
-                    ),
-                  ),
-                  title: Text(
-                    entry.value.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF181059),
-                    ),
-                  ),
-                  subtitle: Text(
-                    'جهة القرابة: ${entry.value.relation}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: NabeehColors.gray,
-                    ),
-                  ),
-                  onTap: () => onSelect(entry.key),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showEditContactSheet(EmergencyContact contact, int index) {
-    final nameCtrl = TextEditingController(text: contact.name);
-    final emailCtrl = TextEditingController(text: contact.email);
-    final relationCtrl = TextEditingController(text: contact.relation);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: 24,
-              right: 24,
-              left: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: NabeehColors.cardBorder,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'تعديل جهة الاتصال:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF181059),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildFormField(
-                  label: 'الاسم:',
-                  controller: nameCtrl,
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 20),
-                _buildFormField(
-                  label: 'الايميل:',
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  icon: Icons.email_outlined,
-                  errorText:
-                      emailCtrl.text.isNotEmpty &&
-                          !_isValidEmail(emailCtrl.text)
-                      ? 'صيغة البريد الإلكتروني غير صحيحة'
-                      : null,
-                ),
-                const SizedBox(height: 20),
-                _buildFormField(
-                  label: 'جهة القرابة:',
-                  controller: relationCtrl,
-                  icon: Icons.people_outline,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: TextButton(
-                          onPressed: () async {
-                            setSheetState(() {});
-                            if (nameCtrl.text.trim().isEmpty ||
-                                emailCtrl.text.trim().isEmpty ||
-                                relationCtrl.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('يرجى تعبئة جميع الحقول'),
-                                ),
-                              );
-                              return;
-                            }
-                            if (!_isValidEmail(emailCtrl.text)) return;
-                            final updated = EmergencyContact(
-                              id: contact.id,
-                              name: nameCtrl.text.trim(),
-                              email: emailCtrl.text.trim(),
-                              relation: relationCtrl.text.trim(),
-                            );
-                            if (contact.id.isNotEmpty) {
-                              await _contactsRef
-                                  ?.doc(contact.id)
-                                  .update(updated.toFirestore());
-                            }
-                            if (!ctx.mounted) return;
-                            Navigator.pop(ctx);
-                            if (mounted)
-                              setState(() => _contacts[index] = updated);
-                          },
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(0, 52),
-                            alignment: Alignment.center,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                LucideIcons.save,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'حفظ',
-                                style: TextStyle(
-                                  fontFamily: 'IBMPlexSansArabic',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 52),
-                          side: const BorderSide(
-                            color: Color.fromARGB(255, 200, 198, 195),
-                            width: 1.2,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.close, color: Colors.grey, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'إلغاء',
-                              style: TextStyle(
-                                fontFamily: 'IBMPlexSansArabic',
-                                color: Colors.grey,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFormField({
-    required String label,
-    required TextEditingController controller,
-    TextInputType keyboardType = TextInputType.text,
-    String? errorText,
-    IconData? icon,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 18, color: const Color(0xFF181059)),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF181059),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          textAlign: TextAlign.right,
-          decoration: InputDecoration(
-            hintText: 'اكتب هنا',
-            hintStyle: const TextStyle(color: NabeehColors.gray, fontSize: 14),
-            errorText: errorText,
-            errorStyle: const TextStyle(fontSize: 12),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: errorText != null ? Colors.red : NabeehColors.cardBorder,
-              ),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: errorText != null ? Colors.red : NabeehColors.lightBlue,
-                width: 2,
-              ),
-            ),
-            errorBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.red),
-            ),
-            focusedErrorBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.red, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 8,
-              horizontal: 0,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   @override
@@ -988,133 +230,46 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             children: [
               _buildHeader(),
               Expanded(
-                child: SingleChildScrollView(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 20,
                   ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'جهات الاتصال:',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF181059),
-                          ),
-                        ),
-                        const Spacer(),
-                        OutlinedButton(
-                          onPressed: _contacts.isNotEmpty
-                              ? _selectContactForEdit
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            minimumSize: const Size(90, 44),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: const BorderSide(
-                              color: Color(0xFF181059),
-                              width: 1.2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.edit_outlined,
-                                size: 20,
-                                color: Color(0xFF181059),
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'تعديل',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF181059),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      _buildContactsButton(),
+                      Expanded(
+                        child: Center(
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    'هل أنت في حالة خطر ؟',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF181059),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 75),
+                                Center(child: _buildSOSButton()),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: _contacts.isNotEmpty
-                              ? _selectContactForDelete
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            minimumSize: const Size(90, 44),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: BorderSide(
-                              color: _contacts.isNotEmpty
-                                  ? Colors.redAccent
-                                  : Colors.grey.shade300,
-                              width: 1.2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                LucideIcons.trash2,
-                                size: 20,
-                                color: _contacts.isNotEmpty
-                                    ? Colors.redAccent
-                                    : Colors.grey.shade400,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'حذف',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _contacts.isNotEmpty
-                                      ? Colors.redAccent
-                                      : Colors.grey.shade400,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ..._contacts.map((c) => _buildContactTile(c)),
-                    if (_contacts.length < 2) _buildAddContactButton(),
-                    const SizedBox(height: 40),
-                    const Text(
-                      'هل أنت في حالة خطر ؟',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF181059),
                       ),
-                    ),
-                    const SizedBox(height: 75),
-                    Center(child: _buildSOSButton()),
-                    const SizedBox(height: 40),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),
@@ -1172,103 +327,47 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     );
   }
 
-  // ── Contact Tile ──────────────────────────────────────────────────────────
-  Widget _buildContactTile(EmergencyContact contact) {
+  // ── Contacts Button ───────────────────────────────────────────────────────
+  Widget _buildContactsButton() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      height: 60,
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: NabeehColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Avatar on the right (in RTL)
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
-              color: Color(0xFFEEF0F8),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Color(0xFF181059),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Info on the left (in RTL)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  contact.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Color(0xFF181059),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'جهة القرابة : ${contact.relation}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: NabeehColors.gray,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Add Contact Button ────────────────────────────────────────────────────
-  Widget _buildAddContactButton() {
-    return GestureDetector(
-      onTap: _showAddContactSheet,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color.fromARGB(255, 235, 233, 229)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: Color(0xFF181059),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.add, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'اضف جهة اتصال',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF181059),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+      ),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ContactsScreen()),
+          );
+        },
+        icon: const Icon(Icons.people_alt_rounded, color: Colors.white, size: 22),
+        label: const Text(
+          'جهات الاتصال',
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          minimumSize: const Size(double.infinity, 60),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       ),
     );
