@@ -1,0 +1,974 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'emergency_screen.dart' show EmergencyContact;
+
+const _kContactsGray = Color(0xFFA4ACB0);
+const _kContactsCardBorder = Color(0xFFE5E7EB);
+
+class ContactsScreen extends StatefulWidget {
+  const ContactsScreen({super.key});
+
+  @override
+  State<ContactsScreen> createState() => _ContactsScreenState();
+}
+
+class _ContactsScreenState extends State<ContactsScreen> {
+  final List<EmergencyContact> _contacts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContacts();
+  }
+
+  CollectionReference<Map<String, dynamic>>? get _contactsRef {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+    return FirebaseFirestore.instance
+        .collection('User')
+        .doc(uid)
+        .collection('EmergencyContacts');
+  }
+
+  Future<void> _loadContacts() async {
+    try {
+      final ref = _contactsRef;
+      if (ref == null) return;
+      final snapshot = await ref.get();
+      if (!mounted) return;
+      setState(() {
+        _contacts
+          ..clear()
+          ..addAll(snapshot.docs.map(EmergencyContact.fromFirestore));
+      });
+    } catch (_) {
+      // تبقى القائمة فارغة إذا فشل الجلب
+    }
+  }
+
+  String _sanitizePhone(String raw) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.length > 10 ? digits.substring(0, 10) : digits;
+  }
+
+  bool _isValidPhone(String phone) {
+    return RegExp(r'^05\d{8}$').hasMatch(_sanitizePhone(phone));
+  }
+
+  // ── Add Contact Sheet ──────────────────────────────────────────────────────
+  void _showAddContactSheet() {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final relationCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: 24,
+              right: 24,
+              left: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _kContactsCardBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'إضافة جهة اتصال:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF181059),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildFormField(
+                  label: 'الاسم:',
+                  controller: nameCtrl,
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'رقم الجوال:',
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  icon: Icons.phone_outlined,
+                  maxLength: 10,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  errorText:
+                      phoneCtrl.text.isNotEmpty && !_isValidPhone(phoneCtrl.text)
+                      ? 'يجب أن يتكون الرقم من 10 أرقام ويبدأ بـ 05'
+                      : null,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'جهة القرابة:',
+                  controller: relationCtrl,
+                  icon: Icons.people_outline,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: TextButton(
+                          onPressed: () async {
+                            setSheetState(() {});
+                            if (nameCtrl.text.trim().isEmpty ||
+                                phoneCtrl.text.trim().isEmpty ||
+                                relationCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('يرجى تعبئة جميع الحقول'),
+                                ),
+                              );
+                              return;
+                            }
+                            if (!_isValidPhone(phoneCtrl.text)) {
+                              setSheetState(() {});
+                              return;
+                            }
+                            try {
+                              final newContact = EmergencyContact(
+                                name: nameCtrl.text.trim(),
+                                phone: _sanitizePhone(phoneCtrl.text),
+                                relation: relationCtrl.text.trim(),
+                              );
+                              final docRef = await _contactsRef!.add(
+                                newContact.toFirestore(),
+                              );
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              if (mounted) {
+                                setState(
+                                  () => _contacts.add(
+                                    EmergencyContact(
+                                      id: docRef.id,
+                                      name: newContact.name,
+                                      phone: newContact.phone,
+                                      relation: newContact.relation,
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('حدث خطأ: $e')),
+                              );
+                            }
+                          },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 52),
+                            alignment: Alignment.center,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add, color: Colors.white, size: 22),
+                              SizedBox(width: 8),
+                              Text(
+                                'إضافة',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 52),
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 200, 198, 195),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.grey, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'إلغاء',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                color: Colors.grey,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteContact(int index) async {
+    final contact = _contacts[index];
+    if (contact.id.isNotEmpty) {
+      await _contactsRef?.doc(contact.id).delete();
+    }
+    if (mounted) setState(() => _contacts.removeAt(index));
+  }
+
+  Future<void> _confirmDeleteContact(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text(
+                'حذف جهة الاتصال',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontWeight: FontWeight.bold,
+                  color: Colors.redAccent,
+                  fontSize: 20,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'هل أنت متأكد من رغبتك في حذف جهة الاتصال هذه نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+            style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 15),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    style: OutlinedButton.styleFrom(
+                      fixedSize: const Size.fromHeight(50),
+                      padding: EdgeInsets.zero,
+                      side: const BorderSide(
+                        color: Colors.redAccent,
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          LucideIcons.trash2,
+                          color: Colors.redAccent,
+                          size: 18,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'حذف نهائي',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    style: TextButton.styleFrom(
+                      fixedSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(
+                          color: Color.fromARGB(255, 200, 198, 195),
+                        ),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.close, color: Colors.grey, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'إلغاء',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            color: Colors.grey,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(width: 22),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true) _deleteContact(index);
+  }
+
+  void _showEditContactSheet(EmergencyContact contact, int index) {
+    final nameCtrl = TextEditingController(text: contact.name);
+    final phoneCtrl = TextEditingController(text: contact.phone);
+    final relationCtrl = TextEditingController(text: contact.relation);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: 24,
+              right: 24,
+              left: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _kContactsCardBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'تعديل جهة الاتصال:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF181059),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildFormField(
+                  label: 'الاسم:',
+                  controller: nameCtrl,
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'رقم الجوال:',
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  icon: Icons.phone_outlined,
+                  maxLength: 10,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  errorText:
+                      phoneCtrl.text.isNotEmpty && !_isValidPhone(phoneCtrl.text)
+                      ? 'يجب أن يتكون الرقم من 10 أرقام ويبدأ بـ 05'
+                      : null,
+                ),
+                const SizedBox(height: 20),
+                _buildFormField(
+                  label: 'جهة القرابة:',
+                  controller: relationCtrl,
+                  icon: Icons.people_outline,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: TextButton(
+                          onPressed: () async {
+                            setSheetState(() {});
+                            if (nameCtrl.text.trim().isEmpty ||
+                                phoneCtrl.text.trim().isEmpty ||
+                                relationCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('يرجى تعبئة جميع الحقول'),
+                                ),
+                              );
+                              return;
+                            }
+                            if (!_isValidPhone(phoneCtrl.text)) {
+                              setSheetState(() {});
+                              return;
+                            }
+                            final updated = EmergencyContact(
+                              id: contact.id,
+                              name: nameCtrl.text.trim(),
+                              phone: _sanitizePhone(phoneCtrl.text),
+                              relation: relationCtrl.text.trim(),
+                            );
+                            if (contact.id.isNotEmpty) {
+                              await _contactsRef
+                                  ?.doc(contact.id)
+                                  .update(updated.toFirestore());
+                            }
+                            if (!ctx.mounted) return;
+                            Navigator.pop(ctx);
+                            if (mounted) {
+                              setState(() => _contacts[index] = updated);
+                            }
+                          },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 52),
+                            alignment: Alignment.center,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                LucideIcons.save,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'حفظ',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 52),
+                          side: const BorderSide(
+                            color: Color.fromARGB(255, 200, 198, 195),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.grey, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'إلغاء',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                color: Colors.grey,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormField({
+    required String label,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+    String? errorText,
+    IconData? icon,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: const Color(0xFF181059)),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF181059),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
+          maxLengthEnforcement: maxLength != null
+              ? MaxLengthEnforcement.enforced
+              : null,
+          textAlign: TextAlign.right,
+          decoration: InputDecoration(
+            counterText: maxLength != null ? '' : null,
+            hintText: 'اكتب هنا',
+            hintStyle: const TextStyle(color: _kContactsGray, fontSize: 14),
+            errorText: errorText,
+            errorStyle: const TextStyle(fontSize: 12),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : _kContactsCardBorder,
+              ),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color: errorText != null
+                    ? Colors.red
+                    : const Color(0xFF1773CF),
+                width: 2,
+              ),
+            ),
+            errorBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.red, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 0,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFDDEEF8), Color(0xFFF2F9FE), Colors.white],
+              stops: [0.0, 0.35, 0.6],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'جهات الاتصال:',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF181059),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ..._contacts.asMap().entries.map(
+                          (e) => _buildContactTile(e.value, e.key),
+                        ),
+                        _buildAddContactButton(),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF181059),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF181059),
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'جهات الاتصال',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+              ),
+            ],
+          ),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF181059),
+                  Color(0xFF181059),
+                  Color(0xFF1773CF),
+                ],
+                stops: [0.09, 0.30, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Image.asset(
+                'assets/images/icon_signLan.png',
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Contact Tile ──────────────────────────────────────────────────────────
+  Widget _buildContactTile(EmergencyContact contact, int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: const Color(0xFF181059), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1773CF).withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEEF0F8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Color(0xFF181059),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      contact.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF181059),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'جهة القرابة : ${contact.relation}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: _kContactsGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showEditContactSheet(contact, index),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF181059),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          LucideIcons.edit2,
+                          size: 16,
+                          color: Color(0xFF181059),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'تعديل',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF181059),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _confirmDeleteContact(index),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.redAccent, width: 1.2),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          LucideIcons.trash2,
+                          size: 16,
+                          color: Colors.redAccent,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'حذف',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Add Contact Button ────────────────────────────────────────────────────
+  Widget _buildAddContactButton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 60,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+      ),
+      child: TextButton.icon(
+        onPressed: _showAddContactSheet,
+        icon: const Icon(LucideIcons.plus, color: Colors.white),
+        label: const Text(
+          'إضافة جهة اتصال جديدة',
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            color: Colors.white,
+            letterSpacing: 2,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
+}
