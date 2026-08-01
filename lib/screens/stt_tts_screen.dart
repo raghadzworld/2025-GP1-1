@@ -196,67 +196,67 @@ class _SttTtsScreenState extends State<SttTtsScreen>
             children: [
               _buildHeader(context), // Custom header matching EditProfileScreen
               Expanded(
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(
-                  fontFamily: 'IBMPlexSansArabic', // Consistent Arabic font
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      BentoCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text(
-                              'اختر طريقة التفاعل',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: NabeehColors.dark,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            _buildModeSwitcher(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 400,
-                        child: AnimatedSwitcher(
-                          duration: 250.ms,
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          layoutBuilder: (currentChild, previousChildren) =>
-                              Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  ...previousChildren,
-                                  if (currentChild case final child?) child,
-                                ],
-                              ),
-                          child: _isSttMode
-                              ? KeyedSubtree(
-                                  key: const ValueKey('stt'),
-                                  child: _buildSttView(),
-                                )
-                              : KeyedSubtree(
-                                  key: const ValueKey('tts'),
-                                  child: _buildTtsView(),
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic', // Consistent Arabic font
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        BentoCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'اختر طريقة التفاعل',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: NabeehColors.dark,
                                 ),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildModeSwitcher(),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 400,
+                          child: AnimatedSwitcher(
+                            duration: 250.ms,
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    ...previousChildren,
+                                    if (currentChild case final child?) child,
+                                  ],
+                                ),
+                            child: _isSttMode
+                                ? KeyedSubtree(
+                                    key: const ValueKey('stt'),
+                                    child: _buildSttView(),
+                                  )
+                                : KeyedSubtree(
+                                    key: const ValueKey('tts'),
+                                    child: _buildTtsView(),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),

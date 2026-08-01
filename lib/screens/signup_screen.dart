@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../main.dart';
 import '../services/email_service.dart';
+import 'verify_email_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -197,6 +199,80 @@ class _SignupScreenState extends State<SignupScreen>
     });
   }
 
+  // ✅ تسجيل حساب فعلي عبر Google (API الجديد v7+)
+  Future<void> _continueWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize();
+
+      final googleUser = await googleSignIn.authenticate();
+      final googleAuth = googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = userCredential.user;
+
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // ✅ لو أول مرة يسجل فيها هذا المستخدم، ننشئ سجل له بفايرستور
+      final docRef = FirebaseFirestore.instance
+          .collection('User')
+          .doc(user.uid);
+      final doc = await docRef.get();
+      if (!doc.exists) {
+        await docRef.set({
+          'FullName': user.displayName ?? '',
+          'Email': user.email ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.main,
+          arguments: {
+            'welcomeName': user.displayName ?? '',
+            'isNewUser': !doc.exists,
+          },
+        );
+      }
+    } on GoogleSignInException catch (e) {
+      if (mounted && e.code != GoogleSignInExceptionCode.canceled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذّر إنشاء الحساب عبر Google، حاولي مرة أخرى',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذّر إنشاء الحساب عبر Google، حاولي مرة أخرى',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _signUp() async {
     _validateName(_nameController.text);
     _validateEmail(_emailController.text);
@@ -236,20 +312,24 @@ class _SignupScreenState extends State<SignupScreen>
           });
 
       try {
-        await EmailService.sendWelcomeEmail(
+        await EmailService.sendWelcomeVerifyEmail(
           _emailController.text.trim(),
           _nameController.text.trim(),
         );
       } catch (_) {}
 
+      // ✅ نسجّل خروج المستخدم فوراً — ما يقدر يدخل التطبيق قبل تفعيل الإيميل
+      await FirebaseAuth.instance.signOut();
+
       if (mounted) {
-        Navigator.pushReplacementNamed(
+        Navigator.pushReplacement(
           context,
-          AppRoutes.main,
-          arguments: {
-            'welcomeName': _nameController.text.trim(),
-            'isNewUser': true,
-          },
+          MaterialPageRoute(
+            builder: (context) => VerifyEmailScreen(
+              email: _emailController.text.trim(),
+              displayName: _nameController.text.trim(),
+            ),
+          ),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -495,7 +575,8 @@ class _SignupScreenState extends State<SignupScreen>
                                   ),
                                 ),
 
-                                if (_passwordFieldFocused || _passwordController.text.isNotEmpty)
+                                if (_passwordFieldFocused ||
+                                    _passwordController.text.isNotEmpty)
                                   Padding(
                                     padding: const EdgeInsets.only(
                                       top: 10,
@@ -737,6 +818,118 @@ class _SignupScreenState extends State<SignupScreen>
                                               ),
                                             ],
                                           ),
+                                  ),
+                                ),
+                                const SizedBox(height: 29),
+
+                                // ── فاصل "أو" ─────────────────────────
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Divider(
+                                        color: const Color(
+                                          0xFFD1D5DB,
+                                        ).withValues(alpha: 0.8),
+                                        thickness: 1,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 15,
+                                      ),
+                                      child: Text(
+                                        'أو',
+                                        style: TextStyle(
+                                          fontFamily: 'IBMPlexSansArabic',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                          color: const Color(
+                                            0xFF6B7280,
+                                          ).withValues(alpha: 0.8),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Divider(
+                                        color: const Color(
+                                          0xFFD1D5DB,
+                                        ).withValues(alpha: 0.8),
+                                        thickness: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 29),
+
+                                // ── زر الاستمرار مع Google ────────────
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: _isLoading
+                                        ? null
+                                        : _continueWithGoogle,
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 15,
+                                      ),
+                                      side: const BorderSide(
+                                        color: Color(0xFFD1D5DB),
+                                        width: 1.5,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/google_logo.png',
+                                          height: 20,
+                                          width: 20,
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => ShaderMask(
+                                                shaderCallback: (bounds) =>
+                                                    const LinearGradient(
+                                                      colors: [
+                                                        Color(0xFF181059),
+                                                        Color(0xFF181059),
+                                                        Color(0xFF1773CF),
+                                                      ],
+                                                      stops: [0.0, 0.30, 1.0],
+                                                      begin:
+                                                          Alignment.topCenter,
+                                                      end: Alignment
+                                                          .bottomCenter,
+                                                    ).createShader(bounds),
+                                                child: const Text(
+                                                  'G',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Text(
+                                          'الاستمرار مع Google',
+                                          style: TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF181059),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),

@@ -334,7 +334,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                         // ── فاصل "أو" ─────────────────────────────────────
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.only(top: 29, bottom: 29),
                           child: Row(
                             children: [
                               Expanded(
@@ -345,7 +345,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
+                                  horizontal: 15,
                                 ),
                                 child: Text(
                                   'أو',
