@@ -122,7 +122,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     final current = _sounds[soundIndex].vibrationPattern;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: NabeehColors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
@@ -296,9 +296,10 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         const Text(
           'اسم الفئة',
           style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: NabeehColors.slate400,
+            fontFamily: 'IBMPlexSansArabic',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: NabeehColors.dark,
           ),
         ),
         const SizedBox(height: 8),
@@ -309,35 +310,46 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           onChanged: (_) {
             if (_nameError != null) setState(() => _nameError = null);
           },
-          decoration: InputDecoration(
+          style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
+         decoration: InputDecoration(
             hintText: 'مثلاً: المنزل، العمل...',
             hintTextDirection: TextDirection.rtl,
+            hintStyle: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: NabeehColors.slate400,
+            ),
             filled: true,
             fillColor: _nameError != null
                 ? Colors.red.withValues(alpha: 0.05)
                 : NabeehColors.slate50,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: _nameError != null
+                    ? Colors.red.withValues(alpha: 0.5)
+                    : NabeehColors.slate200,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: _nameError != null
-                  ? BorderSide(color: Colors.red.withValues(alpha: 0.4))
-                  : BorderSide.none,
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: _nameError != null
+                    ? Colors.red.withValues(alpha: 0.5)
+                    : NabeehColors.slate200,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
                 color: _nameError != null
                     ? Colors.red.withValues(alpha: 0.6)
-                    : NabeehColors.darkBlue.withValues(alpha: 0.4),
+                    : NabeehColors.lightBlue,
+                width: 2,
               ),
             ),
           ),
-          style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.w900),
         ),
         if (_nameError != null) ...[
           const SizedBox(height: 10),
@@ -377,9 +389,10 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         const Text(
           'الأصوات والاهتزاز',
           style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: NabeehColors.slate400,
+            fontFamily: 'IBMPlexSansArabic',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: NabeehColors.dark,
           ),
         ),
         const SizedBox(height: 16),
@@ -413,12 +426,12 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: sound.isEnabled
-              ? const Color(0xFF181059)
-              : const Color.fromARGB(255, 235, 233, 229),
-          width: sound.isEnabled ? 2 : 1,
+              ? NabeehColors.darkBlue
+              : NabeehColors.slate100,
+          width: sound.isEnabled ? 1.8 : 1.0,
         ),
       ),
       child: Column(
@@ -426,56 +439,62 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: sound.isEnabled
-                      ? const Color(0xFF181059).withValues(alpha: 0.08)
-                      : NabeehColors.slate50,
-                  borderRadius: BorderRadius.circular(10),
+                      ? NabeehColors.darkBlue.withValues(alpha: 0.12)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   _soundIcon(sound.soundId),
                   size: 18,
-                  color: sound.isEnabled ? const Color(0xFF181059) : NabeehColors.slate300,
+                  color: sound.isEnabled ? NabeehColors.darkBlue : NabeehColors.slate400,
                 ),
               ),
               const SizedBox(width: 12),
               if (isFireAlarm) ...[
-                const Icon(Icons.lock_outline_rounded,
-                    size: 14, color: NabeehColors.slate300),
-                const SizedBox(width: 4),
+                const Icon(LucideIcons.lock, size: 16, color: NabeehColors.slate400),
+                const SizedBox(width: 6),
               ],
               Expanded(
                 child: Text(
                   sound.name,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: sound.isEnabled
-                        ? NabeehColors.dark
-                        : NabeehColors.slate400,
+                    color: sound.isEnabled ? NabeehColors.dark : NabeehColors.slate500,
                   ),
                 ),
               ),
               Switch(
                 value: sound.isEnabled,
                 onChanged: isFireAlarm
-                    ? (_) {}
+                    ? null
                     : (val) => setState(
                         () => _sounds[index] = sound.copyWith(isEnabled: val)),
-                activeThumbColor: NabeehColors.background,
-                activeTrackColor: const Color(0xFF181059),
-                inactiveThumbColor: NabeehColors.slate400,
-                inactiveTrackColor: NabeehColors.slate200,
+                activeThumbColor: isFireAlarm
+                    ? NabeehColors.slate400
+                    : NabeehColors.background,
+                activeTrackColor: isFireAlarm
+                    ? NabeehColors.slate300
+                    : NabeehColors.darkBlue,
+                inactiveThumbColor: isFireAlarm
+                    ? NabeehColors.slate400
+                    : NabeehColors.slate400,
+                inactiveTrackColor: isFireAlarm
+                    ? NabeehColors.slate200
+                    : NabeehColors.slate200,
                 trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
               ),
             ],
           ),
           if (sound.isEnabled) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Divider(color: Color(0xFFDBEAFE)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             _buildVibrationSlider(index),
             const SizedBox(height: 12),
             _buildPatternPicker(index),
@@ -621,71 +640,79 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
 
   Widget _buildBottomActions() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
         color: NabeehColors.background,
         border: Border(top: BorderSide(color: NabeehColors.slate100)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      width: 1.5,
-                    ),
+          Expanded(
+            child: Container(
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.5,
+                ),
+              ),
+              child: TextButton(
+                onPressed: _isSaving ? null : _handleSave,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: TextButton(
-                    onPressed: _isSaving ? null : _handleSave,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: Text(
-                      isEditing ? 'تحديث الفئة' : 'إضافة الفئة',
-                      style: const TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
+                ),
+                child: Text(
+                  isEditing ? 'تحديث الفئة' : 'إضافة الفئة',
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.white,
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextButton(
-                  onPressed: _isSaving ? null : () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: const BorderSide(color: Color.fromARGB(255, 200, 198, 195), width: 1.5),
-                    ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color.fromARGB(255, 235, 233, 229),
+                  width: 1.5,
+                ),
+              ),
+              child: TextButton(
+                onPressed: _isSaving ? null : () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Text(
-                    'إلغاء',
-                    style: TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 16,
-                      color: NabeehColors.slate400,
-                      fontWeight: FontWeight.w900,
-                    ),
+                ),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 16,
+                    color: NabeehColors.slate500,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),
