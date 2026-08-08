@@ -24,6 +24,8 @@ dependencies:
   shared_preferences: ^2.3.2
   cloud_functions: ^5.6.2
   record: ^5.0.0
+  url_launcher: ^6.3.2
+  video_player: ^2.11.1
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +38,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/videos/
 
   fonts:
     - family: IBMPlexSansArabic

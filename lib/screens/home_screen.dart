@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'listening_screen.dart';
 import 'reminders_screen.dart';
 import 'stt_tts_screen.dart';
+import 'sign_language_player_screen.dart';
+import '../services/sign_language_mode.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -77,6 +79,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _handleTap(String videoAsset, VoidCallback action) {
+    if (signLanguageModeNotifier.value) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => SignLanguagePlayerScreen(
+          videoAsset: videoAsset,
+          onFinished: action,
+        ),
+      );
+    } else {
+      action();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -130,32 +147,55 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Color(0xFF181059),
             ),
           ),
-          Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-              stops: [0.09, 0.30, 1.0],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 1.5,
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () {
+                signLanguageModeNotifier.value = !isActive;
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            Color(0xFF181059),
+                            Color(0xFF181059),
+                            Color(0xFF1773CF),
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Image.asset(
-              'assets/images/icon_signLan.png',
-              color: Colors.white,
-              colorBlendMode: BlendMode.srcIn,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
         ],
       ),
     );
@@ -231,7 +271,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
           GestureDetector(
-            onTap: widget.onMoreInfoPressed,
+            onTap: () => _handleTap(
+              'assets/videos/sign_watch_info.mp4',
+              () => widget.onMoreInfoPressed?.call(),
+            ),
             child: Container(
               height: 48,
               decoration: BoxDecoration(
@@ -289,22 +332,34 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildGridCard(
               title: 'المجموعات\nالصوتية',
               icon: 'assets/images/icon_Ycato.png',
-              onTap: () => Navigator.pushNamed(context, '/categories'),
+              onTap: () => _handleTap(
+                'assets/videos/sign_categories.mp4',
+                () => Navigator.pushNamed(context, '/categories'),
+              ),
             ),
             _buildGridCard(
               title: 'الاستشعار\nالصوتي',
               icon: 'assets/images/icon_YReco.png',
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ListeningScreen())),
+              onTap: () => _handleTap(
+                'assets/videos/sign_listening.mp4',
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ListeningScreen())),
+              ),
             ),
             _buildGridCard(
               title: 'التواصل',
               icon: 'assets/images/icon_YCom.png',
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SttTtsScreen())),
+              onTap: () => _handleTap(
+                'assets/videos/sign_communication.mp4',
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SttTtsScreen())),
+              ),
             ),
             _buildGridCard(
               title: 'المنبّهات',
               icon: 'assets/images/icon_YRima.png',
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersScreen())),
+              onTap: () => _handleTap(
+                'assets/videos/sign_reminders.mp4',
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersScreen())),
+              ),
             ),
           ],
         ),
