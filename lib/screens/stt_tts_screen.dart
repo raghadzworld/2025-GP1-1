@@ -136,21 +136,74 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     });
   }
 
-  void _copyText() {
-    if (_textContent.isNotEmpty) {
-      Clipboard.setData(ClipboardData(text: _textContent));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم نسخ النص'),
-          duration: Duration(seconds: 1),
-          backgroundColor: NabeehColors.dark,
+  // --- Shared warning SnackBar style (red ribbon) for empty-text actions ---
+  void _showEmptyTextWarning(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+        elevation: 0,
+        backgroundColor: const Color(0xFFFFEBEB),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFFF4D4D), width: 1.2),
         ),
-      );
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 18,
+              color: Color(0xFFD32F2F),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFD32F2F),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copyText() {
+    if (_textContent.trim().isEmpty) {
+      _showEmptyTextWarning('لا يوجد نص لنسخه حالياً');
+      return;
     }
+
+    Clipboard.setData(ClipboardData(text: _textContent));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم نسخ النص'),
+        duration: Duration(seconds: 1),
+        backgroundColor: NabeehColors.dark,
+      ),
+    );
   }
 
   void _speakText() {
-    if (_textContent.isEmpty) return;
+    if (_textContent.trim().isEmpty) {
+      _showEmptyTextWarning('لا يوجد نص للنطق حالياً');
+      return;
+    }
+
+    if (_isSpeaking) {
+      _speakingTimer?.cancel();
+      if (mounted) setState(() => _isSpeaking = false);
+      return;
+    }
 
     setState(() => _isSpeaking = true);
     _speakingTimer?.cancel();
@@ -192,71 +245,45 @@ class _SttTtsScreenState extends State<SttTtsScreen>
               end: Alignment.bottomCenter,
             ),
           ),
-          child: Column(
-            children: [
-              _buildHeader(context), // Custom header matching EditProfileScreen
-              Expanded(
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(
-                  fontFamily: 'IBMPlexSansArabic', // Consistent Arabic font
-                ),
-                child: Padding(
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 40),
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      BentoCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text(
-                              'اختر طريقة التفاعل',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: NabeehColors.dark,
-                              ),
+                  child: _buildModeSwitcher(),
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: DefaultTextStyle.merge(
+                    style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                    child: AnimatedSwitcher(
+                      duration: 250.ms,
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      layoutBuilder: (currentChild, previousChildren) => Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ...previousChildren,
+                          if (currentChild case final child?) child,
+                        ],
+                      ),
+                      child: _isSttMode
+                          ? KeyedSubtree(
+                              key: const ValueKey('stt'),
+                              child: _buildSttView(),
+                            )
+                          : KeyedSubtree(
+                              key: const ValueKey('tts'),
+                              child: _buildTtsView(),
                             ),
-                            const SizedBox(height: 8),
-                            _buildModeSwitcher(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 400,
-                        child: AnimatedSwitcher(
-                          duration: 250.ms,
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          layoutBuilder: (currentChild, previousChildren) =>
-                              Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  ...previousChildren,
-                                  if (currentChild case final child?) child,
-                                ],
-                              ),
-                          child: _isSttMode
-                              ? KeyedSubtree(
-                                  key: const ValueKey('stt'),
-                                  child: _buildSttView(),
-                                )
-                              : KeyedSubtree(
-                                  key: const ValueKey('tts'),
-                                  child: _buildTtsView(),
-                                ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
           ),
         ),
       ),
@@ -443,266 +470,262 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   Widget _buildSttView() {
-    return Column(
-      children: [
-        Expanded(
-          child: BentoCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: _buildStatusBadge(
-                    isActive: _isRecording,
-                    activeText: 'جاري الاستماع...',
-                    inactiveText: 'جاهز',
-                  ),
-                ),
-                if (_textContent.isEmpty) ...[
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        _isRecording
-                            ? 'ابدأ التحدث الآن...'
-                            : 'اضغط على المايك للبدء',
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 340,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: NabeehColors.slate100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  if (_textContent.isEmpty) ...[
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _isRecording
+                                  ? 'ابدأ التحدث الآن...'
+                                  : 'اضغط على المايك للبدء',
+                              style: const TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                color: NabeehColors.slate500,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _isRecording
+                                  ? 'سيظهر النص الملتقط هنا مباشرة'
+                                  : 'سيظهر النص الملتقط هنا عند البدء بالاستماع',
+                              style: const TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                color: NabeehColors.slate400,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    if (_isRecording) ...[
+                      _buildRecordingWaveform(),
+                      const SizedBox(height: 16),
+                      const Divider(color: NabeehColors.slate100),
+                      const SizedBox(height: 16),
+                      Text(
+                        _getHeadingFromText(_textContent),
                         style: const TextStyle(
-                          color: NabeehColors.slate500,
-                          fontWeight: FontWeight.w400,
-                          fontSize: 16,
-                          height: 1.5,
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: NabeehColors.dark,
+                          letterSpacing: -0.5,
+                          height: 1.2,
                         ),
                       ),
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 8),
-                  if (_isRecording) ...[
-                    _buildRecordingWaveform(),
-                    const SizedBox(height: 12),
+                    ] else ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _getHeadingFromText(_textContent),
+                        style: const TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: NabeehColors.dark,
+                          letterSpacing: -0.5,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        
+                      ),
+                    ],
                   ],
-                  Text(
-                    _getHeadingFromText(_textContent),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: NabeehColors.dark,
-                      letterSpacing: -0.5,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(color: NabeehColors.slate100),
-                  const SizedBox(height: 8),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [const SizedBox(height: 6)],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (!_isRecording)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _buildSmallAction(
-                          icon: LucideIcons.copy,
-                          label: 'نسخ',
-                          onTap: _copyText,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildSmallAction(
-                          icon: LucideIcons.x,
-                          label: 'مسح',
-                          isDanger: true,
-                          onTap: _clearText,
-                        ),
-                      ],
-                    ),
                 ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 36),
-        GestureDetector(
-          onTap: _toggleRecording,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: _isRecording
-                  ? const LinearGradient(
-                      colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: _isRecording
-                  ? null
-                  : NabeehColors.slate200.withValues(alpha: 0.5),
-              border: _isRecording
-                  ? Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      width: 1.5,
-                    )
-                  : null,
-              boxShadow: _isRecording
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF181059).withValues(alpha: 0.3),
-                        blurRadius: 40,
-                        spreadRadius: 10,
-                      ),
-                    ]
-                  : [],
-            ),
-            child: Center(
-              child: Icon(
-                _isRecording ? LucideIcons.mic : LucideIcons.micOff,
-                size: 38,
-                color: _isRecording ? Colors.white : NabeehColors.slate400,
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 28),
-      ],
+          const SizedBox(height: 40),
+          GestureDetector(
+            onTap: _toggleRecording,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isRecording
+                    ? NabeehColors.lightBlue.withValues(alpha: 0.1)
+                    : NabeehColors.slate200.withValues(alpha: 0.5),
+                boxShadow: _isRecording
+                    ? [
+                        BoxShadow(
+                          color: NabeehColors.lightBlue.withValues(alpha: 0.2),
+                          blurRadius: 40,
+                          spreadRadius: 10,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Center(
+                child: Icon(
+                  _isRecording ? LucideIcons.mic : LucideIcons.micOff,
+                  size: 50,
+                  color: _isRecording ? NabeehColors.lightBlue : NabeehColors.slate400,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
   Widget _buildTtsView() {
-    return Column(
-      children: [
-        Expanded(
-          child: BentoCard(
-            padding: const EdgeInsets.all(16),
-
-            child: Column(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ttsController,
-                    focusNode: _textFocusNode,
-                    maxLines: null,
-                    expands: true,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.right,
-                    onChanged: (value) => setState(() => _textContent = value),
-                    decoration: const InputDecoration(
-                      hintText: 'اكتب ما تريد قوله هنا...',
-                      hintStyle: TextStyle(
-                        color: NabeehColors.slate300,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                    ),
-                    cursorColor: NabeehColors.blue,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      color: NabeehColors.dark,
-                      height: 1.6,
-                    ),
-                  ),
-                ),
-                if (_textContent.isEmpty)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children:
-                          [
-                                'مرحباً بك',
-                                'كيف حالك؟',
-                                'أنا بحاجة لمساعدة',
-                                'شكراً لك',
-                              ]
-                              .map(
-                                (phrase) => Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                    start: 8,
-                                  ),
-                                  child: _buildPhrase(phrase),
-                                ),
-                              )
-                              .toList(),
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                const Divider(color: NabeehColors.slate100),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        _buildToolsIcon(LucideIcons.x, onTap: _clearText),
-                      ],
-                    ),
-                    Text(
-                      '${_textContent.length} حرف',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: NabeehColors.slate400,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 36),
-        _buildVisualizer(
-          icon: LucideIcons.volume2,
-          isActive: _isSpeaking,
-          activeColor: NabeehColors.blue,
-          small: true,
-        ),
-        const SizedBox(height: 24),
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF181059), Color(0xFF1773CF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 1.5,
-            ),
-          ),
-          child: TextButton(
-            onPressed: _speakText,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            child: Text(
-              _isSpeaking ? 'جاري النطق...' : 'نطق النص',
-              style: const TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 340,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
                 color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: NabeehColors.slate100),
+              ),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _ttsController,
+                      focusNode: _textFocusNode,
+                      maxLines: null,
+                      expands: true,
+                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.right,
+                      onChanged: (value) => setState(() => _textContent = value),
+                      decoration: const InputDecoration(
+                        hintText: 'اكتب ما تريد قوله هنا...',
+                        hintStyle: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          color: NabeehColors.slate400,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                      ),
+                      cursorColor: NabeehColors.darkBlue,
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                  if (_textContent.trim().isEmpty)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          'مرحبا',
+                          'كيف حالك؟',
+                          'أنا بحاجة لمساعدة',
+                          'شكراً لك',
+                        ]
+                            .map(
+                              (phrase) => Padding(
+                                padding: const EdgeInsetsDirectional.only(start: 8),
+                                child: _buildPhrase(phrase),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  const Divider(color: NabeehColors.slate100),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          _buildToolsIcon(LucideIcons.x, onTap: _clearText),
+                        ],
+                      ),
+                      Text(
+                        '${_textContent.length} أحرف',
+                        style: const TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: NabeehColors.slate400,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 40),
+          GestureDetector(
+            onTap: _speakText,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isSpeaking
+                    ? NabeehColors.lightBlue.withValues(alpha: 0.1)
+                    : NabeehColors.slate200.withValues(alpha: 0.5),
+                boxShadow: _isSpeaking
+                    ? [
+                        BoxShadow(
+                          color: NabeehColors.lightBlue.withValues(alpha: 0.2),
+                          blurRadius: 40,
+                          spreadRadius: 10,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Center(
+                child: Icon(
+                  LucideIcons.volume2,
+                  size: 50,
+                  color: _isSpeaking ? NabeehColors.lightBlue : NabeehColors.slate400,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
@@ -754,14 +777,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   Widget _buildRecordingWaveform() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      decoration: BoxDecoration(
-        color: NabeehColors.slate50,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: NabeehColors.slate100),
-      ),
+    return SizedBox(
+      height: 90,
       child: _buildWaveBars(isActive: _isRecording),
     );
   }
@@ -785,9 +802,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
               final barHeight = 10 + (baseWave * 50 * liveLevel);
 
               return AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: 6,
+                duration: const Duration(milliseconds: 50),
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                width: 9,
                 height: barHeight,
                 decoration: BoxDecoration(
                   color: isActive

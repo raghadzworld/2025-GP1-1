@@ -464,109 +464,112 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           const SizedBox(height: 24),
           const Divider(color: NabeehColors.slate50),
           const SizedBox(height: 20),
+
+          // ── أزرار تعديل / حذف جنب بعض (بنفس أسلوب صفحة المنبّهات) ──
           Row(
             children: [
-              if (!category.isEnabled)
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF181059), Color(0xFF1773CF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _navigateToAddEdit(category: category),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: NabeehColors.darkBlue, width: 1.2),
                     ),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
-                  ),
-                  child: TextButton(
-                    onPressed: () => _setActiveCategory(category.id),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      minimumSize: const Size(0, 36),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text(
-                      'تفعيل المجموعة',
-                      style: TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                const Text(
-                  'مفعل حالياً',
-                  style: TextStyle(
-                    color: NabeehColors.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _navigateToAddEdit(category: category),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: NabeehColors.darkBlue, width: 1.2),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(LucideIcons.edit2, size: 13, color: NabeehColors.darkBlue),
-                      SizedBox(width: 5),
-                      Text(
-                        'تعديل',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: NabeehColors.darkBlue,
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.edit2, size: 16, color: NabeehColors.darkBlue),
+                        SizedBox(width: 6),
+                        Text(
+                          'تعديل',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: NabeehColors.darkBlue,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: _categories.length <= 1 ? null : () => _deleteCategory(category.id),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _categories.length <= 1 ? NabeehColors.slate200 : Colors.redAccent,
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(LucideIcons.trash2, size: 13,
-                          color: _categories.length <= 1 ? NabeehColors.slate300 : Colors.redAccent),
-                      const SizedBox(width: 5),
-                      Text(
-                        'حذف',
-                        style: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: _categories.length <= 1 ? NabeehColors.slate300 : Colors.redAccent,
-                        ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _categories.length <= 1 ? null : () => _deleteCategory(category.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _categories.length <= 1 ? NabeehColors.slate200 : Colors.redAccent,
+                        width: 1.2,
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(LucideIcons.trash2, size: 16,
+                            color: _categories.length <= 1 ? NabeehColors.slate300 : Colors.redAccent),
+                        const SizedBox(width: 6),
+                        Text(
+                          'حذف',
+                          style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _categories.length <= 1 ? NabeehColors.slate300 : Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
           ),
+
+          // ── زر تفعيل المجموعة تحت زري تعديل/حذف ──
+          if (!category.isEnabled) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
+                ),
+                child: TextButton(
+                  onPressed: () => _setActiveCategory(category.id),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text(
+                    'تفعيل المجموعة',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -580,29 +583,65 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         border: Border.all(color: NabeehColors.slate100),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            sound.name,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: NabeehColors.slate500,
-            ),
+          Icon(
+            _soundIcon(sound.soundId),
+            size: 13,
+            color: NabeehColors.darkBlue,
           ),
-          const SizedBox(height: 3),
-          Text(
-            'اهتزاز ${_intensityLabel(sound.vibrationPower)} · ${_intensityLabel(sound.vibrationPattern)}',
-            style: const TextStyle(
-              fontSize: 14,
-              color: NabeehColors.slate300,
-              fontWeight: FontWeight.w600,
+          const SizedBox(width: 6),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sound.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: NabeehColors.slate500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'اهتزاز ${_intensityLabel(sound.vibrationPower)} · ${_intensityLabel(sound.vibrationPattern)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: NabeehColors.slate300,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  IconData _soundIcon(String soundId) {
+    switch (soundId) {
+      case 'fire_alarm':
+        return LucideIcons.flame;
+      case 'door_bell':
+        return LucideIcons.bell;
+      case 'door_knock':
+        return Icons.sensor_door;
+      case 'baby_cry':
+        return LucideIcons.baby;
+      case 'adhan':
+        return Icons.mosque;
+      default:
+        return LucideIcons.volume2;
+    }
   }
 
   String _intensityLabel(int value) {

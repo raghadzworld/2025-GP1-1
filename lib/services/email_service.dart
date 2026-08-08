@@ -4,21 +4,37 @@ class EmailService {
   static final _functions = FirebaseFunctions.instance;
 
   static Future<void> sendPasswordReset(String email) async {
-    await _functions
-        .httpsCallable('sendCustomPasswordReset')
-        .call({'email': email});
+    await _functions.httpsCallable('sendCustomPasswordReset').call({
+      'email': email,
+    });
   }
 
   static Future<void> sendVerifyNewEmail(String newEmail) async {
-    await _functions
-        .httpsCallable('sendVerifyNewEmail')
-        .call({'newEmail': newEmail});
+    await _functions.httpsCallable('sendVerifyNewEmail').call({
+      'newEmail': newEmail,
+    });
   }
 
   static Future<void> sendWelcomeEmail(String email, String displayName) async {
-    await _functions
-        .httpsCallable('sendWelcomeEmail')
-        .call({'email': email, 'displayName': displayName});
+    await _functions.httpsCallable('sendWelcomeEmail').call({
+      'email': email,
+      'displayName': displayName,
+    });
+  }
+
+  static Future<void> sendVerifyEmail(String email) async {
+    await _functions.httpsCallable('sendVerifyEmail').call({'email': email});
+  }
+
+  // رسالة واحدة تدمج الترحيب + رابط التفعيل — تُستخدم عند الساين أب فقط
+  static Future<void> sendWelcomeVerifyEmail(
+    String email,
+    String displayName,
+  ) async {
+    await _functions.httpsCallable('sendWelcomeVerifyEmail').call({
+      'email': email,
+      'displayName': displayName,
+    });
   }
 
   static Future<void> sendSosEmail({

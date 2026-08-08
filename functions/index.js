@@ -1,8 +1,22 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import admin from "firebase-admin";
 import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 admin.initializeApp();
+
+// ════════════════════════════════════════════════════════
+//  LOGO — نقرأ الصورة من مجلد الفنكشنز نفسها ونحولها لـ base64
+//  عشان تظهر بشكل مضمون بكل تطبيقات الإيميل بدون الاعتماد
+//  على رابط خارجي (Firebase Hosting) قد يُحظر من بعض العملاء
+// ════════════════════════════════════════════════════════
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const logoPath = path.join(__dirname, "assets", "logo_nabeeh.png");
+const LOGO_BASE64 = fs.readFileSync(logoPath).toString("base64");
+const LOGO_DATA_URI = `data:image/png;base64,${LOGO_BASE64}`;
 
 // ─── sendSosEmail ─────────────────────────────────────────────────────────────
 export const sendSosEmail = onCall(async (request) => {
@@ -64,12 +78,6 @@ function getTransporter() {
   });
 }
 
-// ════════════════════════════════════════════════════════
-//  LOGO  — base64 inline (بدّل بـ URL لو عندك hosting)
-//  أو ضع رابط الصورة مباشرة: const LOGO_URL = "https://..."
-// ════════════════════════════════════════════════════════
-const LOGO_URL = "https://nabeeh-3d93d.web.app/logo_nabeeh.png";
-
 const SHARED_STYLES = `
   <style>
     *{box-sizing:border-box}html,body{margin:0}
@@ -123,7 +131,7 @@ const FOOTER_HTML = `
 `;
 
 function heroHtml() {
-  return `<div class="hero" style="background:#2A3173;padding:28px 24px;border-bottom:3px solid #C9A36B;direction:rtl;text-align:right;"><img src="${LOGO_URL}" alt="نبيه" style="height:81px;width:auto;display:inline-block;"></div>`;
+  return `<div class="hero" style="background:#2A3173;padding:28px 24px;border-bottom:3px solid #C9A36B;direction:rtl;text-align:right;"><img src="${LOGO_DATA_URI}" alt="نبيه" style="height:81px;width:auto;display:inline-block;"></div>`;
 }
 
 
@@ -310,6 +318,127 @@ export const sendWelcomeEmail = onCall(async (request) => {
     from: `"نبيه" <${process.env.GMAIL_USER}>`,
     to: email,
     subject: "مرحباً بك في نبيه — تأكيد إنشاء الحساب",
+    html,
+  });
+
+  return { success: true };
+});
+
+
+// ╔══════════════════════════════════════════════════════╗
+//  FUNCTION 4 — sendVerifyEmail
+//  تفعيل الإيميل عند التسجيل (Signup) — مو تغيير إيميل
+//  لا تتطلب request.auth لأنها تُستدعى أيضاً من صفحة
+//  إعادة الإرسال بعد ما يكون المستخدم قد سجّل خروجه
+// ╚══════════════════════════════════════════════════════╝
+export const sendVerifyEmail = onCall(async (request) => {
+  const { email } = request.data;
+  if (!email) throw new HttpsError("invalid-argument", "email مطلوب");
+
+  let verifyLink;
+  try {
+    verifyLink = await admin.auth().generateEmailVerificationLink(email);
+  } catch (err) {
+    throw new HttpsError("not-found", "البريد غير مسجّل في النظام");
+  }
+
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>تفعيل بريدك الإلكتروني — نبيه</title>
+    ${SHARED_STYLES}
+  </head><body>
+    <div class="card">
+      ${heroHtml()}
+      <div class="pad">
+        <h1>خطوة أخيرة لتفعيل حسابك</h1>
+        <p class="lead">
+          مرحباً،<br>
+          يرجى تأكيد بريدك الإلكتروني لتفعيل حسابك في
+          <strong style="color:#1B1F2A;font-weight:600;">نبيه</strong>
+          والبدء باستخدام التطبيق.
+        </p>
+      </div>
+      <div class="btnwrap">
+        <a class="btn" href="${verifyLink}" style="color:#ffffff !important;">تفعيل الحساب ←</a>
+      </div>
+      <div class="urlblock">
+        <div class="url-label">إذا لم يعمل الزر، انسخ الرابط التالي:</div>
+        <div class="url">${verifyLink}</div>
+      </div>
+      <div class="warn">
+        <b>إذا لم تنشئي هذا الحساب</b>
+        <span>تجاهلي هذه الرسالة بأمان.</span>
+      </div>
+      ${FOOTER_HTML}
+  </body></html>`;
+
+  await getTransporter().sendMail({
+    from: `"نبيه" <${process.env.GMAIL_USER}>`,
+    to: email,
+    subject: "فعّلي بريدك الإلكتروني في نبيه",
+    html,
+  });
+
+  return { success: true };
+});
+
+
+// ╔══════════════════════════════════════════════════════╗
+//  FUNCTION 5 — sendWelcomeVerifyEmail
+//  رسالة واحدة تدمج الترحيب + رابط تفعيل الإيميل
+//  تُستخدم عند إنشاء الحساب (Signup) بدل استدعاء
+//  sendWelcomeEmail و sendVerifyEmail بشكل منفصل
+// ╚══════════════════════════════════════════════════════╝
+export const sendWelcomeVerifyEmail = onCall(async (request) => {
+  const { email, displayName } = request.data;
+  if (!email) throw new HttpsError("invalid-argument", "email مطلوب");
+  const name = displayName || "";
+
+  let verifyLink;
+  try {
+    verifyLink = await admin.auth().generateEmailVerificationLink(email);
+  } catch (err) {
+    throw new HttpsError("internal", err.message);
+  }
+
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>مرحباً بك في نبيه — فعّلي حسابك</title>
+    ${SHARED_STYLES}
+  </head><body>
+    <div class="card">
+      ${heroHtml()}
+      <div class="pad">
+        <h1>مرحباً ${name}، يسعدنا انضمامك إلى نبيــه</h1>
+        <p class="lead">
+          لاحظنا إنشاء حساب جديد في تطبيق
+          <strong style="color:#1B1F2A;font-weight:600;">نبيــه</strong>
+          باستخدام هذا البريد الإلكتروني. بقيت خطوة أخيرة فقط
+          لتفعيل حسابك والبدء باستخدام التطبيق.
+        </p>
+      </div>
+      <div class="btnwrap">
+        <a class="btn" href="${verifyLink}" style="color:#ffffff !important;">تفعيل الحساب ←</a>
+      </div>
+      <div class="urlblock">
+        <div class="url-label">إذا لم يعمل الزر، انسخ الرابط التالي:</div>
+        <div class="url">${verifyLink}</div>
+      </div>
+
+      <div class="warn">
+        <b>إذا لم تكوني أنتِ من أنشأ هذا الحساب</b>
+        <span>يمكنك تجاهل هذه الرسالة بأمان — لن يتم تفعيل الحساب دون الضغط على الرابط أعلاه.</span>
+      </div>
+
+      ${FOOTER_HTML}
+  </body></html>`;
+
+  await getTransporter().sendMail({
+    from: `"نبيه" <${process.env.GMAIL_USER}>`,
+    to: email,
+    subject: "مرحباً بك في نبيه — فعّل حسابك",
     html,
   });
 

@@ -14,6 +14,7 @@ class WatchScreen extends StatefulWidget {
 
 class _WatchScreenState extends State<WatchScreen> {
   final String _deviceName = 'LILYGO Watch';
+  final bool _isConnected = false;
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +105,13 @@ class _WatchScreenState extends State<WatchScreen> {
                 color: Colors.white.withValues(alpha: 0.25),
                 width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1773CF).withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Padding(
               padding: const EdgeInsets.all(10),
@@ -169,33 +177,43 @@ class _WatchScreenState extends State<WatchScreen> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1773CF), Color(0xFF1773CF)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0xFFB8D4F0),
-                            blurRadius: 40,
-                            spreadRadius: 2,
+                if (_isConnected)
+                  Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1773CF), Color(0xFF1773CF)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                           ),
-                        ],
-                      ),
-                    )
-                    .animate(
-                      onPlay: (controller) => controller.repeat(reverse: true),
-                    )
-                    .scale(
-                      begin: const Offset(0.95, 0.95),
-                      end: const Offset(1.05, 1.05),
-                      duration: 2500.ms,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFB8D4F0),
+                              blurRadius: 40,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      )
+                      .animate(
+                        onPlay: (controller) => controller.repeat(reverse: true),
+                      )
+                      .scale(
+                        begin: const Offset(0.95, 0.95),
+                        end: const Offset(1.05, 1.05),
+                        duration: 2500.ms,
+                      )
+                else
+                  Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF94A3B8).withValues(alpha: 0.18),
                     ),
+                  ),
                 Container(
                   width: 194,
                   height: 194,
@@ -211,10 +229,12 @@ class _WatchScreenState extends State<WatchScreen> {
                     shape: BoxShape.circle,
                     color: NabeehColors.slate50.withValues(alpha: 0.7),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.watch_rounded,
                     size: 80,
-                    color: Color(0xFF1773CF),
+                    color: _isConnected
+                        ? const Color(0xFF1773CF)
+                        : const Color(0xFF94A3B8),
                   ),
                 ),
               ],
@@ -229,14 +249,30 @@ class _WatchScreenState extends State<WatchScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.grey.withValues(alpha: 0.18)),
               ),
-              child: const Text(
-                'غير متصل',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isConnected
+                          ? const Color(0xFF22C55E)
+                          : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isConnected ? 'متصل' : 'غير متصل',
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -255,56 +291,60 @@ class _WatchScreenState extends State<WatchScreen> {
     );
   }
 
+  // نمط موحّد لحالة "غير متاح" داخل البطاقتين، بأيقونة ملوّنة داخل دائرة خفيفة
+  Widget _buildUnavailableState(IconData icon, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withValues(alpha: 0.12),
+          ),
+          child: Icon(icon, color: color, size: 32),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'غير متاح',
+          style: const TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey,
+            height: 1,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSyncCard() {
+    const accent = Color(0xFF1773CF);
     return SizedBox(
-      height: 200,
+      height: 220,
       child: BentoCard(
         borderRadius: 16,
         border: Border.all(color: const Color(0xFFB8D4F0)),
         padding: const EdgeInsets.all(20),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // العنوان في الأعلى
-            const Align(
-              alignment: Alignment.topCenter,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'آخر تزامن',
-                    style: TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF181059),
-                    ),
-                  ),
-                  Icon(
-                    LucideIcons.refreshCcw,
-                    color: NabeehColors.gray,
-                    size: 18,
-                  ),
-                ],
+            const Text(
+              'آخر تزامن',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF181059),
               ),
             ),
-            // المحتوى في المنتصف
-            const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'غير متاح',
-                    style: TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.grey,
-                      height: 1,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Icon(LucideIcons.wifiOff, color: Colors.grey, size: 28),
-                ],
+            // مسافة حقيقية بين العنوان والمحتوى
+            Expanded(
+              child: Center(
+                child: _buildUnavailableState(LucideIcons.wifiOff, accent),
               ),
             ),
           ],
@@ -314,67 +354,30 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   Widget _buildBatteryCard() {
+    const accent = Color(0xFFF59E0B);
     return SizedBox(
-      height: 200,
+      height: 220,
       child: BentoCard(
         borderRadius: 16,
         border: Border.all(color: const Color(0xFFB8D4F0)),
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'البطارية',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF181059),
-                  ),
-                ),
-                Icon(LucideIcons.battery, color: Colors.green, size: 18),
-              ],
-            ),
-
-            const SizedBox(height: 18),
-
-            const Center(
-              child: Text(
-                '--',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 34,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.grey,
-                ),
+            // العنوان في الأعلى
+            const Text(
+              'البطارية',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF181059),
               ),
             ),
-
-            const SizedBox(height: 6),
-
-            const Center(
-              child: Text(
-                'غير متاح',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 8,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.grey,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            Container(
-              height: 6,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: NabeehColors.slate100,
-                borderRadius: BorderRadius.circular(3),
+            // مسافة حقيقية بين العنوان والمحتوى
+            Expanded(
+              child: Center(
+                child: _buildUnavailableState(LucideIcons.batteryWarning, accent),
               ),
             ),
           ],

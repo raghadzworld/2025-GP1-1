@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../main.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,6 +35,10 @@ class _LoginScreenState extends State<LoginScreen>
   bool _rememberMe = false;
   String _emailError = '';
   String _passwordError = '';
+
+  // --- حالة بانر "الإيميل غير مفعّل" ---
+  bool _emailNotVerified = false;
+  String _unverifiedEmail = '';
 
   @override
   void initState() {
@@ -119,7 +124,86 @@ class _LoginScreenState extends State<LoginScreen>
           : !RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(val.trim())
           ? 'صيغة البريد الإلكتروني غير صحيحة'
           : '';
+      // أي تعديل بالإيميل يلغي بانر عدم التفعيل السابق
+      if (_emailNotVerified) {
+        _emailNotVerified = false;
+      }
     });
+  }
+
+  // ✅ تسجيل دخول فعلي عبر Google (API الجديد v7+)
+  Future<void> _continueWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize();
+
+      final googleUser = await googleSignIn.authenticate();
+      final googleAuth = googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = userCredential.user;
+
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // ✅ لو أول مرة يسجل فيها هذا المستخدم، ننشئ سجل له بفايرستور
+      final docRef = FirebaseFirestore.instance
+          .collection('User')
+          .doc(user.uid);
+      final doc = await docRef.get();
+      if (!doc.exists) {
+        await docRef.set({
+          'FullName': user.displayName ?? '',
+          'Email': user.email ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (mounted) {
+        String welcomeName = doc.exists
+            ? (doc.data()?['FullName'] ?? '')
+            : (user.displayName ?? '');
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.main,
+          arguments: {'welcomeName': welcomeName},
+        );
+      }
+    } on GoogleSignInException catch (e) {
+      // المستخدم ألغى نافذة اختيار الحساب أو صار خطأ بالتسجيل
+      if (mounted && e.code != GoogleSignInExceptionCode.canceled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذّر تسجيل الدخول عبر Google، حاولي مرة أخرى',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذّر تسجيل الدخول عبر Google، حاولي مرة أخرى',
+              style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _login() async {
@@ -132,13 +216,33 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (_emailError.isNotEmpty || _passwordError.isNotEmpty) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _emailNotVerified = false;
+    });
 
     try {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
+      // ✅ تحديث بيانات المستخدم من فايربيس والتأكد من حالة تفعيل الإيميل
+      await credential.user!.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+
+      if (refreshedUser != null && !refreshedUser.emailVerified) {
+        // الإيميل مو مفعّل — نرفض الدخول ونعرض بانر بنفس الصفحة
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _emailNotVerified = true;
+            _unverifiedEmail = _emailController.text.trim();
+          });
+        }
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
         await prefs.setBool('remember_me', true);
@@ -397,88 +501,130 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                 ),
                                 _buildErrorText(_passwordError),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 19),
 
                                 Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    GestureDetector(
-                                      onTap: () => setState(
-                                        () => _rememberMe = !_rememberMe,
-                                      ),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
+                                    Row(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () => setState(
+                                            () => _rememberMe = !_rememberMe,
                                           ),
-                                          gradient: _rememberMe
-                                              ? const LinearGradient(
-                                                  colors: [
-                                                    Color(0xFF181059),
-                                                    Color(0xFF1773CF),
-                                                  ],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                )
-                                              : null,
-                                          color: _rememberMe
-                                              ? null
-                                              : Colors.transparent,
-                                          border: _rememberMe
-                                              ? null
-                                              : Border.all(
-                                                  color: const Color(
-                                                    0xFF181059,
-                                                  ),
-                                                  width: 1.5,
-                                                ),
+                                          child: AnimatedContainer(
+                                            duration: const Duration(
+                                              milliseconds: 200,
+                                            ),
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              gradient: _rememberMe
+                                                  ? const LinearGradient(
+                                                      colors: [
+                                                        Color(0xFF181059),
+                                                        Color(0xFF1773CF),
+                                                      ],
+                                                      begin: Alignment.topLeft,
+                                                      end:
+                                                          Alignment.bottomRight,
+                                                    )
+                                                  : null,
+                                              color: _rememberMe
+                                                  ? null
+                                                  : Colors.transparent,
+                                              border: _rememberMe
+                                                  ? null
+                                                  : Border.all(
+                                                      color: const Color(
+                                                        0xFF181059,
+                                                      ),
+                                                      width: 1.5,
+                                                    ),
+                                            ),
+                                            child: _rememberMe
+                                                ? const Icon(
+                                                    Icons.check_rounded,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  )
+                                                : null,
+                                          ),
                                         ),
-                                        child: _rememberMe
-                                            ? const Icon(
-                                                Icons.check_rounded,
-                                                color: Colors.white,
-                                                size: 16,
-                                              )
-                                            : null,
-                                      ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'تذكــرنـــي',
+                                          style: TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 14,
+                                            color: Color(0xFF181059),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'تذكــرنـــي',
-                                      style: TextStyle(
-                                        fontFamily: 'IBMPlexSansArabic',
-                                        fontSize: 14,
-                                        color: Color(0xFF181059),
+                                    GestureDetector(
+                                      onTap: () => Navigator.pushNamed(
+                                        context,
+                                        AppRoutes.forgotPassword,
+                                      ),
+                                      child: const Text(
+                                        'هل نسيـت كلمــة المـرور؟',
+                                        style: TextStyle(
+                                          fontFamily: 'IBMPlexSansArabic',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF1773CF),
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 29),
 
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: GestureDetector(
-                                    onTap: () => Navigator.pushNamed(
-                                      context,
-                                      AppRoutes.forgotPassword,
+                                if (_emailNotVerified) ...[
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
                                     ),
-                                    child: const Text(
-                                      'هل نسيـت كلمــة المـرور؟ ',
-                                      style: TextStyle(
-                                        fontFamily: 'IBMPlexSansArabic',
-                                        fontSize: 15,
-                                        color: Color(0xFF1773CF),
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: Color(0xFF1773CF),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFEBEB),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFFFF4D4D),
+                                        width: 1.2,
                                       ),
                                     ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.error_outline_rounded,
+                                          color: Color(0xFFD32F2F),
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'بريدك الإلكتروني غير مفعّل بعد. لقد أرسلنا رسالة تفعيل مسبقاً، يرجى التحقق من بريدك واستخدام رابط التفعيل الموجود.',
+                                            style: const TextStyle(
+                                              fontFamily: 'IBMPlexSansArabic',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFD32F2F),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 20),
+                                  const SizedBox(height: 16),
+                                ],
 
                                 Container(
                                   width: double.infinity,
@@ -535,6 +681,118 @@ class _LoginScreenState extends State<LoginScreen>
                                               ),
                                             ],
                                           ),
+                                  ),
+                                ),
+                                const SizedBox(height: 29),
+
+                                // ── فاصل "أو" ─────────────────────────
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Divider(
+                                        color: const Color(
+                                          0xFFD1D5DB,
+                                        ).withValues(alpha: 0.8),
+                                        thickness: 1,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 15,
+                                      ),
+                                      child: Text(
+                                        'أو',
+                                        style: TextStyle(
+                                          fontFamily: 'IBMPlexSansArabic',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                          color: const Color(
+                                            0xFF6B7280,
+                                          ).withValues(alpha: 0.8),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Divider(
+                                        color: const Color(
+                                          0xFFD1D5DB,
+                                        ).withValues(alpha: 0.8),
+                                        thickness: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 29),
+
+                                // ── زر الاستمرار مع Google ────────────
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: _isLoading
+                                        ? null
+                                        : _continueWithGoogle,
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 15,
+                                      ),
+                                      side: const BorderSide(
+                                        color: Color(0xFFD1D5DB),
+                                        width: 1.5,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/google_logo.png',
+                                          height: 20,
+                                          width: 20,
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => ShaderMask(
+                                                shaderCallback: (bounds) =>
+                                                    const LinearGradient(
+                                                      colors: [
+                                                        Color(0xFF181059),
+                                                        Color(0xFF181059),
+                                                        Color(0xFF1773CF),
+                                                      ],
+                                                      stops: [0.0, 0.30, 1.0],
+                                                      begin:
+                                                          Alignment.topCenter,
+                                                      end: Alignment
+                                                          .bottomCenter,
+                                                    ).createShader(bounds),
+                                                child: const Text(
+                                                  'G',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Text(
+                                          'الاستمرار مع Google',
+                                          style: TextStyle(
+                                            fontFamily: 'IBMPlexSansArabic',
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF181059),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),

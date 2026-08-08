@@ -18,7 +18,7 @@ dependencies:
   firebase_core: ^3.0.0
   firebase_auth: ^5.0.0
   cloud_firestore: ^5.0.0
-  google_sign_in: ^6.2.1
+  google_sign_in: ^7.2.0
   http: ^1.2.0
   geolocator: ^13.0.2
   shared_preferences: ^2.3.2
@@ -57,7 +57,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo_nabeeh_blue.png"
+  image_path: "assets/images/NABEEHLOGO.png"
 
 dependency_overrides:
   record_linux: ^1.0.0
