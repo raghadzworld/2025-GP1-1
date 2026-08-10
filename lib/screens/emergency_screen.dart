@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -202,7 +203,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           : 'غير متاح';
 
       final message =
-          'أنا في خطر أحتاج إلى المساعدة 🚨\n\nهذا الموقع الخاص بي:\n$mapsLink';
+          '🚨 أحتاج للمساعدة العاجلة\n'
+          'موقعي: $mapsLink\n'
+          'إذا لم تستطع الوصول، الرجاء الاتصال بالطوارئ (911 أو الرقم المحلي)';
 
       // 4. فتح تطبيق الرسائل مع تعبئة الأرقام والرسالة مسبقاً
       final separator = Platform.isIOS ? ';' : ',';
@@ -257,31 +260,20 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                     children: [
                       const SizedBox(height: 12),
                       _buildContactsButton(),
-                      Expanded(
-                        child: Center(
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    'هل أنت في حالة خطر ؟',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF181059),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 75),
-                                Center(child: _buildSOSButton()),
-                              ],
-                            ),
+                      const SizedBox(height: 40),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'هل أنت في حالة خطر ؟',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF181059),
                           ),
                         ),
                       ),
+                      const SizedBox(height: 80),
+                      Center(child: _buildSOSButton()),
                     ],
                   ),
                 ),
@@ -377,7 +369,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         ),
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -385,12 +377,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           ),
           child: Row(
             children: [
-              const ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  Color(0xFF181059),
-                  BlendMode.srcIn,
-                ),
-                child: Text('👥', style: TextStyle(fontSize: 20)),
+              const Icon(
+                LucideIcons.users,
+                size: 22,
+                color: Color(0xFF181059),
               ),
               const SizedBox(width: 16),
               const Text(

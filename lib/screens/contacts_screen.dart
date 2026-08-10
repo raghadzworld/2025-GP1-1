@@ -20,17 +20,20 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   final List<EmergencyContact> _contacts = [];
   final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadContacts();
+    _searchFocusNode.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -1038,10 +1041,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kContactsCardBorder),
+        border: Border.all(
+          color: _searchFocusNode.hasFocus
+              ? const Color(0xFF181059)
+              : _kContactsCardBorder,
+        ),
       ),
       child: TextField(
         controller: _searchCtrl,
+        focusNode: _searchFocusNode,
         onChanged: (value) => setState(() => _searchQuery = value),
         textAlign: TextAlign.right,
         style: const TextStyle(color: Color(0xFF181059), fontSize: 15),
@@ -1065,7 +1073,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   },
                 )
               : null,
+          filled: false,
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 12,
