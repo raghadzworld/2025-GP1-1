@@ -413,10 +413,9 @@ export const sendWelcomeVerifyEmail = onCall(async (request) => {
       <div class="pad">
         <h1>مرحباً ${name}، يسعدنا انضمامك إلى نبيــه</h1>
         <p class="lead">
-          لاحظنا إنشاء حساب جديد في تطبيق
-          <strong style="color:#1B1F2A;font-weight:600;">نبيــه</strong>
-          باستخدام هذا البريد الإلكتروني. بقيت خطوة أخيرة فقط
-          لتفعيل حسابك والبدء باستخدام التطبيق.
+          أهلاً بك في تطبيق
+          <strong style="color:#1B1F2A;font-weight:600;">نبيــه</strong>،
+          بقيت خطوة أخيرة فقط لتفعيل حسابك والبدء باستخدام التطبيق.
         </p>
       </div>
       <div class="btnwrap">
@@ -428,7 +427,7 @@ export const sendWelcomeVerifyEmail = onCall(async (request) => {
       </div>
 
       <div class="warn">
-        <b>إذا لم تكوني أنتِ من أنشأ هذا الحساب</b>
+        <b>إذا لم يكن أنت من أنشأ الحساب</b>
         <span>يمكنك تجاهل هذه الرسالة بأمان — لن يتم تفعيل الحساب دون الضغط على الرابط أعلاه.</span>
       </div>
 
