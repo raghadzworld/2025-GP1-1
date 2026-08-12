@@ -16,13 +16,30 @@ class CategoriesScreen extends StatefulWidget {
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
   final CategoryService _service = CategoryService.withDefaults();
+  final TextEditingController _searchController = TextEditingController();
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _initialize();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<CategoryModel> get _filteredCategories {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _categories;
+
+    return _categories
+        .where((category) => category.name.toLowerCase().contains(query))
+        .toList();
   }
 
   Future<void> _initialize() async {
@@ -241,6 +258,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredCategories = _filteredCategories;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -267,12 +286,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                         child: Column(
                           children: [
-                            ..._categories.map(
-                              (cat) => Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: _buildCategoryCard(cat),
+                            _buildSearchField(),
+                            const SizedBox(height: 16),
+                            if (filteredCategories.isEmpty &&
+                                _searchQuery.trim().isNotEmpty)
+                              _buildNoSearchResults()
+                            else
+                              ...filteredCategories.map(
+                                (cat) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: _buildCategoryCard(cat),
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -320,6 +345,81 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: NabeehColors.slate100),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        textAlign: TextAlign.right,
+        style: const TextStyle(
+          fontFamily: 'IBMPlexSansArabic',
+          color: NabeehColors.darkNavy,
+          fontSize: 15,
+        ),
+        decoration: InputDecoration(
+          hintText: 'ابحث عن مجموعة...',
+          hintStyle: const TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            color: NabeehColors.slate400,
+            fontSize: 14,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: NabeehColors.darkNavy,
+          ),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: NabeehColors.slate400,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoSearchResults() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 36),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.search_off_rounded,
+            size: 42,
+            color: NabeehColors.slate300,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'لا توجد مجموعات مطابقة',
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              color: NabeehColors.slate500,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
