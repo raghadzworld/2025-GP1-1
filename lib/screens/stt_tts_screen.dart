@@ -1,14 +1,28 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../widgets/custom_widgets.dart';
-// Removed NabeehScreenScaffold import – now using a custom header
+import 'package:http/http.dart' as http;
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import 'nabeeh_colors.dart';
+
+// =====================================================================
+// إعدادات Azure Speech Services — عدّليها بمفاتيحك من Azure Portal
+// =====================================================================
+const String _kAzureSpeechKey = '9lz61KqwP59MlMj2RS7yTugTWEkRDXBrZ49UDKnxCPAA05XOTpNQJQQJ99CHACI8hq2XJ3w3AAAYACOGYzD0';
+const String _kAzureRegion = 'switzerlandnorth'; // مثلاً: uaenorth, westeurope ...
+const String _kSttLanguageCode = 'ar-SA'; // أو ar-EG, ar-AE حسب اللهجة
+const String _kTtsLanguageCode = 'ar-SA';
+const String _kTtsVoiceName = 'ar-SA-ZariyahNeural'; // صوت أنثى سعودي (Neural)
 
 class SttTtsScreen extends StatefulWidget {
   const SttTtsScreen({super.key});
@@ -33,6 +47,14 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   StreamSubscription<RecordingDisposition>? _recorderSubscription;
   late AnimationController _waveController;
 
+  // ------------------- إضافات خاصة بـ Azure STT (Streaming) -------------------
+  WebSocketChannel? _sttSocket;
+  StreamSubscription? _audioSubscription;
+  StreamController<Uint8List>? _micStreamController;
+
+  // ------------------- إضافات خاصة بـ Azure TTS -------------------
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
   @override
   void initState() {
     super.initState();
@@ -53,7 +75,11 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   void dispose() {
     _speakingTimer?.cancel();
     _recorderSubscription?.cancel();
+    _audioSubscription?.cancel();
+    _micStreamController?.close();
+    _sttSocket?.sink.close();
     _recorder?.closeRecorder();
+    _audioPlayer.dispose();
     _textFocusNode.dispose();
     _ttsController.dispose();
     _waveController.dispose();
@@ -81,50 +107,135 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     if (_isRecording) {
       await _stopListening();
     } else {
+      setState(() => _textContent = '');
       await _startListening();
     }
-    setState(() {
-      _isRecording = !_isRecording;
-      if (_isRecording) {
-        _textContent = 'مرحباً، كيف يمكنني مساعدتك اليوم؟';
-      }
-    });
+    setState(() => _isRecording = !_isRecording);
   }
+
+  // =====================================================================
+  // Real-time Speech-to-Text عبر Azure Speech-to-Text REST + استخدام ملف
+  // مسجَّل قصير كبديل مبسّط عن WebSocket المباشر (أسهل صيانة لمشروع تخرج)
+  // =====================================================================
+  //
+  // ملاحظة تصميمية: Azure يوفر بروتوكول WebSocket خام معقد التنسيق (custom
+  // binary framing)، وأيضاً Speech SDK رسمي (لا يوجد له حزمة Flutter رسمية
+  // مستقرة حالياً). لذلك نعتمد هنا على نمط "تسجيل قصير قطع صوت متتالية كل
+  // ~2 ثانية وإرسالها لـ REST API الخاص بالنسخ السريع (Fast Transcription)"،
+  // وهو حل عملي يعطي إحساساً قريباً من real-time بدون تعقيد WebSocket.
+  Timer? _chunkTimer;
+  String _accumulatedTranscript = '';
 
   Future<void> _startListening() async {
     final status = await Permission.microphone.request();
     if (!status.isGranted) {
       debugPrint('Microphone permission denied');
+      _showEmptyTextWarning('صلاحية الوصول للمايكروفون مطلوبة');
       return;
     }
 
-    try {
-      await _recorder!.startRecorder(
-        toFile: 'temp_record.aac',
-        codec: Codec.aacADTS,
-      );
+    _accumulatedTranscript = '';
 
-      _recorderSubscription = _recorder!.onProgress?.listen((event) {
-        if (!mounted) return;
-        final db = event.decibels ?? -40.0;
-        double normalized = ((db + 40) / 40).clamp(0.0, 1.0);
-        double smooth = _amplitude + (normalized - _amplitude) * 0.3;
-        setState(() {
-          _amplitude = smooth;
-        });
+    try {
+      await _startNewChunkRecording();
+
+      // كل ثانيتين: نوقف القطعة الحالية، نرسلها للتفريغ، ونبدأ قطعة جديدة
+      _chunkTimer =
+          Timer.periodic(const Duration(seconds: 2), (_) async {
+        await _processCurrentChunk();
+        if (_isRecording) {
+          await _startNewChunkRecording();
+        }
       });
     } catch (e) {
       debugPrint('RECORDER ERROR: $e');
+      _showEmptyTextWarning('تعذر بدء التسجيل');
+    }
+  }
+
+  String? _currentChunkPath;
+
+  Future<void> _startNewChunkRecording() async {
+    final dir = await getTemporaryDirectory();
+    _currentChunkPath =
+        '${dir.path}/chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+    await _recorder!.startRecorder(
+      toFile: _currentChunkPath,
+      codec: Codec.pcm16WAV,
+      sampleRate: 16000,
+      numChannels: 1,
+    );
+
+    _recorderSubscription = _recorder!.onProgress?.listen((event) {
+      if (!mounted) return;
+      final db = event.decibels ?? -40.0;
+      double normalized = ((db + 40) / 40).clamp(0.0, 1.0);
+      double smooth = _amplitude + (normalized - _amplitude) * 0.3;
+      setState(() => _amplitude = smooth);
+    });
+  }
+
+  Future<void> _processCurrentChunk() async {
+    if (_recorder == null || _currentChunkPath == null) return;
+    final path = await _recorder!.stopRecorder();
+    if (path == null) return;
+
+    final file = File(path);
+    if (!await file.exists()) return;
+    final bytes = await file.readAsBytes();
+    if (bytes.length < 2000) return; // قطعة صغيرة جداً / صامتة، تجاهليها
+
+    await _transcribeChunk(bytes);
+  }
+
+  Future<void> _transcribeChunk(Uint8List audioBytes) async {
+    final url = Uri.parse(
+      'https://$_kAzureRegion.stt.speech.microsoft.com/speech/recognition/'
+      'conversation/cognitiveservices/v1?language=$_kSttLanguageCode&format=simple',
+    );
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
+          'Content-Type':
+              'audio/wav; codecs=audio/pcm; samplerate=16000',
+          'Accept': 'application/json',
+        },
+        body: audioBytes,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final displayText = data['DisplayText'] as String?;
+        if (displayText != null && displayText.trim().isNotEmpty) {
+          _accumulatedTranscript =
+              '$_accumulatedTranscript $displayText'.trim();
+          if (mounted) {
+            setState(() => _textContent = _accumulatedTranscript);
+          }
+        }
+      } else {
+        debugPrint('Azure STT Error: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Azure STT Exception: $e');
     }
   }
 
   Future<void> _stopListening() async {
+    _chunkTimer?.cancel();
+    _chunkTimer = null;
     _recorderSubscription?.cancel();
     _recorderSubscription = null;
-    await _recorder?.stopRecorder();
-    setState(() {
-      _amplitude = 0.0;
-    });
+
+    if (_recorder != null && _recorder!.isRecording) {
+      await _processCurrentChunk();
+    }
+
+    if (mounted) setState(() => _amplitude = 0.0);
   }
 
   void _clearText() {
@@ -193,23 +304,78 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     );
   }
 
-  void _speakText() {
+  // =====================================================================
+  // Text-to-Speech (Azure Speech Services REST API)
+  // =====================================================================
+  void _speakText() async {
     if (_textContent.trim().isEmpty) {
       _showEmptyTextWarning('لا يوجد نص للنطق حالياً');
       return;
     }
 
     if (_isSpeaking) {
+      await _audioPlayer.stop();
       _speakingTimer?.cancel();
       if (mounted) setState(() => _isSpeaking = false);
       return;
     }
 
     setState(() => _isSpeaking = true);
-    _speakingTimer?.cancel();
-    _speakingTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _isSpeaking = false);
-    });
+
+    final url = Uri.parse(
+      'https://$_kAzureRegion.tts.speech.microsoft.com/cognitiveservices/v1',
+    );
+
+    final ssml =
+        '''<speak version='1.0' xml:lang='$_kTtsLanguageCode'>
+  <voice xml:lang='$_kTtsLanguageCode' name='$_kTtsVoiceName'>
+    ${_escapeXml(_textContent)}
+  </voice>
+</speak>''';
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+        },
+        body: utf8.encode(ssml),
+      );
+
+      if (response.statusCode == 200) {
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/tts_output.mp3');
+        await file.writeAsBytes(response.bodyBytes);
+
+        await _audioPlayer.play(DeviceFileSource(file.path));
+        _audioPlayer.onPlayerComplete.listen((_) {
+          if (mounted) setState(() => _isSpeaking = false);
+        });
+      } else {
+        debugPrint('Azure TTS Error: ${response.statusCode} ${response.body}');
+        if (mounted) {
+          setState(() => _isSpeaking = false);
+          _showEmptyTextWarning('تعذر تحويل النص إلى صوت');
+        }
+      }
+    } catch (e) {
+      debugPrint('Azure TTS Exception: $e');
+      if (mounted) {
+        setState(() => _isSpeaking = false);
+        _showEmptyTextWarning('تحقق من الاتصال بالإنترنت');
+      }
+    }
+  }
+
+  String _escapeXml(String text) {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
   }
 
   void _insertPhrase(String phrase) {
@@ -231,7 +397,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
 
   @override
   Widget build(BuildContext context) {
-    // ─── Directionality set to RTL for Arabic layout ────────────────────────
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -371,8 +536,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       ),
     );
   }
-
-  // (The rest of the widget methods remain unchanged, only styling is consistent)
 
   Widget _buildModeSwitcher() {
     return Padding(
@@ -554,7 +717,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                       const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
-                        
+                        children: [
+                          _buildToolsIcon(LucideIcons.copy, onTap: _copyText),
+                        ],
                       ),
                     ],
                   ],
@@ -588,7 +753,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                 child: Icon(
                   _isRecording ? LucideIcons.mic : LucideIcons.micOff,
                   size: 50,
-                  color: _isRecording ? NabeehColors.lightBlue : NabeehColors.slate400,
+                  color:
+                      _isRecording ? NabeehColors.lightBlue : NabeehColors.slate400,
                 ),
               ),
             ),
@@ -658,7 +824,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                         ]
                             .map(
                               (phrase) => Padding(
-                                padding: const EdgeInsetsDirectional.only(start: 8),
+                                padding:
+                                    const EdgeInsetsDirectional.only(start: 8),
                                 child: _buildPhrase(phrase),
                               ),
                             )
@@ -718,59 +885,13 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                 child: Icon(
                   LucideIcons.volume2,
                   size: 50,
-                  color: _isSpeaking ? NabeehColors.lightBlue : NabeehColors.slate400,
+                  color:
+                      _isSpeaking ? NabeehColors.lightBlue : NabeehColors.slate400,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge({
-    required bool isActive,
-    required String activeText,
-    required String inactiveText,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: NabeehColors.slate50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: NabeehColors.slate100),
-      ),
-      child: Row(
-        children: [
-          Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? NabeehColors.lightBlue
-                      : NabeehColors.slate300,
-                  shape: BoxShape.circle,
-                ),
-              )
-              .animate(
-                onPlay: (controller) => isActive ? controller.repeat() : null,
-              )
-              .scale(
-                begin: const Offset(0.8, 0.8),
-                end: const Offset(1.2, 1.2),
-                duration: 800.ms,
-                curve: Curves.easeInOut,
-              ),
-          const SizedBox(width: 8),
-          Text(
-            isActive ? activeText : inactiveText,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: NabeehColors.slate400,
-            ),
-          ),
         ],
       ),
     );
@@ -816,138 +937,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
             }),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildVisualizer({
-    required IconData icon,
-    required bool isActive,
-    Color activeColor = NabeehColors.blue,
-    bool small = false,
-  }) {
-    double size = small ? 90 : 160;
-    return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: isActive
-                ? activeColor.withValues(alpha: 0.12)
-                : NabeehColors.slate50,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isActive
-                  ? activeColor.withValues(alpha: 0.18)
-                  : NabeehColors.slate100,
-              width: 1.5,
-            ),
-            boxShadow: [
-              if (isActive)
-                BoxShadow(
-                  color: activeColor.withValues(alpha: 0.18),
-                  blurRadius: 26,
-                  spreadRadius: 6,
-                ),
-            ],
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              color: isActive ? activeColor : NabeehColors.slate400,
-              size: size * 0.4,
-            ),
-          ),
-        )
-        .animate(
-          onPlay: (controller) =>
-              isActive ? controller.repeat(reverse: true) : null,
-        )
-        .scale(
-          begin: const Offset(0.95, 0.95),
-          end: const Offset(1.05, 1.05),
-          duration: 800.ms,
-          curve: Curves.easeInOut,
-        );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: 200.ms,
-        width: 96,
-        height: 96,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.9),
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.4),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Icon(icon, color: Colors.white, size: 40),
-      ),
-    );
-  }
-
-  Widget _buildSmallAction({
-    required IconData icon,
-    required String label,
-    bool isDanger = false,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDanger
-              ? Colors.red.withValues(alpha: 0.05)
-              : NabeehColors.slate50,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDanger
-                ? Colors.red.withValues(alpha: 0.12)
-                : NabeehColors.slate100,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: NabeehColors.dark.withValues(alpha: 0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 12,
-              color: isDanger ? Colors.red.shade400 : NabeehColors.slate400,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: isDanger ? Colors.red.shade400 : NabeehColors.slate400,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
