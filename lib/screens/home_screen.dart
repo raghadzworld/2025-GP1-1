@@ -354,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             _buildGridCard(
-              title: 'المنبّهات',
+              title: 'المنبهات',
               icon: 'assets/images/icon_YRima.png',
               onTap: () => _handleTap(
                 'assets/videos/sign_reminders.mp4',

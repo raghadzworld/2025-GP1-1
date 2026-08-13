@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:math' as math;
-import 'dart:async'; // 👈 Needed for Timer
+import 'dart:async'; 
 import 'package:record/record.dart';
 import 'nabeeh_colors.dart';
+// 👇 Added Sign Language Imports
+import '../services/sign_language_mode.dart';
+import 'sign_language_player_screen.dart';
 
 class ListeningScreen extends StatefulWidget {
   const ListeningScreen({super.key});
@@ -17,7 +20,6 @@ class _ListeningScreenState extends State<ListeningScreen>
   late AnimationController _waveController;
   final _audioRecorder = AudioRecorder();
   
-  // 👈 Replaced the StreamSubscription with a Timer
   Timer? _amplitudeTimer;
   double _audioLevel = 0.0;
 
@@ -35,24 +37,35 @@ class _ListeningScreenState extends State<ListeningScreen>
     _startInitialListening();
   }
 
-  // 👈 New approach: manually poll the amplitude using a Timer
+  // 👇 Added Sign Language Helper
+  void _handleTap(String videoAsset, VoidCallback action) {
+    if (signLanguageModeNotifier.value) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => SignLanguagePlayerScreen(
+          videoAsset: videoAsset,
+          onFinished: action,
+        ),
+      );
+    } else {
+      action();
+    }
+  }
+
   void _startAmplitudeTimer() {
-    // Cancel any existing timer just to be safe
     _amplitudeTimer?.cancel(); 
     
     _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) async {
-      // Only check if it is actively recording to prevent errors
       if (await _audioRecorder.isRecording()) {
         final amp = await _audioRecorder.getAmplitude();
         
-        // Convert decibels (-50 to 0) into a 0.0 to 1.0 scale
         final double minDb = -45.0; 
         double normalized = (amp.current - minDb) / (0.0 - minDb);
         
         if (mounted) {
           setState(() {
             _audioLevel = normalized.clamp(0.0, 1.0);
-            print('Live Audio Level: $_audioLevel');
           });
         }
       }
@@ -63,7 +76,7 @@ class _ListeningScreenState extends State<ListeningScreen>
     bool hasPermission = await _audioRecorder.hasPermission();
     if (hasPermission) {
       await _audioRecorder.startStream(const RecordConfig());
-      _startAmplitudeTimer(); // 👈 Start the timer
+      _startAmplitudeTimer(); 
       
       setState(() {
         isListening = true;
@@ -81,14 +94,13 @@ class _ListeningScreenState extends State<ListeningScreen>
   @override
   void dispose() {
     _waveController.dispose();
-    _amplitudeTimer?.cancel(); // 👈 Safely cancel the timer when leaving the screen
+    _amplitudeTimer?.cancel(); 
     _audioRecorder.dispose();
     super.dispose();
   }
 
   Future<void> _toggleListening() async {
     if (isListening) {
-      // 👈 Stop the timer and flatline the waves
       _amplitudeTimer?.cancel(); 
       await _audioRecorder.stop();
       
@@ -102,7 +114,7 @@ class _ListeningScreenState extends State<ListeningScreen>
       bool hasPermission = await _audioRecorder.hasPermission();
       if (hasPermission) {
         await _audioRecorder.startStream(const RecordConfig());
-        _startAmplitudeTimer(); // 👈 Restart the timer cleanly
+        _startAmplitudeTimer(); 
         
         setState(() {
           isListening = true;
@@ -192,35 +204,52 @@ class _ListeningScreenState extends State<ListeningScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF181059),
-                    Color(0xFF181059),
-                    Color(0xFF1773CF),
-                  ],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          // 👇 Replaced with active Toggle logic
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () {
+                signLanguageModeNotifier.value = !isActive;
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            Color(0xFF181059),
+                            Color(0xFF181059),
+                            Color(0xFF1773CF),
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  width: 1.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -235,7 +264,8 @@ class _ListeningScreenState extends State<ListeningScreen>
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         GestureDetector(
-          onTap: _toggleListening,
+          // 👇 Wrapped Mic Toggle action with Sign Language
+          onTap: () => _handleTap('assets/videos/sign_start_listening.mp4', () => _toggleListening()),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: 120,

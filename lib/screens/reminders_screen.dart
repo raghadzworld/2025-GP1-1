@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_reminder_screen.dart';
 import 'nabeeh_colors.dart';
+// 👇 Added Sign Language Imports
+import '../services/sign_language_mode.dart';
+import 'sign_language_player_screen.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -14,6 +17,49 @@ class RemindersScreen extends StatefulWidget {
 
 class _RemindersScreenState extends State<RemindersScreen> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
+  
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
+
+  Stream<QuerySnapshot>? _remindersStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocusNode.addListener(() => setState(() {}));
+
+    if (currentUser != null) {
+      _remindersStream = FirebaseFirestore.instance
+          .collection('User')
+          .doc(currentUser!.uid)
+          .collection('Reminders')
+          .snapshots();
+    }
+  }
+
+  // 👇 Added Sign Language Helper
+  void _handleTap(String videoAsset, VoidCallback action) {
+    if (signLanguageModeNotifier.value) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => SignLanguagePlayerScreen(
+          videoAsset: videoAsset,
+          onFinished: action,
+        ),
+      );
+    } else {
+      action();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _deleteReminder(String reminderId) async {
     if (currentUser == null) return;
@@ -30,7 +76,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           const SnackBar(
             backgroundColor: Colors.green,
             content: Text(
-              'تم حذف المنبّه بنجاح',
+              'تم حذف المنبه بنجاح',
               style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
             ),
           ),
@@ -67,7 +113,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
-  // 👇 Updated to accept the alarm's label
   void _confirmDelete(String reminderId, String alarmLabel) {
     showDialog(
       context: context,
@@ -84,7 +129,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 Icon(LucideIcons.alertTriangle, color: Colors.red),
                 SizedBox(width: 10),
                 Text(
-                  'حذف المنبّه',
+                  'حذف المنبه',
                   style: TextStyle(
                     fontFamily: 'IBMPlexSansArabic',
                     fontWeight: FontWeight.bold,
@@ -93,7 +138,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 ),
               ],
             ),
-            // 👇 Displaying the custom label in the confirmation text
             content: Text(
               'هل أنت متأكد من رغبتك في حذف "$alarmLabel"؟', 
               style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
@@ -221,21 +265,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
             child: Column(
               children: [
                 _buildHeader(),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
                 Expanded(
-                  child: currentUser == null
+                  child: currentUser == null || _remindersStream == null
                       ? const Center(
                           child: Text(
-                            'الرجاء تسجيل الدخول لعرض المنبّهات',
+                            'الرجاء تسجيل الدخول لعرض المنبهات',
                             style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
                           ),
                         )
                       : StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('User')
-                              .doc(currentUser!.uid)
-                              .collection('Reminders')
-                              .snapshots(),
+                          stream: _remindersStream,
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
@@ -251,16 +291,27 @@ class _RemindersScreenState extends State<RemindersScreen> {
                               return _buildEmptyState();
                             }
 
-                            final reminders = snapshot.data!.docs;
+                            final allReminders = snapshot.data!.docs;
+                            
+                            final filteredReminders = allReminders.where((doc) {
+                              if (_searchQuery.isEmpty) return true;
+                              final data = doc.data() as Map<String, dynamic>;
+                              final label = data['label']?.toString().toLowerCase() ?? '';
+                              return label.contains(_searchQuery.toLowerCase());
+                            }).toList();
 
                             return SingleChildScrollView(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ...reminders.map((doc) {
-                                    final data =
-                                        doc.data() as Map<String, dynamic>;
+                                  _buildRemindersCountBadge(allReminders.length),
+                                  const SizedBox(height: 12),
+                                  _buildSearchField(),
+                                  const SizedBox(height: 20),
+                                  
+                                  ...filteredReminders.map((doc) {
+                                    final data = doc.data() as Map<String, dynamic>;
                                     return _buildAlarmCard(doc.id, data);
                                   }),
                                   const SizedBox(height: 8),
@@ -276,6 +327,95 @@ class _RemindersScreenState extends State<RemindersScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _searchFocusNode.hasFocus
+              ? const Color(0xFF181059)
+              : NabeehColors.slate200, 
+        ),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        focusNode: _searchFocusNode,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        textAlign: TextAlign.right,
+        style: const TextStyle(color: Color(0xFF181059), fontSize: 15),
+        decoration: InputDecoration(
+          hintText: 'ابحث عن منبه...',
+          hintStyle: const TextStyle(color: NabeehColors.slate400, fontSize: 14),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF181059),
+          ),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: NabeehColors.slate400,
+                  ),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRemindersCountBadge(int count) {
+    final label = count == 0
+        ? 'لا توجد منبهات'
+        : count == 1
+        ? 'منبه واحد'
+        : '$count منبهات';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF181059)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Color(0xFF181059),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF181059),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -339,7 +479,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ),
               const SizedBox(width: 12),
               const Text(
-                'المنبّهات',
+                'المنبهات',
                 style: TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 24,
@@ -349,35 +489,52 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [
-                    NabeehColors.darkNavy,
-                    NabeehColors.darkNavy,
-                    NabeehColors.lightBlue,
-                  ],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          // 👇 Replaced with active Toggle logic
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () {
+                signLanguageModeNotifier.value = !isActive;
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            Color(0xFF181059),
+                            Color(0xFF181059),
+                            Color(0xFF1773CF),
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.25),
+                    width: 1.5,
+                  ),
                 ),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.25),
-                  width: 1.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -390,7 +547,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Widget _buildAlarmCard(String reminderId, Map<String, dynamic> alarm) {
     final bool isActive = alarm['isEnabled'] ?? false;
     final String timeString = alarm['time'] ?? '00:00';
-    final String label = alarm['label'] ?? 'منبّه';
+    final String label = alarm['label'] ?? 'منبه';
 
     final List<dynamic> daysArray = alarm['daysActive'] ?? [];
 
@@ -438,7 +595,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     label,
                     style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
-                      fontSize: 17,
+                      fontSize: 20, 
                       fontWeight: FontWeight.w600,
                       color: isActive
                           ? NabeehColors.lightBlue
@@ -539,7 +696,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _editAlarm(reminderId, alarm),
+                  // 👇 Wrapped Edit action with Sign Language
+                  onTap: () => _handleTap('assets/videos/sign_edit_reminder.mp4', () => _editAlarm(reminderId, alarm)),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -576,8 +734,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  // 👇 Passing the label along with the ID here
-                  onTap: () => _confirmDelete(reminderId, label), 
+                  // 👇 Wrapped Delete action with Sign Language
+                  onTap: () => _handleTap('assets/videos/sign_delete_reminder.mp4', () => _confirmDelete(reminderId, label)), 
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -632,15 +790,19 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ),
       ),
       child: TextButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddReminderScreen()),
-          );
-        },
+        // 👇 Wrapped Add New Reminder action with Sign Language
+        onPressed: () => _handleTap(
+          'assets/videos/sign_add_reminder.mp4', 
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddReminderScreen()),
+            );
+          },
+        ),
         icon: const Icon(LucideIcons.plus, color: Colors.white),
         label: const Text(
-          'إضافة منبّه جديد',
+          'إضافة منبه جديد',
           style: TextStyle(
             fontFamily: 'IBMPlexSansArabic',
             color: Colors.white,

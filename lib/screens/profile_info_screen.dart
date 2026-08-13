@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
 import '../features/categories/data/services/category_service.dart';
 import 'settings_screen.dart';
+import '../services/sign_language_mode.dart';
+import 'sign_language_player_screen.dart';
 
 class ProfileInfoScreen extends StatelessWidget {
   final VoidCallback onEdit;
@@ -68,139 +70,139 @@ class ProfileInfoScreen extends StatelessWidget {
         bool isDeleting = false;
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Row(
-              children: [
-                Icon(LucideIcons.alertTriangle, color: Colors.red),
-                SizedBox(width: 10),
-                Text(
-                  'حذف الحساب',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: AlertDialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
-            ),
-            content: const Text(
-              'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
-              style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
-            ),
-            actionsPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-            actions: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: isDeleting ? null : () async {
-                        setDialogState(() => isDeleting = true);
-                        try {
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user != null) {
-                            await FirebaseFirestore.instance.collection('User').doc(user.uid).delete();
-                            await user.delete();
-                            if (context.mounted) {
-                              Navigator.of(dialogContext).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('تم حذف حسابك بنجاح. نأمل أن تعود إلينا قريباً.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
-                                  backgroundColor: Colors.green,
-                                  duration: Duration(seconds: 4),
-                                ),
-                              );
-                              Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
-                            }
-                          }
-                        } on FirebaseAuthException catch (e) {
-                          setDialogState(() => isDeleting = false);
-                          String message = e.code == 'requires-recent-login'
-                              ? 'لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.'
-                              : 'حدث خطأ: ${e.message}';
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(message, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')), backgroundColor: Colors.red),
-                            );
-                          }
-                        } catch (e) {
-                          setDialogState(() => isDeleting = false);
-                          debugPrint('Error deleting account: $e');
-                        }
-                      },
-                      style: OutlinedButton.styleFrom(
-                        fixedSize: const Size.fromHeight(50),
-                        padding: EdgeInsets.zero,
-                        side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (isDeleting)
-                            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2))
-                          else
-                            const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'حذف نهائي',
-                            style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 16),
-                          ),
-                        ],
+                title: const Row(
+                  children: [
+                    Icon(LucideIcons.alertTriangle, color: Colors.red),
+                    SizedBox(width: 10),
+                    Text(
+                      'حذف الحساب',
+                      style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      style: TextButton.styleFrom(
-                        fixedSize: const Size.fromHeight(50),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(
-                            color: Color.fromARGB(255, 200, 198, 195),
+                  ],
+                ),
+                content: const Text(
+                  'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+                  style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
+                ),
+                actionsPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                actions: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isDeleting ? null : () async {
+                            setDialogState(() => isDeleting = true);
+                            try {
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user != null) {
+                                await FirebaseFirestore.instance.collection('User').doc(user.uid).delete();
+                                await user.delete();
+                                if (context.mounted) {
+                                  Navigator.of(dialogContext).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('تم حذف حسابك بنجاح. نأمل أن تعود إلينا قريباً.', style: TextStyle(fontFamily: 'IBMPlexSansArabic')),
+                                      backgroundColor: Colors.green,
+                                      duration: Duration(seconds: 4),
+                                    ),
+                                  );
+                                  Navigator.pushNamedAndRemoveUntil(context, '/welcome', (route) => false);
+                                }
+                              }
+                            } on FirebaseAuthException catch (e) {
+                              setDialogState(() => isDeleting = false);
+                              String message = e.code == 'requires-recent-login'
+                                  ? 'لأسباب أمنية، يرجى تسجيل الخروج ثم الدخول مجدداً قبل محاولة حذف الحساب.'
+                                  : 'حدث خطأ: ${e.message}';
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(message, style: const TextStyle(fontFamily: 'IBMPlexSansArabic')), backgroundColor: Colors.red),
+                                );
+                              }
+                            } catch (e) {
+                              setDialogState(() => isDeleting = false);
+                              debugPrint('Error deleting account: $e');
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            fixedSize: const Size.fromHeight(50),
+                            padding: EdgeInsets.zero,
+                            side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (isDeleting)
+                                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2))
+                              else
+                                const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'حذف نهائي',
+                                style: TextStyle(fontFamily: 'IBMPlexSansArabic', fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 16),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            LucideIcons.x,
-                            color: NabeehColors.slate500,
-                            size: 18,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'إلغاء',
-                            style: TextStyle(
-                              fontFamily: 'IBMPlexSansArabic',
-                              color: NabeehColors.slate500,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: TextButton.styleFrom(
+                            fixedSize: const Size.fromHeight(50),
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(
+                                color: Color.fromARGB(255, 200, 198, 195),
+                              ),
                             ),
                           ),
-                        ],
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                LucideIcons.x,
+                                color: NabeehColors.slate500,
+                                size: 18,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'إلغاء',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  color: NabeehColors.slate500,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
-      },
-    );
       },
     );
   }
@@ -334,6 +336,22 @@ class ProfileInfoScreen extends StatelessWidget {
     );
   }
 
+  // --- Sign Language Helper ---
+  void _handleTap(BuildContext context, String videoAsset, VoidCallback action) {
+    if (signLanguageModeNotifier.value) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => SignLanguagePlayerScreen(
+          videoAsset: videoAsset,
+          onFinished: action,
+        ),
+      );
+    } else {
+      action();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -360,20 +378,24 @@ class ProfileInfoScreen extends StatelessWidget {
                   icon: LucideIcons.edit2,
                   title: 'تعديل الملف الشخصي',
                   borderColor: const Color(0xFF181059),
-                  onTap: onEdit,
+                  onTap: () => _handleTap(context, 'assets/videos/sign_edit_profile.mp4', onEdit),
                 ),
                 _buildSettingsTile(
                   icon: LucideIcons.lock,
                   title: 'تغيير كلمة المرور',
                   borderColor: const Color(0xFF181059),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
-                      ),
-                    );
-                  },
+                  onTap: () => _handleTap(
+                    context, 
+                    'assets/videos/sign_change_password.mp4',
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 _buildSettingsTile(
                   icon: LucideIcons.trash2,
@@ -381,7 +403,11 @@ class ProfileInfoScreen extends StatelessWidget {
                   titleColor: Colors.red,
                   iconColor: Colors.red,
                   borderColor: Colors.red,
-                  onTap: () => _confirmDeleteAccount(context),
+                  onTap: () => _handleTap(
+                    context, 
+                    'assets/videos/sign_delete_account.mp4', 
+                    () => _confirmDeleteAccount(context),
+                  ),
                 ),
 
                 const Spacer(),
@@ -399,7 +425,11 @@ class ProfileInfoScreen extends StatelessWidget {
                       ),
                     ),
                     child: ElevatedButton.icon(
-                      onPressed: () => _confirmLogout(context),
+                      onPressed: () => _handleTap(
+                        context, 
+                        'assets/videos/sign_logout.mp4', 
+                        () => _confirmLogout(context),
+                      ),
                       icon: const Icon(
                         LucideIcons.logOut,
                         color: Colors.white,
@@ -453,33 +483,52 @@ class ProfileInfoScreen extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF181059),
-                  Color(0xFF181059),
-                  Color(0xFF1773CF),
-                ],
-                stops: [0.09, 0.30, 1.0],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () {
+                signLanguageModeNotifier.value = !isActive;
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            Color(0xFF181059),
+                            Color(0xFF181059),
+                            Color(0xFF1773CF),
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
             ),
           ),
@@ -522,7 +571,6 @@ class ProfileInfoScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // 👇 Removed const so the arrow color can match the dynamic borderColor
               Directionality(
                 textDirection: TextDirection.ltr,
                 child: Icon(

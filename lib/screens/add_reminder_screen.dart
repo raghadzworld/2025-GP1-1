@@ -3,6 +3,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
+// 👇 Added Sign Language Imports
+import '../services/sign_language_mode.dart';
+import 'sign_language_player_screen.dart';
 
 class AddReminderScreen extends StatefulWidget {
   final String? reminderId;
@@ -23,10 +26,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   late FixedExtentScrollController _minuteController;
   late FixedExtentScrollController _amPmController;
 
-  // 👈 Added a dedicated list to securely hold the state of our selected days
   List<String> selectedDays = []; 
   
-  String label = "منبّه";
+  String label = "منبه";
   String repeat = "مطلقاً";
   double vibrationPowerValue = 1.0;
   String vibrationPattern = "متصل";
@@ -40,13 +42,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
     if (widget.existingData != null) {
       final data = widget.existingData!;
-      label = data['label'] ?? "منبّه";
+      label = data['label'] ?? "منبه";
 
-      // 👈 Directly load the days from Firebase into our state list
       List<dynamic> daysArray = data['daysActive'] ?? [];
       selectedDays = List<String>.from(daysArray);
 
-      // 👈 Determine the display text based on our secure state list
       if (selectedDays.isEmpty) {
         repeat = "مطلقاً";
       } else if (selectedDays.length == 7) {
@@ -87,6 +87,22 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     _amPmController = FixedExtentScrollController(initialItem: isAm ? 0 : 1);
   }
 
+  // 👇 Added Sign Language Helper
+  void _handleTap(String videoAsset, VoidCallback action) {
+    if (signLanguageModeNotifier.value) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => SignLanguagePlayerScreen(
+          videoAsset: videoAsset,
+          onFinished: action,
+        ),
+      );
+    } else {
+      action();
+    }
+  }
+
   Future<void> _saveReminder() async {
     setState(() => _isLoading = true);
     try {
@@ -104,7 +120,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       final reminderData = {
         'label': label,
         'time': timeString,
-        'daysActive': selectedDays, // 👈 Directly save the list, avoiding string parsing bugs!
+        'daysActive': selectedDays, 
         'isEnabled': widget.existingData?['isEnabled'] ?? true,
         'vibrationPower': powerInt,
         'vibrationPattern': patternInt,
@@ -252,7 +268,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               ),
               const SizedBox(width: 12),
               Text(
-                widget.reminderId == null ? 'إضافة منبّه' : 'تعديل منبّه',
+                widget.reminderId == null ? 'إضافة منبه' : 'تعديل منبه',
                 style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 24,
@@ -262,35 +278,52 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [
-                    NabeehColors.darkNavy,
-                    NabeehColors.darkNavy,
-                    NabeehColors.lightBlue,
-                  ],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          // 👇 Replaced with active Toggle logic
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () {
+                signLanguageModeNotifier.value = !isActive;
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            Color(0xFF181059),
+                            Color(0xFF181059),
+                            Color(0xFF1773CF),
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  width: 1.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: Colors.white,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -619,7 +652,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                       itemCount: days.length,
                       itemBuilder: (context, index) {
                         final day = days[index];
-                        // 👈 Check against our secure list variable
                         final isSelected = selectedDays.contains(day);
                         return CheckboxListTile(
                           title: Text(
@@ -641,13 +673,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           ),
                           onChanged: (bool? val) {
                             setSheetState(() {
-                              // 👈 Update the list securely 
                               if (val == true) {
                                 selectedDays.add(day);
                               } else {
                                 selectedDays.remove(day);
                               }
-                              // Keep the days in standard week order
                               selectedDays.sort((a, b) => days.indexOf(a).compareTo(days.indexOf(b)));
                             });
                             setState(() {
@@ -903,7 +933,10 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 ),
               ),
               child: TextButton(
-                onPressed: _isLoading ? null : _saveReminder,
+                // 👇 Wrapped Save action with Sign Language
+                onPressed: _isLoading 
+                    ? null 
+                    : () => _handleTap('assets/videos/sign_save_reminder.mp4', _saveReminder),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
@@ -930,8 +963,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           const SizedBox(width: 6),
                           Text(
                             widget.reminderId == null
-                                ? 'إضافة المنبّه'
-                                : 'تحديث المنبّه',
+                                ? 'إضافة المنبه'
+                                : 'تحديث المنبه',
                             style: const TextStyle(
                               fontFamily: 'IBMPlexSansArabic',
                               fontWeight: FontWeight.bold,
