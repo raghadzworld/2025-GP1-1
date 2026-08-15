@@ -20,6 +20,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _emailController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isGoogleUser = false; // Flag for Google users
 
   // --- Inline error ribbon state ---
   String? _nameError;
@@ -46,6 +47,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _loadCurrentUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      // Check if logged in with Google
+      _isGoogleUser = user.providerData
+          .any((userInfo) => userInfo.providerId == 'google.com');
+
       try {
         final doc = await FirebaseFirestore.instance
             .collection('User')
@@ -191,7 +196,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         
-        if (_emailChanged) {
+        if (_emailChanged && !_isGoogleUser) {
           final uid = user.uid;
           final newEmail = _emailController.text.trim();
 
@@ -292,7 +297,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isPendingEmail = _emailChanged && !_linkSent;
+    bool isPendingEmail = _emailChanged && !_linkSent && !_isGoogleUser;
     bool isSaveDisabled = _isLoading || isPendingEmail;
 
     return Directionality(
@@ -331,83 +336,86 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         if (_nameError != null) _buildErrorRibbon(_nameError!),
                         const SizedBox(height: 20),
 
-                        _buildTextField(
-                          controller: _emailController,
-                          label: 'الايميل',
-                          icon: LucideIcons.mail,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-
-                        // --- DYNAMIC EMAIL STATUS UI ---
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          height: (_emailChanged || _linkSent) ? 45 : 0,
-                          margin: EdgeInsets.only(
-                            top: (_emailChanged || _linkSent) ? 8 : 0,
+                        // Conditionally render the email field and its UI if NOT a Google user
+                        if (!_isGoogleUser) ...[
+                          _buildTextField(
+                            controller: _emailController,
+                            label: 'الايميل',
+                            icon: LucideIcons.mail,
+                            keyboardType: TextInputType.emailAddress,
                           ),
-                          child: _linkSent
-                              ? const Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.',
-                                    style: TextStyle(
-                                      fontFamily: 'IBMPlexSansArabic',
-                                      color: Color(0xFF1773CF),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                )
-                              : (_emailChanged
-                                  ? Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Builder(
-                                        builder: (context) {
-                                          final isDisabled = _isSendingLink || _emailFormatError != null;
-                                          return OutlinedButton(
-                                            onPressed: isDisabled ? null : _sendVerificationLink,
-                                            style: OutlinedButton.styleFrom(
-                                              backgroundColor: isDisabled ? const Color(0xFFF3F4F6) : Colors.white,
-                                              side: BorderSide(
-                                                color: isDisabled ? Colors.grey : const Color(0xFF181059),
-                                                width: 1.5,
-                                              ),
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 8,
-                                              ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                            child: _isSendingLink
-                                                ? const SizedBox(
-                                                    width: 16,
-                                                    height: 16,
-                                                    child: CircularProgressIndicator(
-                                                      color: Color(0xFF181059),
-                                                      strokeWidth: 2,
-                                                    ),
-                                                  )
-                                                : Text(
-                                                    'إرسال رابط التأكيد',
-                                                    style: TextStyle(
-                                                      fontFamily: 'IBMPlexSansArabic',
-                                                      color: isDisabled ? Colors.grey : const Color(0xFF181059),
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                          );
-                                        },
+
+                          // --- DYNAMIC EMAIL STATUS UI ---
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: (_emailChanged || _linkSent) ? 45 : 0,
+                            margin: EdgeInsets.only(
+                              top: (_emailChanged || _linkSent) ? 8 : 0,
+                            ),
+                            child: _linkSent
+                                ? const Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      'تم إرسال الرابط. يرجى التأكيد في بريدك ثم الضغط على حفظ بالأسفل.',
+                                      style: TextStyle(
+                                        fontFamily: 'IBMPlexSansArabic',
+                                        color: Color(0xFF1773CF),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    )
-                                  : const SizedBox.shrink()),
-                        ),
-                        if (_emailFormatError != null)
-                          _buildErrorRibbon(_emailFormatError!),
-                        if (_emailSaveError != null)
-                          _buildErrorRibbon(_emailSaveError!),
+                                    ),
+                                  )
+                                : (_emailChanged
+                                    ? Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Builder(
+                                          builder: (context) {
+                                            final isDisabled = _isSendingLink || _emailFormatError != null;
+                                            return OutlinedButton(
+                                              onPressed: isDisabled ? null : _sendVerificationLink,
+                                              style: OutlinedButton.styleFrom(
+                                                backgroundColor: isDisabled ? const Color(0xFFF3F4F6) : Colors.white,
+                                                side: BorderSide(
+                                                  color: isDisabled ? Colors.grey : const Color(0xFF181059),
+                                                  width: 1.5,
+                                                ),
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 8,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              child: _isSendingLink
+                                                  ? const SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child: CircularProgressIndicator(
+                                                        color: Color(0xFF181059),
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    )
+                                                  : Text(
+                                                      'إرسال رابط التأكيد',
+                                                      style: TextStyle(
+                                                        fontFamily: 'IBMPlexSansArabic',
+                                                        color: isDisabled ? Colors.grey : const Color(0xFF181059),
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                            );
+                                          },
+                                        ),
+                                      )
+                                    : const SizedBox.shrink()),
+                          ),
+                          if (_emailFormatError != null)
+                            _buildErrorRibbon(_emailFormatError!),
+                          if (_emailSaveError != null)
+                            _buildErrorRibbon(_emailSaveError!),
+                        ],
 
                         const SizedBox(height: 60),
 

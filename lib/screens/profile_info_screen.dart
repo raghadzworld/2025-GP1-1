@@ -354,6 +354,11 @@ class ProfileInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check if the current user logged in with Google
+    final user = FirebaseAuth.instance.currentUser;
+    final isGoogleUser = user?.providerData
+        .any((userInfo) => userInfo.providerId == 'google.com') ?? false;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -380,23 +385,27 @@ class ProfileInfoScreen extends StatelessWidget {
                   borderColor: const Color(0xFF181059),
                   onTap: () => _handleTap(context, 'assets/videos/sign_edit_profile.mp4', onEdit),
                 ),
-                _buildSettingsTile(
-                  icon: LucideIcons.lock,
-                  title: 'تغيير كلمة المرور',
-                  borderColor: const Color(0xFF181059),
-                  onTap: () => _handleTap(
-                    context, 
-                    'assets/videos/sign_change_password.mp4',
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsScreen(),
-                        ),
-                      );
-                    },
+                
+                // Conditionally display the change password tile
+                if (!isGoogleUser)
+                  _buildSettingsTile(
+                    icon: LucideIcons.lock,
+                    title: 'تغيير كلمة المرور',
+                    borderColor: const Color(0xFF181059),
+                    onTap: () => _handleTap(
+                      context, 
+                      'assets/videos/sign_change_password.mp4',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+
                 _buildSettingsTile(
                   icon: LucideIcons.trash2,
                   title: 'حذف الحساب',
