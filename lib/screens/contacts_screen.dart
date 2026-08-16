@@ -717,15 +717,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         const SizedBox(height: 12),
                         _buildSearchField(),
                         const SizedBox(height: 20),
-                        const Text(
-                          'جهات الاتصال:',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF181059),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         ..._contacts.asMap().entries.where((e) {
                           if (_searchQuery.isEmpty) return true;
                           return e.value.name.toLowerCase().contains(

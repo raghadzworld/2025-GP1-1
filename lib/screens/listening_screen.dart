@@ -1,12 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
-import 'dart:async'; 
-import 'package:record/record.dart';
+import 'dart:async';
+import 'dart:typed_data';
 import 'nabeeh_colors.dart';
-// 👇 Added Sign Language Imports
 import '../services/sign_language_mode.dart';
+import '../services/watch_audio_socket.dart';
+import '../services/audio_utils.dart';
+import '../services/event_classifier_service.dart';
+import '../widgets/watch_ip_dialog.dart';
+import '../features/categories/data/models/sound_setting_model.dart';
+import '../features/categories/data/services/category_service.dart';
 import 'sign_language_player_screen.dart';
+
+const _kChunkSeconds = 3;
+const _kBytesPerChunk =
+    WatchAudioSocket.sampleRate * 2 * _kChunkSeconds; // 16-bit mono PCM
+
+const Map<String, String> _kCategoryLabels = {
+  'doorbell': 'جرس الباب',
+  'knock': 'طرق على الباب',
+  'baby_cry': 'بكاء طفل',
+  'fire_alarm': 'إنذار حريق',
+  'adhan': 'أذان',
+  'quran_recitation': 'تلاوة قرآن',
+  'na': 'لا يوجد صوت مهم',
+};
+
+// فقط هذي الفئات تظهر كإشعارات داخل بطاقة "الصوت المكتشف حالياً"
+const Map<String, String> _kAlertEmojis = {
+  'fire_alarm': '🚨',
+  'adhan': '🕌',
+  'baby_cry': '👶🏻',
+  'doorbell': '🔔',
+  'knock': '✊🏻',
+};
+
+// رموز عرض النتيجة على شاشة الساعة نفسها — بروتوكول '#' + حرف الفئة
+const Map<String, String> _kWatchDetectionCodes = {
+  'doorbell': 'D',
+  'knock': 'K',
+  'baby_cry': 'B',
+  'fire_alarm': 'F',
+  'adhan': 'A',
+};
+
+const _kMaxDetectionEntries = 30;
+
+// تحويل تسمية فئة الـ API إلى soundId المستخدم بميزة "المجموعات الصوتية"
+const Map<String, String> _kApiLabelToSoundId = {
+  'doorbell': 'door_bell',
+  'knock': 'door_knock',
+  'baby_cry': 'baby_cry',
+  'fire_alarm': 'fire_alarm',
+  'adhan': 'adhan',
+};
+
+// مقياس التطبيق: 1=خفيف، 2=متوسط، 3=قوي — مقياس الساعة: 1=قوي، 2=متوسط، 3=خفيف
+// (معكوسين) — نفس التحويل ينطبق على النمط والشدة لأنهم بنفس المقياس
+int _toWatchVibrationCode(int appValue) => 4 - appValue;
 
 class ListeningScreen extends StatefulWidget {
   const ListeningScreen({super.key});
@@ -18,13 +71,44 @@ class ListeningScreen extends StatefulWidget {
 class _ListeningScreenState extends State<ListeningScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _waveController;
-  final _audioRecorder = AudioRecorder();
-  
-  Timer? _amplitudeTimer;
-  double _audioLevel = 0.0;
+  final _watchSocket = WatchAudioSocket();
+  final List<int> _pcmBuffer = [];
+  bool _isClassifying = false;
 
+  String? _watchIp;
   bool isListening = false;
-  String detectedSound = 'جاري التحقق من الميكروفون...';
+  bool _isConnecting = false;
+  double _audioLevel = 0.0;
+  String detectedSound = 'اضغط على المايك لبدء الاستماع من الساعة';
+  final List<({String emoji, String label, String time})> _detections = [];
+
+  // إعدادات المجموعة الصوتية المفعّلة (تفعيل + نمط/شدة الاهتزاز لكل صوت)
+  final CategoryService _categoryService = CategoryService.withDefaults();
+  Map<String, SoundSettingModel> _activeSoundSettings =
+      _defaultSoundSettingsMap();
+
+  static Map<String, SoundSettingModel> _defaultSoundSettingsMap() => {
+    for (final sound in CategoryService.defaultSounds) sound.soundId: sound,
+  };
+
+  Future<void> _loadActiveSoundSettings() async {
+    try {
+      final categories = await _categoryService.getCategories();
+      final activeMatches = categories.where((c) => c.isEnabled);
+      if (activeMatches.isEmpty) {
+        _activeSoundSettings = _defaultSoundSettingsMap();
+        return;
+      }
+      final active = activeMatches.first;
+      _activeSoundSettings = {
+        for (final sound in active.sounds) sound.soundId: sound,
+      };
+    } catch (_) {
+      // نرجع للإعدادات الافتراضية لو تعذر التحميل — عشان الأصوات الحرجة
+      // زي إنذار الحريق تضل تُنبّه حتى لو فشل جلب إعدادات المستخدم
+      _activeSoundSettings = _defaultSoundSettingsMap();
+    }
+  }
 
   @override
   void initState() {
@@ -33,11 +117,15 @@ class _ListeningScreenState extends State<ListeningScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    
-    _startInitialListening();
+    _loadWatchIp();
   }
 
-  // 👇 Added Sign Language Helper
+  Future<void> _loadWatchIp() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() => _watchIp = prefs.getString(kWatchIpPrefsKey));
+  }
+
   void _handleTap(String videoAsset, VoidCallback action) {
     if (signLanguageModeNotifier.value) {
       showDialog(
@@ -53,80 +141,165 @@ class _ListeningScreenState extends State<ListeningScreen>
     }
   }
 
-  void _startAmplitudeTimer() {
-    _amplitudeTimer?.cancel(); 
-    
-    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) async {
-      if (await _audioRecorder.isRecording()) {
-        final amp = await _audioRecorder.getAmplitude();
-        
-        final double minDb = -45.0; 
-        double normalized = (amp.current - minDb) / (0.0 - minDb);
-        
-        if (mounted) {
-          setState(() {
-            _audioLevel = normalized.clamp(0.0, 1.0);
-          });
-        }
-      }
-    });
-  }
-
-  Future<void> _startInitialListening() async {
-    bool hasPermission = await _audioRecorder.hasPermission();
-    if (hasPermission) {
-      await _audioRecorder.startStream(const RecordConfig());
-      _startAmplitudeTimer(); 
-      
-      setState(() {
-        isListening = true;
-        detectedSound = 'جاري الاستماع للبيئة...';
-        _waveController.repeat();
-      });
-    } else {
-      setState(() {
-        isListening = false;
-        detectedSound = 'يرجى تفعيل صلاحية الميكروفون';
-      });
-    }
+  Future<String?> _promptForWatchIp() async {
+    final ip = await promptForWatchIp(context);
+    if (ip != null && mounted) setState(() => _watchIp = ip);
+    return ip;
   }
 
   @override
   void dispose() {
     _waveController.dispose();
-    _amplitudeTimer?.cancel(); 
-    _audioRecorder.dispose();
+    _watchSocket.stop();
     super.dispose();
   }
 
   Future<void> _toggleListening() async {
     if (isListening) {
-      _amplitudeTimer?.cancel(); 
-      await _audioRecorder.stop();
-      
+      await _stopListening();
+      return;
+    }
+
+    var ip = _watchIp;
+    if (ip == null || ip.isEmpty) {
+      ip = await _promptForWatchIp();
+      if (ip == null) return;
+    }
+
+    setState(() {
+      _isConnecting = true;
+      detectedSound = 'جاري الاتصال بالساعة...';
+    });
+
+    try {
+      _pcmBuffer.clear();
+      _detections.clear();
+      await _loadActiveSoundSettings();
+      await _watchSocket.connect(
+        host: ip,
+        onData: _onAudioData,
+        onError: _onSocketError,
+        onDone: _onSocketDone,
+      );
+      if (!mounted) return;
       setState(() {
-        isListening = false;
-        _audioLevel = 0.0; 
-        _waveController.stop();
-        detectedSound = 'الميكروفون متوقف';
+        _isConnecting = false;
+        isListening = true;
+        detectedSound = 'جاري الاستماع من الساعة...';
+        _waveController.repeat();
       });
-    } else {
-      bool hasPermission = await _audioRecorder.hasPermission();
-      if (hasPermission) {
-        await _audioRecorder.startStream(const RecordConfig());
-        _startAmplitudeTimer(); 
-        
-        setState(() {
-          isListening = true;
-          _waveController.repeat();
-          detectedSound = 'جاري الاستماع للبيئة...';
-        });
-      } else {
-        setState(() {
-          detectedSound = 'يرجى تفعيل صلاحية الميكروفون';
-        });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isConnecting = false;
+        isListening = false;
+        detectedSound = 'تعذّر الاتصال بالساعة — تأكد من عنوان IP والشبكة';
+      });
+    }
+  }
+
+  void _onAudioData(Uint8List data) {
+    setState(() => _audioLevel = pcm16PeakAmplitude(data));
+
+    _pcmBuffer.addAll(data);
+    if (_pcmBuffer.length >= _kBytesPerChunk) {
+      final chunk = Uint8List.fromList(_pcmBuffer.sublist(0, _kBytesPerChunk));
+      _pcmBuffer.removeRange(0, _kBytesPerChunk);
+      // نتجاهل هذا المقطع لو فيه طلب سابق ما خلص بعد — عشان ما تتكدس
+      // الطلبات ويصير "انفجار" نتائج متأخرة لما السيرفر يرد أخيراً.
+      if (!_isClassifying) {
+        _classifyChunk(chunk);
       }
     }
+  }
+
+  Future<void> _classifyChunk(Uint8List pcmChunk) async {
+    _isClassifying = true;
+    final wavBytes = pcm16ToWav(
+      pcmChunk,
+      sampleRate: WatchAudioSocket.sampleRate,
+    );
+    try {
+      final result = await EventClassifierService.classifyWavChunk(wavBytes);
+      debugPrint(
+        'classifyWavChunk result: label=${result.label} shouldAlert=${result.shouldAlert} debugReason=${result.debugReason}',
+      );
+      if (!mounted || !isListening) return;
+      final emoji = _kAlertEmojis[result.label];
+      final soundId = _kApiLabelToSoundId[result.label];
+      final soundSetting = soundId != null
+          ? _activeSoundSettings[soundId]
+          : null;
+      final isSoundEnabled = soundSetting?.isEnabled ?? false;
+
+      if (result.shouldAlert && emoji != null && isSoundEnabled) {
+        setState(() {
+          _detections.insert(
+            0,
+            (
+              emoji: emoji,
+              label: _kCategoryLabels[result.label] ?? result.label,
+              time: _formatDetectionTime(DateTime.now()),
+            ),
+          );
+          if (_detections.length > _kMaxDetectionEntries) {
+            _detections.removeLast();
+          }
+        });
+
+        final watchCode = _kWatchDetectionCodes[result.label];
+        if (watchCode != null) {
+          _watchSocket.sendDetectionCode(
+            watchCode,
+            pattern: _toWatchVibrationCode(soundSetting!.vibrationPattern),
+            power: _toWatchVibrationCode(soundSetting.vibrationPower),
+          );
+        }
+      }
+      if (result.shouldAlert && result.fireAlarmSafetyFlag) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🚨 احتمال إنذار حريق — تحقق فورًا'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('classifyWavChunk failed: $e');
+    } finally {
+      _isClassifying = false;
+    }
+  }
+
+  String _formatDetectionTime(DateTime time) {
+    final isAm = time.hour < 12;
+    final hour12 = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour12:$minute ${isAm ? 'ص' : 'م'}';
+  }
+
+  void _onSocketError(Object error) {
+    debugPrint('Watch socket error: $error');
+    _stopListening();
+  }
+
+  void _onSocketDone() {
+    if (isListening) _stopListening();
+  }
+
+  Future<void> _stopListening() async {
+    await _watchSocket.stop();
+    _pcmBuffer.clear();
+    if (!mounted) return;
+    setState(() {
+      isListening = false;
+      _isConnecting = false;
+      _audioLevel = 0.0;
+      _waveController.stop();
+      detectedSound = 'الميكروفون متوقف';
+      _detections.clear();
+    });
   }
 
   @override
@@ -135,6 +308,7 @@ class _ListeningScreenState extends State<ListeningScreen>
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -149,11 +323,20 @@ class _ListeningScreenState extends State<ListeningScreen>
             child: Column(
               children: [
                 _buildHeader(),
-                const SizedBox(height: 60),
-                _buildMicAndWaves(),
-                const Spacer(),
-                _buildCurrentSoundCard(),
-                const SizedBox(height: 110), 
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildWatchIpRow(),
+                        const SizedBox(height: 40),
+                        _buildMicAndWaves(),
+                        const SizedBox(height: 60),
+                        _buildCurrentSoundCard(),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -204,7 +387,6 @@ class _ListeningScreenState extends State<ListeningScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // 👇 Replaced with active Toggle logic
           ValueListenableBuilder<bool>(
             valueListenable: signLanguageModeNotifier,
             builder: (context, isActive, _) => GestureDetector(
@@ -259,13 +441,52 @@ class _ListeningScreenState extends State<ListeningScreen>
     );
   }
 
+  Widget _buildWatchIpRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: GestureDetector(
+        onTap: isListening ? null : _promptForWatchIp,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.watch, size: 14, color: NabeehColors.slate500),
+            const SizedBox(width: 6),
+            Text(
+              _watchIp == null || _watchIp!.isEmpty
+                  ? 'اضغط لتحديد عنوان IP للساعة'
+                  : 'الساعة: $_watchIp',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 12,
+                color: NabeehColors.slate500,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (!isListening) ...[
+              const SizedBox(width: 6),
+              Icon(
+                LucideIcons.pencil,
+                size: 12,
+                color: NabeehColors.slate500,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMicAndWaves() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         GestureDetector(
-          // 👇 Wrapped Mic Toggle action with Sign Language
-          onTap: () => _handleTap('assets/videos/sign_start_listening.mp4', () => _toggleListening()),
+          onTap: _isConnecting
+              ? null
+              : () => _handleTap(
+                  'assets/videos/sign_start_listening.mp4',
+                  () => _toggleListening(),
+                ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: 120,
@@ -286,13 +507,17 @@ class _ListeningScreenState extends State<ListeningScreen>
                   : [],
             ),
             child: Center(
-              child: Icon(
-                isListening ? LucideIcons.mic : LucideIcons.micOff,
-                size: 50,
-                color: isListening
-                    ? NabeehColors.lightBlue
-                    : NabeehColors.slate400,
-              ),
+              child: _isConnecting
+                  ? const CircularProgressIndicator(
+                      color: NabeehColors.lightBlue,
+                    )
+                  : Icon(
+                      isListening ? LucideIcons.mic : LucideIcons.micOff,
+                      size: 50,
+                      color: isListening
+                          ? NabeehColors.lightBlue
+                          : NabeehColors.slate400,
+                    ),
             ),
           ),
         ),
@@ -308,16 +533,17 @@ class _ListeningScreenState extends State<ListeningScreen>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: List.generate(15, (index) {
                   final offset = index * 0.4;
-                  
+
                   final baseRipple = (math.sin(
-                              (_waveController.value * 2 * math.pi) + offset) +
+                              (_waveController.value * 2 * math.pi) +
+                                  offset) +
                           1) /
                       2;
-                  
-                  final heightVal = isListening 
-                      ? baseRipple * (_audioLevel + 0.1) 
+
+                  final heightVal = isListening
+                      ? baseRipple * (_audioLevel + 0.1)
                       : 0.0;
-                      
+
                   final barHeight = 10 + (heightVal * 50);
 
                   return AnimatedContainer(
@@ -415,8 +641,59 @@ class _ListeningScreenState extends State<ListeningScreen>
                   ),
               ],
             ),
+            if (isListening && _detections.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 160,
+                child: ListView(
+                  children: _detections.map(_buildDetectionEntry).toList(),
+                ),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDetectionEntry(
+    ({String emoji, String label, String time}) detection,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF181059), width: 1.2),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Text(detection.emoji, style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: 10),
+              Text(
+                detection.label,
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF181059),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            detection.time,
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 11,
+              color: NabeehColors.slate500,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -126,6 +126,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         _startCountdown();
       }
     } on FirebaseFunctionsException catch (e) {
+      debugPrint('sendPasswordReset failed: code=${e.code} message=${e.message} details=${e.details}');
       if (mounted) {
         if (e.code == 'not-found') {
           FocusScope.of(context).unfocus();

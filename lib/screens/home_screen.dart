@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'listening_screen.dart';
 import 'reminders_screen.dart';
 import 'stt_tts_screen.dart';
 import 'sign_language_player_screen.dart';
 import '../services/sign_language_mode.dart';
+import '../services/watch_audio_socket.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -38,11 +40,32 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _userName = '';
+  bool _isWatchConnected = false;
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
+    _queryWatchStatus();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // MainScreen يبني كل التبويبات من جديد بأي تبديل تبويب (IndexedStack)،
+    // فـ didUpdateWidget يتفعّل بدل initState — نستخدمه لتحديث حالة الساعة
+    // كل ما ترجعين لهذي الصفحة، بدل ما تضل ثابتة على أول استعلام بالجلسة.
+    _queryWatchStatus();
+  }
+
+  Future<void> _queryWatchStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ip = prefs.getString(kWatchIpPrefsKey);
+    if (ip == null || ip.isEmpty) return;
+
+    final status = await WatchAudioSocket.queryStatus(ip);
+    if (!mounted) return;
+    setState(() => _isWatchConnected = status?.isConnected ?? false);
   }
 
   @override
@@ -259,13 +282,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Center(
+          Center(
             child: Text(
-              'غير متصلة',
+              _isWatchConnected ? 'متصلة' : 'غير متصلة',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: Colors.red,
+                color: _isWatchConnected ? NabeehColors.green : Colors.red,
               ),
             ),
           ),

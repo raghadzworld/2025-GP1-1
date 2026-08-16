@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/watch_audio_socket.dart';
 import '../widgets/custom_widgets.dart';
+import '../widgets/watch_ip_dialog.dart';
 import 'nabeeh_colors.dart';
 
 class WatchScreen extends StatefulWidget {
@@ -13,8 +16,74 @@ class WatchScreen extends StatefulWidget {
 }
 
 class _WatchScreenState extends State<WatchScreen> {
-  final String _deviceName = 'LILYGO Watch';
-  final bool _isConnected = false;
+  String? _watchIp;
+  bool _isConnected = false;
+  int? _batteryPercent; // null = لم يُستعلَم بعد، -1 = غير متوفرة
+  int? _lastSyncSecondsAgo;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIpAndQuery();
+  }
+
+  Future<void> _loadIpAndQuery() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() => _watchIp = prefs.getString(kWatchIpPrefsKey));
+    await _queryStatus();
+  }
+
+  Future<void> _queryStatus() async {
+    final ip = _watchIp;
+    if (ip == null || ip.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    final status = await WatchAudioSocket.queryStatus(ip);
+    debugPrint(
+      status == null
+          ? 'WatchAudioSocket.queryStatus($ip) failed — no response'
+          : 'WatchAudioSocket.queryStatus($ip) => isConnected=${status.isConnected} battery=${status.batteryPercent} lastSync=${status.lastSyncSecondsAgo}',
+    );
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (status != null) {
+        _isConnected = status.isConnected;
+        _batteryPercent = status.batteryPercent;
+        _lastSyncSecondsAgo = status.lastSyncSecondsAgo;
+      } else {
+        _isConnected = false;
+        _batteryPercent = null;
+        _lastSyncSecondsAgo = null;
+      }
+    });
+  }
+
+  Future<void> _editWatchIp() async {
+    final ip = await promptForWatchIp(context);
+    if (ip != null && mounted) {
+      setState(() => _watchIp = ip);
+      await _queryStatus();
+    }
+  }
+
+  // القيمة الخام بالثواني تمثّل مدة الاتصال الحالي وهي متصلة (تزيد من صفر)،
+  // أو مدة الانقطاع لو انقطعت — التنسيق يصير هنا بالتطبيق بدل الفيرموير
+  // عشان نقدر نغيّره وقت ما نبي بدون تعديل الساعة.
+  String _formatDuration(int seconds) {
+    if (seconds < 60) return '$seconds ثانية';
+    final minutes = seconds ~/ 60;
+    if (minutes < 60) return '$minutes دقيقة';
+    final hours = minutes ~/ 60;
+    return '$hours ساعة';
+  }
+
+  String _formatSyncStatus(int seconds) {
+    final duration = _formatDuration(seconds);
+    return _isConnected ? 'متصلة منذ $duration' : 'انقطعت قبل $duration';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,20 +103,26 @@ class _WatchScreenState extends State<WatchScreen> {
           child: Column(
           children: [
             _buildHeader(context),
+            _buildWatchIpRow(),
             Expanded(
               child: DefaultTextStyle.merge(
                 style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        _buildWatchHeroCard(),
-                        const SizedBox(height: 16),
-                        _buildMetricsGrid(),
-                        const SizedBox(height: 20),
-                      ],
+                child: RefreshIndicator(
+                  onRefresh: _queryStatus,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
+                          _buildWatchHeroCard(),
+                          const SizedBox(height: 16),
+                          _buildMetricsGrid(),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -128,6 +203,35 @@ class _WatchScreenState extends State<WatchScreen> {
     );
   }
 
+  Widget _buildWatchIpRow() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: _editWatchIp,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.watch, size: 14, color: NabeehColors.gray),
+            const SizedBox(width: 6),
+            Text(
+              _watchIp == null || _watchIp!.isEmpty
+                  ? 'اضغط لتحديد عنوان IP للساعة'
+                  : 'الساعة: $_watchIp',
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 12,
+                color: NabeehColors.gray,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(LucideIcons.pencil, size: 12, color: NabeehColors.gray),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildWatchHeroCard() {
     return BentoCard(
       padding: const EdgeInsets.all(24),
@@ -143,15 +247,6 @@ class _WatchScreenState extends State<WatchScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    /*const Text(
-                      'الساعة المتصلة',
-                      style: TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF181059),
-                      ),
-                    )*/
                     const SizedBox(height: 6),
                     Text(
                       'حـالة الساعـة:',
@@ -168,6 +263,15 @@ class _WatchScreenState extends State<WatchScreen> {
                   ],
                 ),
               ),
+              if (_isLoading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF1773CF),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 24),
@@ -245,9 +349,13 @@ class _WatchScreenState extends State<WatchScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.1),
+                color: (_isConnected ? const Color(0xFF22C55E) : Colors.grey)
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.18)),
+                border: Border.all(
+                  color: (_isConnected ? const Color(0xFF22C55E) : Colors.grey)
+                      .withValues(alpha: 0.18),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -264,12 +372,14 @@ class _WatchScreenState extends State<WatchScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _isConnected ? 'متصل' : 'غير متصل',
-                    style: const TextStyle(
+                    _isConnected ? 'متصلة' : 'غير متصلة',
+                    style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Colors.grey,
+                      color: _isConnected
+                          ? const Color(0xFF22C55E)
+                          : Colors.grey,
                     ),
                   ),
                 ],
@@ -321,7 +431,7 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   Widget _buildSyncCard() {
-    const accent = Color(0xFF1773CF);
+    final accent = _isConnected ? const Color(0xFF22C55E) : const Color(0xFF1773CF);
     return SizedBox(
       height: 220,
       child: BentoCard(
@@ -344,7 +454,39 @@ class _WatchScreenState extends State<WatchScreen> {
             // مسافة حقيقية بين العنوان والمحتوى
             Expanded(
               child: Center(
-                child: _buildUnavailableState(LucideIcons.wifiOff, accent),
+                child: _lastSyncSecondsAgo != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accent.withValues(alpha: 0.12),
+                            ),
+                            child: Icon(
+                              _isConnected
+                                  ? LucideIcons.wifi
+                                  : LucideIcons.wifiOff,
+                              color: accent,
+                              size: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _formatSyncStatus(_lastSyncSecondsAgo!),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF181059),
+                            ),
+                          ),
+                        ],
+                      )
+                    : _buildUnavailableState(LucideIcons.wifiOff, accent),
               ),
             ),
           ],
@@ -355,6 +497,7 @@ class _WatchScreenState extends State<WatchScreen> {
 
   Widget _buildBatteryCard() {
     const accent = Color(0xFFF59E0B);
+    final hasBattery = _batteryPercent != null && _batteryPercent! >= 0;
     return SizedBox(
       height: 220,
       child: BentoCard(
@@ -377,7 +520,41 @@ class _WatchScreenState extends State<WatchScreen> {
             // مسافة حقيقية بين العنوان والمحتوى
             Expanded(
               child: Center(
-                child: _buildUnavailableState(LucideIcons.batteryWarning, accent),
+                child: hasBattery
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accent.withValues(alpha: 0.12),
+                            ),
+                            child: Icon(
+                              _batteryPercent! <= 20
+                                  ? LucideIcons.batteryLow
+                                  : LucideIcons.batteryFull,
+                              color: accent,
+                              size: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '$_batteryPercent%',
+                            style: const TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF181059),
+                            ),
+                          ),
+                        ],
+                      )
+                    : _buildUnavailableState(
+                        LucideIcons.batteryWarning,
+                        accent,
+                      ),
               ),
             ),
           ],
