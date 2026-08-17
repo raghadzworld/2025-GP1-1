@@ -1,65 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'dart:math' as math;
 import 'dart:async';
-import 'dart:typed_data';
 import 'nabeeh_colors.dart';
 import '../services/sign_language_mode.dart';
 import '../services/watch_audio_socket.dart';
-import '../services/audio_utils.dart';
-import '../services/event_classifier_service.dart';
 import '../widgets/watch_ip_dialog.dart';
-import '../features/categories/data/models/sound_setting_model.dart';
-import '../features/categories/data/services/category_service.dart';
 import 'sign_language_player_screen.dart';
-
-const _kChunkSeconds = 3;
-const _kBytesPerChunk =
-    WatchAudioSocket.sampleRate * 2 * _kChunkSeconds; // 16-bit mono PCM
-
-const Map<String, String> _kCategoryLabels = {
-  'doorbell': 'جرس الباب',
-  'knock': 'طرق على الباب',
-  'baby_cry': 'بكاء طفل',
-  'fire_alarm': 'إنذار حريق',
-  'adhan': 'أذان',
-  'quran_recitation': 'تلاوة قرآن',
-  'na': 'لا يوجد صوت مهم',
-};
-
-// فقط هذي الفئات تظهر كإشعارات داخل بطاقة "الصوت المكتشف حالياً"
-const Map<String, String> _kAlertEmojis = {
-  'fire_alarm': '🚨',
-  'adhan': '🕌',
-  'baby_cry': '👶🏻',
-  'doorbell': '🔔',
-  'knock': '✊🏻',
-};
-
-// رموز عرض النتيجة على شاشة الساعة نفسها — بروتوكول '#' + حرف الفئة
-const Map<String, String> _kWatchDetectionCodes = {
-  'doorbell': 'D',
-  'knock': 'K',
-  'baby_cry': 'B',
-  'fire_alarm': 'F',
-  'adhan': 'A',
-};
-
-const _kMaxDetectionEntries = 30;
-
-// تحويل تسمية فئة الـ API إلى soundId المستخدم بميزة "المجموعات الصوتية"
-const Map<String, String> _kApiLabelToSoundId = {
-  'doorbell': 'door_bell',
-  'knock': 'door_knock',
-  'baby_cry': 'baby_cry',
-  'fire_alarm': 'fire_alarm',
-  'adhan': 'adhan',
-};
-
-// مقياس التطبيق: 1=خفيف، 2=متوسط، 3=قوي — مقياس الساعة: 1=قوي، 2=متوسط، 3=خفيف
-// (معكوسين) — نفس التحويل ينطبق على النمط والشدة لأنهم بنفس المقياس
-int _toWatchVibrationCode(int appValue) => 4 - appValue;
 
 class ListeningScreen extends StatefulWidget {
   const ListeningScreen({super.key});
@@ -71,44 +20,15 @@ class ListeningScreen extends StatefulWidget {
 class _ListeningScreenState extends State<ListeningScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _waveController;
-  final _watchSocket = WatchAudioSocket();
-  final List<int> _pcmBuffer = [];
-  bool _isClassifying = false;
+  StreamSubscription<Map<String, dynamic>?>? _updateSub;
 
   String? _watchIp;
   bool isListening = false;
   bool _isConnecting = false;
+  bool _serviceAcknowledged = false;
   double _audioLevel = 0.0;
   String detectedSound = 'اضغط على المايك لبدء الاستماع من الساعة';
-  final List<({String emoji, String label, String time})> _detections = [];
-
-  // إعدادات المجموعة الصوتية المفعّلة (تفعيل + نمط/شدة الاهتزاز لكل صوت)
-  final CategoryService _categoryService = CategoryService.withDefaults();
-  Map<String, SoundSettingModel> _activeSoundSettings =
-      _defaultSoundSettingsMap();
-
-  static Map<String, SoundSettingModel> _defaultSoundSettingsMap() => {
-    for (final sound in CategoryService.defaultSounds) sound.soundId: sound,
-  };
-
-  Future<void> _loadActiveSoundSettings() async {
-    try {
-      final categories = await _categoryService.getCategories();
-      final activeMatches = categories.where((c) => c.isEnabled);
-      if (activeMatches.isEmpty) {
-        _activeSoundSettings = _defaultSoundSettingsMap();
-        return;
-      }
-      final active = activeMatches.first;
-      _activeSoundSettings = {
-        for (final sound in active.sounds) sound.soundId: sound,
-      };
-    } catch (_) {
-      // نرجع للإعدادات الافتراضية لو تعذر التحميل — عشان الأصوات الحرجة
-      // زي إنذار الحريق تضل تُنبّه حتى لو فشل جلب إعدادات المستخدم
-      _activeSoundSettings = _defaultSoundSettingsMap();
-    }
-  }
+  List<Map<String, dynamic>> _detections = [];
 
   @override
   void initState() {
@@ -118,6 +38,40 @@ class _ListeningScreenState extends State<ListeningScreen>
       duration: const Duration(milliseconds: 1500),
     );
     _loadWatchIp();
+    _updateSub = FlutterBackgroundService().on('update').listen(_onServiceUpdate);
+    _syncWithRunningService();
+  }
+
+  // الخدمة الخلفية ممكن تكون شغّالة أصلاً (المستخدم بدأ الاستماع، طلع من
+  // الصفحة أو قفل التطبيق، ورجع فتحها من جديد) — نطلب آخر حالة عشان
+  // الواجهة تعكس الوضع الصحيح بدل ما تبدأ فاضية.
+  Future<void> _syncWithRunningService() async {
+    final running = await FlutterBackgroundService().isRunning();
+    if (running) {
+      FlutterBackgroundService().invoke('request_status');
+    }
+  }
+
+  void _onServiceUpdate(Map<String, dynamic>? event) {
+    if (event == null || !mounted) return;
+    _serviceAcknowledged = true;
+    setState(() {
+      isListening = event['isListening'] as bool? ?? false;
+      _isConnecting = event['isConnecting'] as bool? ?? false;
+      detectedSound = event['statusText'] as String? ?? detectedSound;
+      _audioLevel = (event['audioLevel'] as num?)?.toDouble() ?? 0.0;
+      final rawDetections = event['detections'] as List?;
+      if (rawDetections != null) {
+        _detections = rawDetections
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+    });
+    if (isListening) {
+      _waveController.repeat();
+    } else {
+      _waveController.stop();
+    }
   }
 
   Future<void> _loadWatchIp() async {
@@ -150,13 +104,15 @@ class _ListeningScreenState extends State<ListeningScreen>
   @override
   void dispose() {
     _waveController.dispose();
-    _watchSocket.stop();
+    _updateSub?.cancel();
+    // نتعمّد عدم إيقاف الخدمة هنا — المفروض تضل شغّالة حتى بعد ما نطلع
+    // من هذي الصفحة، لين المستخدم يوقفها بنفسه من زر المايك.
     super.dispose();
   }
 
   Future<void> _toggleListening() async {
     if (isListening) {
-      await _stopListening();
+      FlutterBackgroundService().invoke('stop_listening');
       return;
     }
 
@@ -171,135 +127,16 @@ class _ListeningScreenState extends State<ListeningScreen>
       detectedSound = 'جاري الاتصال بالساعة...';
     });
 
-    try {
-      _pcmBuffer.clear();
-      _detections.clear();
-      await _loadActiveSoundSettings();
-      await _watchSocket.connect(
-        host: ip,
-        onData: _onAudioData,
-        onError: _onSocketError,
-        onDone: _onSocketDone,
-      );
-      if (!mounted) return;
-      setState(() {
-        _isConnecting = false;
-        isListening = true;
-        detectedSound = 'جاري الاستماع من الساعة...';
-        _waveController.repeat();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isConnecting = false;
-        isListening = false;
-        detectedSound = 'تعذّر الاتصال بالساعة — تأكد من عنوان IP والشبكة';
-      });
+    await FlutterBackgroundService().startService();
+
+    // بدء تشغيل الـ isolate الخلفي ما يعني إنه جاهز يستقبل أوامرنا فورًا —
+    // لو وصل أمرنا قبل ما يسجّل مستمعه، البلجن يتجاهله بصمت بدون أي رد.
+    // نعيد الإرسال كل شوي لين يوصلنا أول رد يؤكد إن الخدمة استلمت.
+    _serviceAcknowledged = false;
+    for (var attempt = 0; attempt < 8 && !_serviceAcknowledged && mounted; attempt++) {
+      FlutterBackgroundService().invoke('start_listening', {'watchIp': ip});
+      await Future.delayed(const Duration(milliseconds: 500));
     }
-  }
-
-  void _onAudioData(Uint8List data) {
-    setState(() => _audioLevel = pcm16PeakAmplitude(data));
-
-    _pcmBuffer.addAll(data);
-    if (_pcmBuffer.length >= _kBytesPerChunk) {
-      final chunk = Uint8List.fromList(_pcmBuffer.sublist(0, _kBytesPerChunk));
-      _pcmBuffer.removeRange(0, _kBytesPerChunk);
-      // نتجاهل هذا المقطع لو فيه طلب سابق ما خلص بعد — عشان ما تتكدس
-      // الطلبات ويصير "انفجار" نتائج متأخرة لما السيرفر يرد أخيراً.
-      if (!_isClassifying) {
-        _classifyChunk(chunk);
-      }
-    }
-  }
-
-  Future<void> _classifyChunk(Uint8List pcmChunk) async {
-    _isClassifying = true;
-    final wavBytes = pcm16ToWav(
-      pcmChunk,
-      sampleRate: WatchAudioSocket.sampleRate,
-    );
-    try {
-      final result = await EventClassifierService.classifyWavChunk(wavBytes);
-      debugPrint(
-        'classifyWavChunk result: label=${result.label} shouldAlert=${result.shouldAlert} debugReason=${result.debugReason}',
-      );
-      if (!mounted || !isListening) return;
-      final emoji = _kAlertEmojis[result.label];
-      final soundId = _kApiLabelToSoundId[result.label];
-      final soundSetting = soundId != null
-          ? _activeSoundSettings[soundId]
-          : null;
-      final isSoundEnabled = soundSetting?.isEnabled ?? false;
-
-      if (result.shouldAlert && emoji != null && isSoundEnabled) {
-        setState(() {
-          _detections.insert(
-            0,
-            (
-              emoji: emoji,
-              label: _kCategoryLabels[result.label] ?? result.label,
-              time: _formatDetectionTime(DateTime.now()),
-            ),
-          );
-          if (_detections.length > _kMaxDetectionEntries) {
-            _detections.removeLast();
-          }
-        });
-
-        final watchCode = _kWatchDetectionCodes[result.label];
-        if (watchCode != null) {
-          _watchSocket.sendDetectionCode(
-            watchCode,
-            pattern: _toWatchVibrationCode(soundSetting!.vibrationPattern),
-            power: _toWatchVibrationCode(soundSetting.vibrationPower),
-          );
-        }
-      }
-      if (result.shouldAlert && result.fireAlarmSafetyFlag) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🚨 احتمال إنذار حريق — تحقق فورًا'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('classifyWavChunk failed: $e');
-    } finally {
-      _isClassifying = false;
-    }
-  }
-
-  String _formatDetectionTime(DateTime time) {
-    final isAm = time.hour < 12;
-    final hour12 = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour12:$minute ${isAm ? 'ص' : 'م'}';
-  }
-
-  void _onSocketError(Object error) {
-    debugPrint('Watch socket error: $error');
-    _stopListening();
-  }
-
-  void _onSocketDone() {
-    if (isListening) _stopListening();
-  }
-
-  Future<void> _stopListening() async {
-    await _watchSocket.stop();
-    _pcmBuffer.clear();
-    if (!mounted) return;
-    setState(() {
-      isListening = false;
-      _isConnecting = false;
-      _audioLevel = 0.0;
-      _waveController.stop();
-      detectedSound = 'الميكروفون متوقف';
-      _detections.clear();
-    });
   }
 
   @override
@@ -656,9 +493,7 @@ class _ListeningScreenState extends State<ListeningScreen>
     );
   }
 
-  Widget _buildDetectionEntry(
-    ({String emoji, String label, String time}) detection,
-  ) {
+  Widget _buildDetectionEntry(Map<String, dynamic> detection) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -672,10 +507,13 @@ class _ListeningScreenState extends State<ListeningScreen>
         children: [
           Row(
             children: [
-              Text(detection.emoji, style: const TextStyle(fontSize: 18)),
+              Text(
+                detection['emoji'] as String? ?? '',
+                style: const TextStyle(fontSize: 18),
+              ),
               const SizedBox(width: 10),
               Text(
-                detection.label,
+                detection['label'] as String? ?? '',
                 style: const TextStyle(
                   fontFamily: 'IBMPlexSansArabic',
                   fontSize: 14,
@@ -686,7 +524,7 @@ class _ListeningScreenState extends State<ListeningScreen>
             ],
           ),
           Text(
-            detection.time,
+            detection['time'] as String? ?? '',
             style: const TextStyle(
               fontFamily: 'IBMPlexSansArabic',
               fontSize: 11,

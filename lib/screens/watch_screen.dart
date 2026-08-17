@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 import '../services/watch_audio_socket.dart';
+import '../services/wifi_provisioning_service.dart';
 import '../widgets/custom_widgets.dart';
 import '../widgets/watch_ip_dialog.dart';
 import 'nabeeh_colors.dart';
@@ -40,6 +42,19 @@ class _WatchScreenState extends State<WatchScreen> {
     if (ip == null || ip.isEmpty) return;
 
     setState(() => _isLoading = true);
+
+    // خدمة الاستماع بالخلفية (لو شغّالة) ماسكة الاتصال الوحيد اللي الساعة
+    // تقبله — فتح اتصال ثاني للاستعلام بينافسه ويفشل. وجود الخدمة شغّالة
+    // أصلاً دليل كافٍ إن الساعة متصلة، بدون داعي لاستعلام TCP منفصل.
+    if (await FlutterBackgroundService().isRunning()) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isConnected = true;
+      });
+      return;
+    }
+
     final status = await WatchAudioSocket.queryStatus(ip);
     debugPrint(
       status == null
@@ -120,6 +135,8 @@ class _WatchScreenState extends State<WatchScreen> {
                           _buildWatchHeroCard(),
                           const SizedBox(height: 16),
                           _buildMetricsGrid(),
+                          const SizedBox(height: 16),
+                          _buildWifiProvisionButton(),
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -559,6 +576,322 @@ class _WatchScreenState extends State<WatchScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildWifiProvisionButton() {
+    return Container(
+      height: 60,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF181059), Color(0xFF1773CF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+      ),
+      child: TextButton.icon(
+        onPressed: _showWifiProvisioningSheet,
+        icon: const Icon(LucideIcons.wifi, color: Colors.white, size: 20),
+        label: const Text(
+          'تغيير شبكة واي فاي الساعة',
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showWifiProvisioningSheet() {
+    final ssidCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
+    var obscurePassword = true;
+    var isBusy = false;
+    WifiProvisioningStep? step;
+    String? errorText;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          String stepLabel(WifiProvisioningStep s) {
+            switch (s) {
+              case WifiProvisioningStep.scanning:
+                return 'جاري البحث عن الساعة...';
+              case WifiProvisioningStep.connecting:
+                return 'جاري الاتصال بالساعة...';
+              case WifiProvisioningStep.writing:
+                return 'جاري إرسال بيانات الشبكة...';
+              case WifiProvisioningStep.confirming:
+                return 'بانتظار تأكيد الساعة...';
+              case WifiProvisioningStep.done:
+                return 'تم الإرسال بنجاح ✓';
+            }
+          }
+
+          Future<void> submit() async {
+            if (ssidCtrl.text.trim().isEmpty || passwordCtrl.text.isEmpty) {
+              setSheetState(() => errorText = 'يرجى تعبئة اسم الشبكة وكلمة السر');
+              return;
+            }
+            setSheetState(() {
+              isBusy = true;
+              errorText = null;
+              step = null;
+            });
+            try {
+              await WifiProvisioningService.provision(
+                ssid: ssidCtrl.text.trim(),
+                password: passwordCtrl.text,
+                onStep: (s) => setSheetState(() => step = s),
+              );
+              await Future.delayed(const Duration(milliseconds: 800));
+              if (ctx.mounted) Navigator.pop(ctx);
+            } catch (e) {
+              setSheetState(() {
+                isBusy = false;
+                errorText = e is WifiProvisioningException
+                    ? e.message
+                    : 'حدث خطأ غير متوقع: $e';
+              });
+            }
+          }
+
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: 24,
+                right: 24,
+                left: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E7EB),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'تزويد الساعة بشبكة واي فاي',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF181059),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'اضغطي زر "تغيير شبكة الواي فاي" من إعدادات الساعة أولاً، '
+                    'ثم أدخلي بيانات الشبكة هنا واضغطي اتصال وإرسال.',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 13,
+                      color: NabeehColors.gray,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: ssidCtrl,
+                    enabled: !isBusy,
+                    textAlign: TextAlign.right,
+                    decoration: const InputDecoration(
+                      labelText: 'اسم الشبكة (SSID)',
+                      prefixIcon: Icon(LucideIcons.wifi, size: 18),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordCtrl,
+                    enabled: !isBusy,
+                    obscureText: obscurePassword,
+                    textAlign: TextAlign.right,
+                    decoration: InputDecoration(
+                      labelText: 'كلمة السر',
+                      prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword
+                              ? LucideIcons.eye
+                              : LucideIcons.eyeOff,
+                          size: 18,
+                        ),
+                        onPressed: () => setSheetState(
+                          () => obscurePassword = !obscurePassword,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (step != null) ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        if (step != WifiProvisioningStep.done)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF1773CF),
+                            ),
+                          )
+                        else
+                          const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF22C55E),
+                            size: 18,
+                          ),
+                        const SizedBox(width: 10),
+                        Text(
+                          stepLabel(step!),
+                          style: const TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF181059),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (errorText != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 13,
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: TextButton(
+                            onPressed: isBusy ? null : submit,
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: isBusy
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        LucideIcons.bluetooth,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'اتصال وإرسال',
+                                        style: TextStyle(
+                                          fontFamily: 'IBMPlexSansArabic',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isBusy ? null : () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 52),
+                            side: const BorderSide(
+                              color: Color.fromARGB(255, 200, 198, 195),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.close, color: Colors.grey, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'إلغاء',
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

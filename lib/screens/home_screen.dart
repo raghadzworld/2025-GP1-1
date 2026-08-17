@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'listening_screen.dart';
 import 'reminders_screen.dart';
 import 'stt_tts_screen.dart';
@@ -62,6 +63,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     final ip = prefs.getString(kWatchIpPrefsKey);
     if (ip == null || ip.isEmpty) return;
+
+    // خدمة الاستماع بالخلفية (لو شغّالة) ماسكة الاتصال الوحيد اللي الساعة
+    // تقبله — فتح اتصال ثاني للاستعلام بينافسه ويفشل. وجود الخدمة شغّالة
+    // أصلاً دليل كافٍ إن الساعة متصلة، بدون داعي لاستعلام TCP منفصل.
+    if (await FlutterBackgroundService().isRunning()) {
+      if (!mounted) return;
+      setState(() => _isWatchConnected = true);
+      return;
+    }
 
     final status = await WatchAudioSocket.queryStatus(ip);
     if (!mounted) return;
