@@ -12,7 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart';
 import 'nabeeh_colors.dart';
 
 // =====================================================================
@@ -21,8 +21,16 @@ import 'nabeeh_colors.dart';
 const String _kAzureSpeechKey = '9lz61KqwP59MlMj2RS7yTugTWEkRDXBrZ49UDKnxCPAA05XOTpNQJQQJ99CHACI8hq2XJ3w3AAAYACOGYzD0';
 const String _kAzureRegion = 'switzerlandnorth'; // مثلاً: uaenorth, westeurope ...
 const String _kSttLanguageCode = 'ar-SA'; // أو ar-EG, ar-AE حسب اللهجة
-const String _kTtsLanguageCode = 'ar-SA';
-const String _kTtsVoiceName = 'ar-SA-ZariyahNeural'; // صوت أنثى سعودي (Neural)
+const String _kTtsLanguageCode = 'ar-KW';
+const String _kTtsVoiceName = 'ar-KW-FahedNeural';
+
+// ------------------- إعدادات كشف الكلام (لعرض الويف فقط) -------------------
+const double _kSilenceDbThreshold = -35.0; // فوق هذا القدر = "فيه كلام"، وتحته "سكوت"
+
+// ------------------- إعدادات سرعة النطق (TTS) -------------------
+// راوح بين هالحدين عشان تتحكمين بسرعة الصوت. قللناهم شوي عشان النطق يصير أبطأ.
+const double _kTtsMinRate = 0.93;
+const double _kTtsMaxRate = 1.02;
 
 class SttTtsScreen extends StatefulWidget {
   const SttTtsScreen({super.key});
@@ -47,11 +55,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   StreamSubscription<RecordingDisposition>? _recorderSubscription;
   late AnimationController _waveController;
 
-  // ------------------- إضافات خاصة بـ Azure STT (Streaming) -------------------
-  WebSocketChannel? _sttSocket;
-  StreamSubscription? _audioSubscription;
-  StreamController<Uint8List>? _micStreamController;
-
   // ------------------- إضافات خاصة بـ Azure TTS -------------------
   final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -69,15 +72,17 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   Future<void> _initRecorder() async {
     _recorder = FlutterSoundRecorder();
     await _recorder!.openRecorder();
+    await _recorder!.setSubscriptionDuration(const Duration(milliseconds: 100));
   }
 
   @override
   void dispose() {
     _speakingTimer?.cancel();
     _recorderSubscription?.cancel();
-    _audioSubscription?.cancel();
-    _micStreamController?.close();
-    _sttSocket?.sink.close();
+    _pcmSubscription?.cancel();
+    _pcmStreamController?.close();
+    _sttSub?.cancel();
+    _sttChannel?.sink.close();
     _recorder?.closeRecorder();
     _audioPlayer.dispose();
     _textFocusNode.dispose();
@@ -114,17 +119,28 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   // =====================================================================
-  // Real-time Speech-to-Text عبر Azure Speech-to-Text REST + استخدام ملف
-  // مسجَّل قصير كبديل مبسّط عن WebSocket المباشر (أسهل صيانة لمشروع تخرج)
+  // Real-time Speech-to-Text عبر بروتوكول Azure الـ WebSocket (بث حي)
   // =====================================================================
   //
-  // ملاحظة تصميمية: Azure يوفر بروتوكول WebSocket خام معقد التنسيق (custom
-  // binary framing)، وأيضاً Speech SDK رسمي (لا يوجد له حزمة Flutter رسمية
-  // مستقرة حالياً). لذلك نعتمد هنا على نمط "تسجيل قصير قطع صوت متتالية كل
-  // ~2 ثانية وإرسالها لـ REST API الخاص بالنسخ السريع (Fast Transcription)"،
-  // وهو حل عملي يعطي إحساساً قريباً من real-time بدون تعقيد WebSocket.
-  Timer? _chunkTimer;
-  String _accumulatedTranscript = '';
+  // بدل الإرسال دفعة-دفعة (REST) بعد كل سكوت، نفتح اتصال WebSocket مع Azure
+  // ونبث الصوت أول بأول أثناء ما تتكلمين، وياخذين ردود جزئية (speech.hypothesis)
+  // تتحدث لحظياً، وردود نهائية (speech.phrase) بعد كل جملة — تماماً مثل ترجمة
+  // قوقل. ملاحظة: بروتوكول Azure الخام (framing) موثّق جزئياً وغير رسمي لـ
+  // Flutter، فالكود جرّبته بأفضل معرفتي لكنه ما اختُبر فعلياً على سيرفر Azure
+  // حي (ما عندي وصول شبكة لـ Azure هنا) — لازم تجربينه وتتابعين الـ debug
+  // console لو صار خطأ بتنسيق الرسائل.
+
+  IOWebSocketChannel? _sttChannel;
+  StreamSubscription? _sttSub;
+  StreamController<Uint8List>? _pcmStreamController;
+  StreamSubscription<Uint8List>? _pcmSubscription;
+
+  String _sttRequestId = '';
+  String _confirmedTranscript = '';
+  String _currentHypothesis = '';
+  bool _isFirstAudioFrame = true;
+
+  bool _isUserSpeaking = false;
 
   Future<void> _startListening() async {
     final status = await Permission.microphone.request();
@@ -134,108 +150,261 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       return;
     }
 
-    _accumulatedTranscript = '';
+    _confirmedTranscript = '';
+    _currentHypothesis = '';
+    _isFirstAudioFrame = true;
+    _sttRequestId = _newId();
 
     try {
-      await _startNewChunkRecording();
-
-      // كل ثانيتين: نوقف القطعة الحالية، نرسلها للتفريغ، ونبدأ قطعة جديدة
-      _chunkTimer =
-          Timer.periodic(const Duration(seconds: 2), (_) async {
-        await _processCurrentChunk();
-        if (_isRecording) {
-          await _startNewChunkRecording();
-        }
-      });
+      await _connectSttSocket();
+      await _startStreamingAudio();
     } catch (e) {
-      debugPrint('RECORDER ERROR: $e');
-      _showEmptyTextWarning('تعذر بدء التسجيل');
+      debugPrint('STT START ERROR: $e');
+      _showEmptyTextWarning('تعذر بدء الاستماع');
+      await _stopListening();
     }
   }
 
-  String? _currentChunkPath;
+  Future<void> _connectSttSocket() async {
+    final connectionId = _newId();
+    final uri = Uri.parse(
+      'wss://$_kAzureRegion.stt.speech.microsoft.com/speech/recognition/'
+      'conversation/cognitiveservices/v1?language=$_kSttLanguageCode&format=simple',
+    );
 
-  Future<void> _startNewChunkRecording() async {
-    final dir = await getTemporaryDirectory();
-    _currentChunkPath =
-        '${dir.path}/chunk_${DateTime.now().millisecondsSinceEpoch}.wav';
+    _sttChannel = IOWebSocketChannel.connect(
+      uri,
+      headers: {
+        'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
+        'X-ConnectionId': connectionId,
+      },
+    );
+
+    _sttSub = _sttChannel!.stream.listen(
+      _handleSttMessage,
+      onError: (e) => debugPrint('STT SOCKET ERROR: $e'),
+      onDone: () => debugPrint('STT SOCKET CLOSED'),
+    );
+
+    // نضمن إن القناة جاهزة قبل ما نرسل speech.config
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    final timestamp = DateTime.now().toUtc().toIso8601String();
+    final config = jsonEncode({
+      'context': {
+        'system': {'version': '1.0.0'},
+        'os': {'platform': 'Flutter', 'name': 'Flutter', 'version': '1.0.0'},
+        'device': {
+          'manufacturer': 'unknown',
+          'model': 'unknown',
+          'version': '1.0.0',
+        },
+      },
+    });
+
+    _sttChannel!.sink.add(
+      'Path: speech.config\r\n'
+      'X-RequestId: $_sttRequestId\r\n'
+      'X-Timestamp: $timestamp\r\n'
+      'Content-Type: application/json; charset=utf-8\r\n\r\n'
+      '$config',
+    );
+  }
+
+  Future<void> _startStreamingAudio() async {
+    _pcmStreamController = StreamController<Uint8List>();
+    _pcmSubscription = _pcmStreamController!.stream.listen(_onPcmChunk);
 
     await _recorder!.startRecorder(
-      toFile: _currentChunkPath,
-      codec: Codec.pcm16WAV,
+      toStream: _pcmStreamController!.sink,
+      codec: Codec.pcm16,
       sampleRate: 16000,
       numChannels: 1,
     );
 
     _recorderSubscription = _recorder!.onProgress?.listen((event) {
       if (!mounted) return;
-      final db = event.decibels ?? -40.0;
+      final db = event.decibels ?? -160.0;
+
+      // تحديث الأمواج المرئية
       double normalized = ((db + 40) / 40).clamp(0.0, 1.0);
       double smooth = _amplitude + (normalized - _amplitude) * 0.3;
       setState(() => _amplitude = smooth);
+
+      // أول ما نكتشف كلام فعلي، الويف يفضل ظاهر لين تطفين المايك بنفسك
+      if (db > _kSilenceDbThreshold && !_isUserSpeaking) {
+        setState(() => _isUserSpeaking = true);
+      }
     });
   }
 
-  Future<void> _processCurrentChunk() async {
-    if (_recorder == null || _currentChunkPath == null) return;
-    final path = await _recorder!.stopRecorder();
-    if (path == null) return;
+  void _onPcmChunk(Uint8List chunk) {
+    final channel = _sttChannel;
+    if (channel == null || chunk.isEmpty) return;
 
-    final file = File(path);
-    if (!await file.exists()) return;
-    final bytes = await file.readAsBytes();
-    if (bytes.length < 2000) return; // قطعة صغيرة جداً / صامتة، تجاهليها
+    final timestamp = DateTime.now().toUtc().toIso8601String();
+    Uint8List payload = chunk;
+    String header;
 
-    await _transcribeChunk(bytes);
+    if (_isFirstAudioFrame) {
+      payload = Uint8List.fromList([..._buildWavHeader(), ...chunk]);
+      header = 'Path:audio\r\n'
+          'X-RequestId:$_sttRequestId\r\n'
+          'X-Timestamp:$timestamp\r\n'
+          'Content-Type:audio/x-wav\r\n';
+      _isFirstAudioFrame = false;
+    } else {
+      header = 'Path:audio\r\n'
+          'X-RequestId:$_sttRequestId\r\n'
+          'X-Timestamp:$timestamp\r\n';
+    }
+
+    _sendAudioFrame(channel, header, payload);
   }
 
-  Future<void> _transcribeChunk(Uint8List audioBytes) async {
-    final url = Uri.parse(
-      'https://$_kAzureRegion.stt.speech.microsoft.com/speech/recognition/'
-      'conversation/cognitiveservices/v1?language=$_kSttLanguageCode&format=simple',
-    );
+  void _sendAudioFrame(
+    IOWebSocketChannel channel,
+    String header,
+    Uint8List payload,
+  ) {
+    final headerBytes = utf8.encode(header);
+    final headerLen = headerBytes.length;
+    final frame = BytesBuilder()
+      ..addByte((headerLen >> 8) & 0xFF)
+      ..addByte(headerLen & 0xFF)
+      ..add(headerBytes)
+      ..add(payload);
+    channel.sink.add(frame.toBytes());
+  }
 
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
-          'Content-Type':
-              'audio/wav; codecs=audio/pcm; samplerate=16000',
-          'Accept': 'application/json',
-        },
-        body: audioBytes,
-      );
+  /// رأس WAV بسيط (44 بايت) بحجم بيانات غير معروف (بث حي)
+  List<int> _buildWavHeader() {
+    const sampleRate = 16000;
+    const bitsPerSample = 16;
+    const channels = 1;
+    final byteRate = sampleRate * channels * bitsPerSample ~/ 8;
+    final blockAlign = channels * bitsPerSample ~/ 8;
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final displayText = data['DisplayText'] as String?;
-        if (displayText != null && displayText.trim().isNotEmpty) {
-          _accumulatedTranscript =
-              '$_accumulatedTranscript $displayText'.trim();
-          if (mounted) {
-            setState(() => _textContent = _accumulatedTranscript);
-          }
-        }
-      } else {
-        debugPrint('Azure STT Error: ${response.statusCode} ${response.body}');
+    final header = BytesBuilder()
+      ..add(ascii.encode('RIFF'))
+      ..add(_uint32le(0))
+      ..add(ascii.encode('WAVE'))
+      ..add(ascii.encode('fmt '))
+      ..add(_uint32le(16))
+      ..add(_uint16le(1))
+      ..add(_uint16le(channels))
+      ..add(_uint32le(sampleRate))
+      ..add(_uint32le(byteRate))
+      ..add(_uint16le(blockAlign))
+      ..add(_uint16le(bitsPerSample))
+      ..add(ascii.encode('data'))
+      ..add(_uint32le(0));
+    return header.toBytes();
+  }
+
+  List<int> _uint32le(int v) =>
+      [v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF];
+  List<int> _uint16le(int v) => [v & 0xFF, (v >> 8) & 0xFF];
+
+  String _newId() {
+    final rnd = math.Random.secure();
+    const chars = '0123456789abcdef';
+    return List.generate(32, (_) => chars[rnd.nextInt(16)]).join();
+  }
+
+  void _handleSttMessage(dynamic message) {
+    if (message is! String) return; // ما نتوقع بيانات ثنائية من السيرفر هنا
+
+    final sepIndex = message.indexOf('\r\n\r\n');
+    final headerPart = sepIndex == -1 ? message : message.substring(0, sepIndex);
+    final bodyPart = sepIndex == -1 ? '' : message.substring(sepIndex + 4);
+
+    String? path;
+    for (final line in headerPart.split('\r\n')) {
+      if (line.toLowerCase().startsWith('path:')) {
+        path = line.substring(5).trim();
       }
-    } catch (e) {
-      debugPrint('Azure STT Exception: $e');
+    }
+    if (path == null || bodyPart.trim().isEmpty) return;
+
+    Map<String, dynamic>? data;
+    try {
+      data = jsonDecode(bodyPart) as Map<String, dynamic>;
+    } catch (_) {
+      return;
+    }
+
+    switch (path) {
+      case 'speech.hypothesis':
+        final text = (data['Text'] as String?)?.trim() ?? '';
+        _currentHypothesis = text;
+        if (mounted) {
+          setState(() {
+            _textContent = _joinTranscript(_confirmedTranscript, _currentHypothesis);
+          });
+        }
+        break;
+
+      case 'speech.phrase':
+        final status = data['RecognitionStatus'] as String?;
+        final text = ((data['DisplayText'] ?? data['Text']) as String?)?.trim();
+        if (status == 'Success' && text != null && text.isNotEmpty) {
+          _confirmedTranscript = _joinTranscript(_confirmedTranscript, text);
+        }
+        _currentHypothesis = '';
+        if (mounted) setState(() => _textContent = _confirmedTranscript);
+        break;
+
+      default:
+        break; // turn.start / speech.startDetected / speech.endDetected / turn.end
     }
   }
 
+  String _joinTranscript(String base, String addition) {
+    if (addition.trim().isEmpty) return base.trim();
+    if (base.trim().isEmpty) return addition.trim();
+    return '${base.trim()} ${addition.trim()}';
+  }
+
   Future<void> _stopListening() async {
-    _chunkTimer?.cancel();
-    _chunkTimer = null;
     _recorderSubscription?.cancel();
     _recorderSubscription = null;
 
     if (_recorder != null && _recorder!.isRecording) {
-      await _processCurrentChunk();
+      await _recorder!.stopRecorder();
     }
 
-    if (mounted) setState(() => _amplitude = 0.0);
+    await _pcmSubscription?.cancel();
+    _pcmSubscription = null;
+    await _pcmStreamController?.close();
+    _pcmStreamController = null;
+
+    // نرسل إشارة "خلصت الصوت" للسيرفر (frame فارغ) بعدها نقفل
+    final channel = _sttChannel;
+    if (channel != null) {
+      try {
+        _sendAudioFrame(
+          channel,
+          'Path:audio\r\n'
+          'X-RequestId:$_sttRequestId\r\n'
+          'X-Timestamp:${DateTime.now().toUtc().toIso8601String()}\r\n',
+          Uint8List(0),
+        );
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (_) {}
+      await channel.sink.close();
+      _sttChannel = null;
+    }
+    await _sttSub?.cancel();
+    _sttSub = null;
+
+    if (mounted) {
+      setState(() {
+        _amplitude = 0.0;
+        _isUserSpeaking = false;
+        _currentHypothesis = '';
+      });
+    }
   }
 
   void _clearText() {
@@ -326,10 +495,11 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       'https://$_kAzureRegion.tts.speech.microsoft.com/cognitiveservices/v1',
     );
 
-    final ssml =
-        '''<speak version='1.0' xml:lang='$_kTtsLanguageCode'>
+    final preparedText = _prepareTextForNaturalSpeech(_textContent);
+
+    final ssml = '''<speak version='1.0' xml:lang='$_kTtsLanguageCode'>
   <voice xml:lang='$_kTtsLanguageCode' name='$_kTtsVoiceName'>
-    ${_escapeXml(_textContent)}
+    ${_buildExpressiveSsml(preparedText)}
   </voice>
 </speak>''';
 
@@ -339,7 +509,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         headers: {
           'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
           'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+          'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
         },
         body: utf8.encode(ssml),
       );
@@ -369,6 +539,14 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     }
   }
 
+  String _prepareTextForNaturalSpeech(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return trimmed;
+    const endings = ['.', '؟', '!', '،', '؛'];
+    if (endings.any((e) => trimmed.endsWith(e))) return trimmed;
+    return '$trimmed.';
+  }
+
   String _escapeXml(String text) {
     return text
         .replaceAll('&', '&amp;')
@@ -376,6 +554,50 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&apos;');
+  }
+
+  /// يضيف سكتات قصيرة بعد علامات الترقيم داخل الجملة الواحدة (بعد الفواصل
+  /// مثلاً)، يُستدعى بعد الـ escape.
+  String _addNaturalPauses(String escapedText) {
+    return escapedText.replaceAll('، ', '،<break time="180ms"/> ');
+  }
+
+  /// يقسم النص لجمل، وكل جملة يديها نبرة/سرعة مختلفة شوي بشكل عشوائي
+  /// بسيط، عشان نكسر الرتابة الآلية اللي تصير لما كل النص يتنطق بنفس
+  /// النبرة الثابتة من أول لآخر. السرعة الأساسية دحين أبطأ شوي
+  /// (_kTtsMinRate إلى _kTtsMaxRate) حسب طلبك.
+  String _buildExpressiveSsml(String text) {
+    final sentences = _splitIntoSentences(text);
+    if (sentences.isEmpty) {
+      return '<prosody rate="${_kTtsMinRate.toStringAsFixed(2)}" pitch="+0%">${_addNaturalPauses(_escapeXml(text))}</prosody>';
+    }
+
+    final rnd = math.Random();
+    final rateRange = _kTtsMaxRate - _kTtsMinRate;
+    final buffer = StringBuffer();
+    for (var i = 0; i < sentences.length; i++) {
+      final sentence = sentences[i].trim();
+      if (sentence.isEmpty) continue;
+
+      final pitchOffset = -3 + rnd.nextInt(7); // بين -3% و +3%
+      final rate = _kTtsMinRate + rnd.nextDouble() * rateRange;
+      final pitchStr = pitchOffset >= 0 ? '+$pitchOffset%' : '$pitchOffset%';
+
+      buffer.write(
+        '<prosody rate="${rate.toStringAsFixed(2)}" pitch="$pitchStr">'
+        '${_addNaturalPauses(_escapeXml(sentence))}'
+        '</prosody>',
+      );
+      if (i != sentences.length - 1) {
+        buffer.write('<break time="280ms"/>');
+      }
+    }
+    return buffer.toString();
+  }
+
+  List<String> _splitIntoSentences(String text) {
+    final pattern = RegExp(r'(?<=[.؟!؛])\s+');
+    return text.split(pattern).where((s) => s.trim().isNotEmpty).toList();
   }
 
   void _insertPhrase(String phrase) {
@@ -387,12 +609,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       }
       _ttsController.text = _textContent;
     });
-  }
-
-  String _getHeadingFromText(String text) {
-    final words = text.trim().split(' ');
-    if (words.length <= 3) return text;
-    return '${words.take(3).join(' ')}...';
   }
 
   @override
@@ -633,6 +849,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   Widget _buildSttView() {
+    final showWaveform = _isRecording && _isUserSpeaking;
+    final hasText = _textContent.trim().isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -650,16 +869,22 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  if (_textContent.isEmpty) ...[
+                  if (!hasText) ...[
                     Expanded(
                       child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            if (showWaveform) ...[
+                              _buildRecordingWaveform(),
+                              const SizedBox(height: 16),
+                            ],
                             Text(
-                              _isRecording
-                                  ? 'ابدأ التحدث الآن...'
-                                  : 'اضغط على المايك للبدء',
+                              !_isRecording
+                                  ? 'اضغط على المايك للبدء'
+                                  : (showWaveform
+                                      ? 'جارِ الاستماع...'
+                                      : 'ابدأ التحدث الآن...'),
                               style: const TextStyle(
                                 fontFamily: 'IBMPlexSansArabic',
                                 color: NabeehColors.slate500,
@@ -685,35 +910,28 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                       ),
                     ),
                   ] else ...[
-                    if (_isRecording) ...[
+                    if (showWaveform) ...[
                       _buildRecordingWaveform(),
                       const SizedBox(height: 16),
                       const Divider(color: NabeehColors.slate100),
                       const SizedBox(height: 16),
-                      Text(
-                        _getHeadingFromText(_textContent),
-                        style: const TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: NabeehColors.dark,
-                          letterSpacing: -0.5,
-                          height: 1.2,
+                    ],
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Text(
+                          _textContent,
+                          style: const TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: NabeehColors.dark,
+                            letterSpacing: -0.5,
+                            height: 1.4,
+                          ),
                         ),
                       ),
-                    ] else ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _getHeadingFromText(_textContent),
-                        style: const TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: NabeehColors.dark,
-                          letterSpacing: -0.5,
-                          height: 1.2,
-                        ),
-                      ),
+                    ),
+                    if (!_isRecording) ...[
                       const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -768,8 +986,12 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   Widget _buildTtsView() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          children: [
           SizedBox(
             height: 340,
             child: Container(
@@ -819,7 +1041,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
                         children: [
                           'مرحبا',
                           'كيف حالك؟',
-                          'أنا بحاجة لمساعدة',
+                          'أنا بحاجة للمساعدة',
                           'شكراً لك',
                         ]
                             .map(
@@ -893,6 +1115,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
           ),
           const SizedBox(height: 20),
         ],
+      ),
       ),
     );
   }
