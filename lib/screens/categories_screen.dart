@@ -17,6 +17,7 @@ class CategoriesScreen extends StatefulWidget {
 class _CategoriesScreenState extends State<CategoriesScreen> {
   final CategoryService _service = CategoryService.withDefaults();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -30,6 +31,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -42,12 +44,23 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         .toList();
   }
 
+  // تضمن أن المجموعة المفعّلة تكون دائماً في أول القائمة
+  List<CategoryModel> _sortActiveFirst(List<CategoryModel> list) {
+    final sorted = [...list];
+    final activeIndex = sorted.indexWhere((c) => c.isEnabled);
+    if (activeIndex > 0) {
+      final active = sorted.removeAt(activeIndex);
+      sorted.insert(0, active);
+    }
+    return sorted;
+  }
+
   Future<void> _initialize() async {
     try {
       final categories = await _service.initializeForUser();
       if (mounted) {
         setState(() {
-          _categories = categories;
+          _categories = _sortActiveFirst(categories);
           _isLoading = false;
         });
       }
@@ -69,10 +82,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     try {
       await _service.setActiveCategory(id, currentCategories: _categories);
       setState(() {
-        _categories = _categories
+        final updated = _categories
             .map((c) => c.copyWith(isEnabled: c.id == id))
             .toList();
+        _categories = _sortActiveFirst(updated);
       });
+
+      // نرجّع المستخدم لأعلى الصفحة عشان يشوف المجموعة المُفعَّلة
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -197,6 +220,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             _categories[idx] = _categories[idx].copyWith(isEnabled: true);
           }
         }
+        _categories = _sortActiveFirst(_categories);
       });
     } on StateError {
       if (mounted) {
@@ -242,6 +266,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           // إضافة: أضفه للقائمة
           _categories = [..._categories, result];
         }
+        _categories = _sortActiveFirst(_categories);
       });
     } else if (result is DeletedCategoryResult) {
       setState(() {
@@ -252,6 +277,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             _categories[idx] = _categories[idx].copyWith(isEnabled: true);
           }
         }
+        _categories = _sortActiveFirst(_categories);
       });
     }
   }
@@ -282,10 +308,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   : DefaultTextStyle.merge(
                       style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
                       child: SingleChildScrollView(
+                        controller: _scrollController,
                         physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _buildCategoriesCountBadge(_categories.length),
+                            const SizedBox(height: 12),
                             _buildSearchField(),
                             const SizedBox(height: 16),
                             if (filteredCategories.isEmpty &&
@@ -307,6 +337,47 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           ],
         ),
         ),
+      ),
+    );
+  }
+
+  // 👇 بادج عدد المجموعات (بنفس أسلوب صفحة المنبهات)
+  Widget _buildCategoriesCountBadge(int count) {
+    final label = count == 0
+        ? 'لا توجد مجموعات'
+        : count == 1
+            ? 'مجموعة واحدة'
+            : '$count مجموعات';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF181059)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Color(0xFF181059),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF181059),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -399,27 +470,35 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
+  // 👇 رسالة "لا توجد نتائج" مُمركزة أفقياً، وتتكيف مع ظهور الكيبورد حتى لا يغطيها
   Widget _buildNoSearchResults() {
+    final bool keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 36),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.search_off_rounded,
-            size: 42,
-            color: NabeehColors.slate300,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'لا توجد مجموعات مطابقة',
-            style: TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              color: NabeehColors.slate500,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+      padding: EdgeInsets.only(top: keyboardOpen ? 40 : 180),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              size: 42,
+              color: NabeehColors.slate300,
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            const Text(
+              'لا توجد مجموعات مطابقة',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                color: NabeehColors.slate500,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
