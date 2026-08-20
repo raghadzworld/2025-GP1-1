@@ -310,22 +310,58 @@ class _RemindersScreenState extends State<RemindersScreen> {
                                   _buildSearchField(),
                                   const SizedBox(height: 20),
                                   
-                                  ...filteredReminders.map((doc) {
-                                    final data = doc.data() as Map<String, dynamic>;
-                                    return _buildAlarmCard(doc.id, data);
-                                  }),
-                                  const SizedBox(height: 8),
-                                  _buildAddButton(),
-                                  const SizedBox(height: 40),
+                                  if (filteredReminders.isEmpty &&
+                                      _searchQuery.trim().isNotEmpty)
+                                    _buildNoSearchResults()
+                                  else
+                                    ...filteredReminders.map((doc) {
+                                      final data = doc.data() as Map<String, dynamic>;
+                                      return _buildAlarmCard(doc.id, data);
+                                    }),
                                 ],
                               ),
                             );
                           },
                         ),
                 ),
+                if (currentUser != null && _remindersStream != null)
+                  _buildAddButtonFooter(),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // 👇 رسالة "لا توجد نتائج" مُمركزة أفقياً، وتتكيف مع ظهور الكيبورد حتى لا يغطيها
+  Widget _buildNoSearchResults() {
+    final bool keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    return Padding(
+      padding: EdgeInsets.only(top: keyboardOpen ? 40 : 180),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              size: 42,
+              color: NabeehColors.slate300,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'لا توجد منبهات مطابقة',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                color: NabeehColors.slate500,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -438,8 +474,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 40),
-          _buildAddButton(),
         ],
       ),
     );
@@ -770,6 +804,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAddButtonFooter() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: _buildAddButton(),
     );
   }
 
