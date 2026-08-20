@@ -92,6 +92,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final phoneCtrl = TextEditingController();
     final relationCtrl = TextEditingController();
 
+    String? nameError;
+    String? phoneError;
+    String? relationError;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -102,7 +106,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Directionality(
           textDirection: TextDirection.rtl,
-          child: Padding(
+          child: SingleChildScrollView(
             padding: EdgeInsets.only(
               top: 24,
               right: 24,
@@ -137,6 +141,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   label: 'الاسم:',
                   controller: nameCtrl,
                   icon: Icons.person_outline,
+                  errorText: nameError,
+                  onChanged: (_) {
+                    if (nameError != null) setSheetState(() => nameError = null);
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildFormField(
@@ -149,16 +157,22 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  errorText:
-                      phoneCtrl.text.isNotEmpty && !_isValidPhone(phoneCtrl.text)
-                      ? 'يجب أن يتكون الرقم من 10 أرقام ويبدأ بـ 05'
-                      : null,
+                  errorText: phoneError,
+                  onChanged: (_) {
+                    if (phoneError != null) setSheetState(() => phoneError = null);
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildFormField(
                   label: 'جهة القرابة:',
                   controller: relationCtrl,
                   icon: Icons.people_outline,
+                  errorText: relationError,
+                  onChanged: (_) {
+                    if (relationError != null) {
+                      setSheetState(() => relationError = null);
+                    }
+                  },
                 ),
                 const SizedBox(height: 32),
                 Row(
@@ -179,26 +193,34 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         ),
                         child: TextButton(
                           onPressed: () async {
-                            setSheetState(() {});
-                            if (nameCtrl.text.trim().isEmpty ||
-                                phoneCtrl.text.trim().isEmpty ||
-                                relationCtrl.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('يرجى تعبئة جميع الحقول'),
-                                ),
-                              );
+                            final name = nameCtrl.text.trim();
+                            final phone = phoneCtrl.text.trim();
+                            final relation = relationCtrl.text.trim();
+
+                            setSheetState(() {
+                              nameError =
+                                  name.isEmpty ? 'الرجاء إدخال الاسم' : null;
+                              phoneError = phone.isEmpty
+                                  ? 'الرجاء إدخال رقم الجوال'
+                                  : !_isValidPhone(phone)
+                                      ? 'يجب أن يتكون الرقم من 10 أرقام ويبدأ بـ 05'
+                                      : null;
+                              relationError = relation.isEmpty
+                                  ? 'الرجاء إدخال جهة القرابة'
+                                  : null;
+                            });
+
+                            if (nameError != null ||
+                                phoneError != null ||
+                                relationError != null) {
                               return;
                             }
-                            if (!_isValidPhone(phoneCtrl.text)) {
-                              setSheetState(() {});
-                              return;
-                            }
+
                             try {
                               final newContact = EmergencyContact(
-                                name: nameCtrl.text.trim(),
-                                phone: _sanitizePhone(phoneCtrl.text),
-                                relation: relationCtrl.text.trim(),
+                                name: name,
+                                phone: _sanitizePhone(phone),
+                                relation: relation,
                               );
                               final docRef = await _contactsRef!.add(
                                 newContact.toFirestore(),
@@ -418,6 +440,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final phoneCtrl = TextEditingController(text: contact.phone);
     final relationCtrl = TextEditingController(text: contact.relation);
 
+    String? nameError;
+    String? phoneError;
+    String? relationError;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -428,7 +454,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Directionality(
           textDirection: TextDirection.rtl,
-          child: Padding(
+          child: SingleChildScrollView(
             padding: EdgeInsets.only(
               top: 24,
               right: 24,
@@ -463,6 +489,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   label: 'الاسم:',
                   controller: nameCtrl,
                   icon: Icons.person_outline,
+                  errorText: nameError,
+                  onChanged: (_) {
+                    if (nameError != null) setSheetState(() => nameError = null);
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildFormField(
@@ -475,16 +505,22 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  errorText:
-                      phoneCtrl.text.isNotEmpty && !_isValidPhone(phoneCtrl.text)
-                      ? 'يجب أن يتكون الرقم من 10 أرقام ويبدأ بـ 05'
-                      : null,
+                  errorText: phoneError,
+                  onChanged: (_) {
+                    if (phoneError != null) setSheetState(() => phoneError = null);
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildFormField(
                   label: 'جهة القرابة:',
                   controller: relationCtrl,
                   icon: Icons.people_outline,
+                  errorText: relationError,
+                  onChanged: (_) {
+                    if (relationError != null) {
+                      setSheetState(() => relationError = null);
+                    }
+                  },
                 ),
                 const SizedBox(height: 32),
                 Row(
@@ -505,26 +541,34 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         ),
                         child: TextButton(
                           onPressed: () async {
-                            setSheetState(() {});
-                            if (nameCtrl.text.trim().isEmpty ||
-                                phoneCtrl.text.trim().isEmpty ||
-                                relationCtrl.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('يرجى تعبئة جميع الحقول'),
-                                ),
-                              );
+                            final name = nameCtrl.text.trim();
+                            final phone = phoneCtrl.text.trim();
+                            final relation = relationCtrl.text.trim();
+
+                            setSheetState(() {
+                              nameError =
+                                  name.isEmpty ? 'الرجاء إدخال الاسم' : null;
+                              phoneError = phone.isEmpty
+                                  ? 'الرجاء إدخال رقم الجوال'
+                                  : !_isValidPhone(phone)
+                                      ? 'يجب أن يتكون الرقم من 10 أرقام ويبدأ بـ 05'
+                                      : null;
+                              relationError = relation.isEmpty
+                                  ? 'الرجاء إدخال جهة القرابة'
+                                  : null;
+                            });
+
+                            if (nameError != null ||
+                                phoneError != null ||
+                                relationError != null) {
                               return;
                             }
-                            if (!_isValidPhone(phoneCtrl.text)) {
-                              setSheetState(() {});
-                              return;
-                            }
+
                             final updated = EmergencyContact(
                               id: contact.id,
-                              name: nameCtrl.text.trim(),
-                              phone: _sanitizePhone(phoneCtrl.text),
-                              relation: relationCtrl.text.trim(),
+                              name: name,
+                              phone: _sanitizePhone(phone),
+                              relation: relation,
                             );
                             if (contact.id.isNotEmpty) {
                               await _contactsRef
@@ -609,6 +653,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
+  // ── Form Field with unified red error-box style (matches AddEditCategoryScreen) ──
   Widget _buildFormField({
     required String label,
     required TextEditingController controller,
@@ -617,7 +662,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
     IconData? icon,
     List<TextInputFormatter>? inputFormatters,
     int? maxLength,
+    ValueChanged<String>? onChanged,
   }) {
+    final hasError = errorText != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -648,30 +696,25 @@ class _ContactsScreenState extends State<ContactsScreen> {
               ? MaxLengthEnforcement.enforced
               : null,
           textAlign: TextAlign.right,
+          onChanged: onChanged,
           decoration: InputDecoration(
             counterText: maxLength != null ? '' : null,
             hintText: 'اكتب هنا',
             hintStyle: const TextStyle(color: _kContactsGray, fontSize: 14),
-            errorText: errorText,
-            errorStyle: const TextStyle(fontSize: 12),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(
-                color: errorText != null ? Colors.red : _kContactsCardBorder,
+                color: hasError
+                    ? Colors.red.withValues(alpha: 0.5)
+                    : _kContactsCardBorder,
               ),
             ),
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(
-                color: errorText != null
-                    ? Colors.red
+                color: hasError
+                    ? Colors.red.withValues(alpha: 0.6)
                     : const Color(0xFF1773CF),
                 width: 2,
               ),
-            ),
-            errorBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.red),
-            ),
-            focusedErrorBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.red, width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               vertical: 8,
@@ -679,12 +722,45 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ),
           ),
         ),
+        if (hasError) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.alertCircle, size: 14, color: Colors.red),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    errorText,
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final filteredContacts = _contacts.asMap().entries.where((e) {
+      if (_searchQuery.isEmpty) return true;
+      return e.value.name.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -703,32 +779,28 @@ class _ContactsScreenState extends State<ContactsScreen> {
             child: Column(
               children: [
                 _buildHeader(),
-                const SizedBox(height: 20),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 20,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildContactsCountBadge(),
                         const SizedBox(height: 12),
                         _buildSearchField(),
-                        const SizedBox(height: 20),
-                        ..._contacts.asMap().entries.where((e) {
-                          if (_searchQuery.isEmpty) return true;
-                          return e.value.name.toLowerCase().contains(
-                            _searchQuery.toLowerCase(),
-                          );
-                        }).map((e) => _buildContactTile(e.value, e.key)),
-                        _buildAddContactButton(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+                        if (filteredContacts.isEmpty &&
+                            _searchQuery.trim().isNotEmpty)
+                          _buildNoSearchResults()
+                        else
+                          ...filteredContacts.map(
+                            (e) => _buildContactTile(e.value, e.key),
+                          ),
                       ],
                     ),
                   ),
                 ),
+                _buildAddContactButton(),
               ],
             ),
           ),
@@ -832,6 +904,39 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── No Search Results ────────────────────────────────────────────────────
+  Widget _buildNoSearchResults() {
+    final bool keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    return Padding(
+      padding: EdgeInsets.only(top: keyboardOpen ? 40 : 180),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              size: 42,
+              color: _kContactsGray,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'لا توجد جهات اتصال مطابقة',
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                color: _kContactsGray,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -982,44 +1087,47 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
-  // ── Add Contact Button ────────────────────────────────────────────────────
+  // ── Add Contact Button (ثابت أسفل الشاشة، يرتفع فوق الكيبورد تلقائياً) ──────
   Widget _buildAddContactButton() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      height: 60,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF181059), Color(0xFF1773CF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1.5,
-        ),
-      ),
-      child: TextButton.icon(
-        onPressed: () => _handleTap(
-          'assets/videos/sign_add_contact.mp4',
-          _showAddContactSheet,
-        ),
-        icon: const Icon(LucideIcons.plus, color: Colors.white),
-        label: const Text(
-          'إضافة جهة اتصال جديدة',
-          style: TextStyle(
-            fontFamily: 'IBMPlexSansArabic',
-            color: Colors.white,
-            letterSpacing: 2,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Container(
+        height: 60,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF181059), Color(0xFF1773CF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.25),
+            width: 1.5,
           ),
         ),
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+        child: TextButton.icon(
+          onPressed: () => _handleTap(
+            'assets/videos/sign_add_contact.mp4',
+            _showAddContactSheet,
+          ),
+          icon: const Icon(LucideIcons.plus, color: Colors.white),
+          label: const Text(
+            'إضافة جهة اتصال جديدة',
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              color: Colors.white,
+              letterSpacing: 2,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
       ),
