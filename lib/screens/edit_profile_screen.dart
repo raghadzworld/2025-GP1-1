@@ -299,6 +299,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     bool isPendingEmail = _emailChanged && !_linkSent && !_isGoogleUser;
     bool isSaveDisabled = _isLoading || isPendingEmail;
+    final bool emailHasError =
+        _emailFormatError != null || _emailSaveError != null;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -332,6 +334,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           controller: _nameController,
                           label: 'الاسم الكامل',
                           icon: LucideIcons.user,
+                          hasError: _nameError != null,
                         ),
                         if (_nameError != null) _buildErrorRibbon(_nameError!),
                         const SizedBox(height: 20),
@@ -343,6 +346,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             label: 'الايميل',
                             icon: LucideIcons.mail,
                             keyboardType: TextInputType.emailAddress,
+                            hasError: emailHasError,
                           ),
 
                           // --- DYNAMIC EMAIL STATUS UI ---
@@ -496,32 +500,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  // ── رسالة الخطأ الموحّدة (بنفس أسلوب صفحة الفئات وجهات الاتصال) ────────────
   Widget _buildErrorRibbon(String message) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEB),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFF4D4D), width: 1.2),
+        color: Colors.red.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Color(0xFFD32F2F),
-            size: 18,
-          ),
+          const Icon(LucideIcons.alertCircle, size: 14, color: Colors.red),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
-                color: Color(0xFFD32F2F),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.red,
               ),
             ),
           ),
@@ -620,7 +621,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
+    bool hasError = false,
   }) {
+    final borderColor = hasError
+        ? Colors.red.withValues(alpha: 0.5)
+        : const Color.fromARGB(255, 235, 233, 229);
+    final focusedBorderColor = hasError
+        ? Colors.red.withValues(alpha: 0.6)
+        : const Color(0xFF1773CF);
+
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
@@ -633,31 +642,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(
+        labelStyle: TextStyle(
           fontFamily: 'IBMPlexSansArabic',
-          color: NabeehColors.slate500,
+          color: hasError ? Colors.red : NabeehColors.slate500,
           fontWeight: FontWeight.normal,
         ),
-        prefixIcon: Icon(icon, color: const Color(0xFF181059), size: 22),
+        prefixIcon: Icon(
+          icon,
+          color: hasError ? Colors.red : const Color(0xFF181059),
+          size: 22,
+        ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: hasError
+            ? Colors.red.withValues(alpha: 0.05)
+            : Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color.fromARGB(255, 235, 233, 229),
-          ),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color.fromARGB(255, 235, 233, 229),
-          ),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Color.fromARGB(255, 235, 233, 229),
-          ),
+          borderSide: BorderSide(color: focusedBorderColor, width: 2),
         ),
       ),
     );
