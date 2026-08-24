@@ -27,7 +27,7 @@ class EventClassificationResult {
 
 class EventClassifierService {
   static const String _baseUrl =
-      'https://nabeeh-api-715905518635.us-central1.run.app';
+      'https://nabeeh-api-v2-test-715905518635.us-central1.run.app';
 
   static Future<EventClassificationResult> classifyWavChunk(
     Uint8List wavBytes,

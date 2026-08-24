@@ -136,7 +136,10 @@ class _WatchScreenState extends State<WatchScreen> {
                           const SizedBox(height: 16),
                           _buildMetricsGrid(),
                           const SizedBox(height: 16),
-                          _buildWifiProvisionButton(),
+                          // معطّل مؤقتاً — البلوتوث يسبب تعطّل، نبي نتأكد أول
+                          // من استقرار API/الساعة/الاتصال عالشبكة الحالية قبل
+                          // ما نرجّع ميزة تغيير الواي فاي.
+                          // _buildWifiProvisionButton(),
                           const SizedBox(height: 20),
                         ],
                       ),

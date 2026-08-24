@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
@@ -23,8 +24,18 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
-  await initializeBackgroundService();
   runApp(const NabeehApp());
+  // نهيّئ خدمة الاستماع الخلفية بعد أول رسمة للواجهة، مو قبلها — لو تعلّقت
+  // هذي الخطوة لأي سبب (مثلاً حالة خدمة تالفة بعد تعطّل سابق بنظام أندرويد)،
+  // ما نبي المستخدم يعلق على شاشة بيضاء بدون أي واجهة للأبد بانتظارها.
+  unawaited(
+    initializeBackgroundService().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => debugPrint(
+        'initializeBackgroundService: timed out — continuing without it',
+      ),
+    ),
+  );
 }
 
 class AppRoutes {

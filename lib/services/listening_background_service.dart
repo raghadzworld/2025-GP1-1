@@ -82,8 +82,11 @@ Future<void> initializeBackgroundService() async {
       foregroundServiceNotificationId: kListeningNotificationId,
       initialNotificationTitle: 'نبيه',
       initialNotificationContent: 'جاري التحضير...',
+      // connectedDevice يتطلب صلاحية بلوتوث/USB/NFC حاصلة فعلياً وقت التشغيل
+      // (Android يرفضه بـ SecurityException بدونها) — اتصالنا بالساعة واي
+      // فاي/TCP عادي وما له علاقة بالبلوتوث، فـ dataSync وحده يوصف حالتنا صح
+      // بدون هذا الشرط الإضافي.
       foregroundServiceTypes: [
-        AndroidForegroundType.connectedDevice,
         AndroidForegroundType.dataSync,
       ],
     ),
