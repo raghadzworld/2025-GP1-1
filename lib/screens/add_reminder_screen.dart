@@ -6,6 +6,7 @@ import 'nabeeh_colors.dart';
 // 👇 Added Sign Language Imports
 import '../services/sign_language_mode.dart';
 import 'sign_language_player_screen.dart';
+import '../services/reminder_alarm_service.dart';
 
 class AddReminderScreen extends StatefulWidget {
   final String? reminderId;
@@ -131,10 +132,38 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           .doc(uid)
           .collection('Reminders');
 
+      String reminderId;
       if (widget.reminderId == null) {
-        await remindersRef.add(reminderData);
+        final doc = await remindersRef.add(reminderData);
+        reminderId = doc.id;
       } else {
-        await remindersRef.doc(widget.reminderId).update(reminderData);
+        reminderId = widget.reminderId!;
+        await remindersRef.doc(reminderId).update(reminderData);
+      }
+
+      // نجدول (أو نلغي) إنذار المنبّه الحقيقي بمجرد الحفظ — بدل ما ننتظر
+      // مزامنة لاحقة. حساب الساعة بصيغة ٢٤ ساعة: ١٢ص تصير ٠، والباقي +١٢
+      // للفترة المسائية. بـ try منفصل عشان فشل جدولة الإنذار (مثلاً صلاحية
+      // مرفوضة) ما يوقف حفظ المنبّه نفسه في Firestore أو يظهر كخطأ عام
+      // مربك — التذكير المحفوظ بيتزامن لاحقًا من شاشة القائمة على أي حال.
+      try {
+        final isEnabled = reminderData['isEnabled'] as bool;
+        if (isEnabled) {
+          final hour24 = isAm ? (selectedHour % 12) : (selectedHour % 12) + 12;
+          await ReminderAlarmService.scheduleReminder(
+            reminderId: reminderId,
+            label: label,
+            hour24: hour24,
+            minute: selectedMinute,
+            daysActive: selectedDays,
+            vibrationPattern: patternInt,
+            vibrationPower: powerInt,
+          );
+        } else {
+          await ReminderAlarmService.cancelReminder(reminderId);
+        }
+      } catch (e) {
+        debugPrint('_saveReminder: alarm scheduling failed — $e');
       }
 
       if (mounted) Navigator.pop(context);

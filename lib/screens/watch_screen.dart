@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -23,11 +25,26 @@ class _WatchScreenState extends State<WatchScreen> {
   int? _batteryPercent; // null = لم يُستعلَم بعد، -1 = غير متوفرة
   int? _lastSyncSecondsAgo;
   bool _isLoading = false;
+  Timer? _statusTimer;
 
   @override
   void initState() {
     super.initState();
     _loadIpAndQuery();
+    // نفس فكرة نقطة الاتصال على الساعة نفسها: بدون تحديث دوري، هذي الشاشة
+    // تجمّد على نتيجة أول استعلام لين المستخدمة تسحب للتحديث يدويًا. تكرار
+    // الاستعلام كل ٥ ثوانٍ يخلي "متصلة/غير متصلة" هنا تتبع الحالة الحقيقية
+    // بدل ما تضل قديمة.
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _queryStatus(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadIpAndQuery() async {

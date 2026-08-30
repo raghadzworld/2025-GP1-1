@@ -122,6 +122,39 @@ class WatchAudioSocket {
     }
   }
 
+  /// نفس فكرة sendDetectionCode لكن بدون الحاجة لكائن WatchAudioSocket
+  /// موجود أصلاً (وبالتالي بدون _host محفوظ من اتصال بث سابق) — تُستخدم من
+  /// سياقات ما فيها أي اتصال بث مفتوح، مثل منبّه يشتغل من عزلة خلفية منفصلة
+  /// تمامًا (AlarmManager) عند وصول وقته. تفتح اتصال TCP مؤقت للإرسال فقط
+  /// وتقفله، بالضبط متل الفرع الاحتياطي بـ sendDetectionCode.
+  static Future<bool> sendCodeToHostDirect(
+    String host,
+    String code, {
+    required int pattern,
+    required int power,
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final message = [
+      0x23, // '#'
+      ...code.codeUnits,
+      ...pattern.toString().codeUnits,
+      ...power.toString().codeUnits,
+    ];
+    Socket? tempSocket;
+    try {
+      tempSocket = await Socket.connect(host, port, timeout: timeout);
+      tempSocket.add(message);
+      await tempSocket.flush();
+      debugPrint('sendCodeToHostDirect: sent "$code$pattern$power" to $host:$port');
+      return true;
+    } catch (e) {
+      debugPrint('sendCodeToHostDirect: failed to send "$code" to $host — $e');
+      return false;
+    } finally {
+      await tempSocket?.close();
+    }
+  }
+
   /// يفتح اتصال قصير مستقل بالساعة، يرسل 'i'، ويرجع حالتها الحالية.
   /// يستخدم من شاشات ما فيها اتصال بث مفتوح أصلاً (الساعة، الرئيسية).
   static Future<WatchStatus?> queryStatus(

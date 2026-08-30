@@ -7,6 +7,44 @@ import 'nabeeh_colors.dart';
 // 👇 Added Sign Language Imports
 import '../services/sign_language_mode.dart';
 import 'sign_language_player_screen.dart';
+import '../services/reminder_alarm_service.dart';
+
+/// يحوّل نص الوقت المخزّن ("hh:mm ص/م") لساعة بصيغة ٢٤ ساعة + دقيقة —
+/// نفس منطق التحويل المستخدم بشاشة إضافة/تعديل المنبّه، لازم يضل مطابق له.
+({int hour24, int minute}) _parseReminderTime(String timeString) {
+  final isAm = timeString.contains('ص');
+  final cleanStr = timeString.replaceAll('ص', '').replaceAll('م', '').trim();
+  final parts = cleanStr.split(':');
+  final hour12 = int.tryParse(parts.isNotEmpty ? parts[0] : '12') ?? 12;
+  final minute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+  final hour24 = isAm ? (hour12 % 12) : (hour12 % 12) + 12;
+  return (hour24: hour24, minute: minute);
+}
+
+Future<void> _syncReminderAlarm(
+  String reminderId,
+  Map<String, dynamic> data,
+) async {
+  try {
+    final isEnabled = data['isEnabled'] ?? false;
+    if (isEnabled != true) {
+      await ReminderAlarmService.cancelReminder(reminderId);
+      return;
+    }
+    final parsed = _parseReminderTime(data['time'] ?? '12:00 ص');
+    await ReminderAlarmService.scheduleReminder(
+      reminderId: reminderId,
+      label: data['label'] ?? 'منبه',
+      hour24: parsed.hour24,
+      minute: parsed.minute,
+      daysActive: List<String>.from(data['daysActive'] ?? const []),
+      vibrationPattern: data['vibrationPattern'] ?? 1,
+      vibrationPower: data['vibrationPower'] ?? 2,
+    );
+  } catch (e) {
+    debugPrint('_syncReminderAlarm($reminderId): $e');
+  }
+}
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -30,11 +68,21 @@ class _RemindersScreenState extends State<RemindersScreen> {
     _searchFocusNode.addListener(() => setState(() {}));
 
     if (currentUser != null) {
-      _remindersStream = FirebaseFirestore.instance
+      final remindersRef = FirebaseFirestore.instance
           .collection('User')
           .doc(currentUser!.uid)
-          .collection('Reminders')
-          .snapshots();
+          .collection('Reminders');
+      _remindersStream = remindersRef.snapshots();
+
+      // مزامنة لمرة وحدة عند فتح الشاشة: تعيد جدولة كل منبّه مفعّل من
+      // بياناته الحالية بـ Firestore. تغطي منبّهات مُنشأة قبل ما تصير هذي
+      // الميزة موجودة، ومنبّهات تغيّرت من جهاز ثاني — التحديثات الفورية
+      // (إضافة/تعديل/حذف/تبديل) من هالشاشة نفسها متكفّلة فيها الدوال أدناه.
+      remindersRef.get().then((snapshot) {
+        for (final doc in snapshot.docs) {
+          _syncReminderAlarm(doc.id, doc.data());
+        }
+      }).catchError((e) => debugPrint('Initial reminder alarm sync failed: $e'));
     }
   }
 
@@ -70,6 +118,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           .collection('Reminders')
           .doc(reminderId)
           .delete();
+      await ReminderAlarmService.cancelReminder(reminderId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -99,15 +148,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Future<void> _toggleReminderStatus(
     String reminderId,
     bool currentStatus,
+    Map<String, dynamic> data,
   ) async {
     if (currentUser == null) return;
     try {
+      final newStatus = !currentStatus;
       await FirebaseFirestore.instance
           .collection('User')
           .doc(currentUser!.uid)
           .collection('Reminders')
           .doc(reminderId)
-          .update({'isEnabled': !currentStatus});
+          .update({'isEnabled': newStatus});
+      await _syncReminderAlarm(reminderId, {...data, 'isEnabled': newStatus});
     } catch (e) {
       debugPrint('Error updating status: $e');
     }
@@ -678,7 +730,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 inactiveTrackColor: NabeehColors.slate200,
                 trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                 onChanged: (val) {
-                  _toggleReminderStatus(reminderId, isActive);
+                  _toggleReminderStatus(reminderId, isActive, alarm);
                 },
               ),
             ],

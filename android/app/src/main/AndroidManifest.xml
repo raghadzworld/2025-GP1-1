@@ -6,6 +6,14 @@
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+<!-- منبّهات التذكيرات: تشتغل حتى لو التطبيق مقفول بالكامل، عن طريق
+     AlarmManager (حزمة android_alarm_manager_plus). RECEIVE_BOOT_COMPLETED
+     يخلي rescheduleOnReboot يشتغل صح بعد إعادة تشغيل الجوال، و
+     SCHEDULE_EXACT_ALARM لازم لدقة توقيت المنبّه على أندرويد ١٢+. -->
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+<uses-permission android:name="android.permission.WAKE_LOCK" />
+
 <!-- تزويد الساعة بشبكة الواي فاي عبر BLE -->
 <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -42,12 +44,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _userName = '';
   bool _isWatchConnected = false;
+  Timer? _watchStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
     _queryWatchStatus();
+    // استعلام لمرة وحدة عند فتح الصفحة كان يخلي هذي القيمة تتجمّد على أول
+    // نتيجة — لو الساعة انقطعت (أو اتصلت) بعدها بثوانٍ، ما فيه شي يحدّث
+    // الواجهة إلا لو المستخدمة تركت الصفحة ورجعت لها. تكرار الاستعلام كل ٥
+    // ثوانٍ يخلي هذي القيمة تعكس حالة الساعة الفعلية بشكل حي، نفس فكرة نقطة
+    // الاتصال بالساعة نفسها.
+    _watchStatusTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _queryWatchStatus(),
+    );
   }
 
   @override
@@ -80,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _watchStatusTimer?.cancel();
     super.dispose();
   }
 

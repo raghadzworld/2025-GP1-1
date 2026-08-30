@@ -16,6 +16,7 @@ import 'screens/signup_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'services/listening_background_service.dart';
+import 'services/reminder_alarm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,18 @@ void main() async {
       const Duration(seconds: 10),
       onTimeout: () => debugPrint(
         'initializeBackgroundService: timed out — continuing without it',
+      ),
+    ),
+  );
+  // نفس فكرة الخدمة الخلفية أعلاه: ما نوقف أول رسمة للواجهة بانتظار هذي —
+  // لو المستخدمة رفضت صلاحية "الإنذار الدقيق" أو تعلّقت لأي سبب، التطبيق
+  // يفتح عادي وتضل التذكيرات (وأي جدولة سابقة محفوظة) تشتغل بمجرد ما
+  // تنضبط الصلاحية لاحقًا.
+  unawaited(
+    ReminderAlarmService.initialize().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => debugPrint(
+        'ReminderAlarmService.initialize: timed out — continuing without it',
       ),
     ),
   );
