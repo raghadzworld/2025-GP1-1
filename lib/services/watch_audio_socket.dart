@@ -155,6 +155,53 @@ class WatchAudioSocket {
     }
   }
 
+  /// يرسل جدول التذكيرات كامل للساعة: '@' + الجدول + '\n'.
+  ///
+  /// الساعة تحفظه بذاكرتها الدائمة (NVS) وتطلق كل تذكير من ساعتها الداخلية،
+  /// فيهتز السوار بوقته حتى لو الجوال نايم أو خارج الشبكة أو بطاريته فاضية —
+  /// وهذا المهم لمستخدم أصم، لأن السوار هو قناة التنبيه الأساسية مو الجوال.
+  ///
+  /// صيغة الجدول (تفكّها parse_reminder_payload بالفيرموير):
+  ///   H:M:daysMask:pattern:intensity:once  ومقاطعها مفصولة بـ ';'
+  /// ونص فاضي معناه "امسح كل التذكيرات المحفوظة بالساعة".
+  /// يرجّع عدد التذكيرات اللي أكّدت الساعة إنها حفظتها، أو null لو ما وصل ردّ.
+  static Future<int?> sendRemindersToHost(
+    String host,
+    String payload, {
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    Socket? tempSocket;
+    try {
+      tempSocket = await Socket.connect(host, port, timeout: timeout);
+      tempSocket.add(utf8.encode('@$payload\n'));
+      await tempSocket.flush();
+
+      // ننتظر ردّ الساعة "R,<count>" قبل ما نقفل الاتصال — مو بس للتأكيد:
+      // الانتظار نفسه ضروري. الفيرموير يقرأ من الاتصال داخل حلقة فيها
+      // تأخير، والجدول عشرات البايتات، فقفل الاتصال فور الإرسال كان يقطعه
+      // بالنص ويضيع بدون ما يظهر أي خطأ بالجوال. البقاء لين يوصل الردّ
+      // يضمن إن الساعة خلّصت قراءة كل شي.
+      final ack = await tempSocket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .firstWhere((line) => line.startsWith('R,'))
+          .timeout(timeout);
+
+      final count = int.tryParse(ack.substring(2).trim());
+      debugPrint(
+        'sendRemindersToHost: sent "${payload.isEmpty ? '(cleared)' : payload}" '
+        'to $host:$port — الساعة حفظت $count تذكير',
+      );
+      return count;
+    } catch (e) {
+      debugPrint('sendRemindersToHost: failed to send schedule to $host — $e');
+      return null;
+    } finally {
+      await tempSocket?.close();
+    }
+  }
+
   /// يفتح اتصال قصير مستقل بالساعة، يرسل 'i'، ويرجع حالتها الحالية.
   /// يستخدم من شاشات ما فيها اتصال بث مفتوح أصلاً (الساعة، الرئيسية).
   static Future<WatchStatus?> queryStatus(

@@ -13,6 +13,12 @@
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 <uses-permission android:name="android.permission.WAKE_LOCK" />
+<uses-permission android:name="android.permission.VIBRATE" />
+<!-- إشعار التذكير يستخدم fullScreenIntent: true (يوقظ الشاشة زي المنبّه).
+     من أندرويد ١٤ هذي الصلاحية ما تُمنح تلقائيًا إلا لتطبيقات المنبّه
+     والاتصال؛ بدون التصريح فيها هنا يتجاهل النظام fullScreenIntent بصمت
+     ويعرض الإشعار كإشعار عادي. -->
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
 <!-- تزويد الساعة بشبكة الواي فاي عبر BLE -->
 <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -72,6 +78,56 @@ android:label="@string/app_name"
             android:name="id.flutter.flutter_background_service.BackgroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- ‏android_alarm_manager_plus ما يصرّح عن مكوّناته في مانيفست الحزمة
+             نفسها (على عكس أغلب الحِزَم) — لازم التطبيق يصرّح عنها بنفسه، وهذا
+             موثّق بـ README الحزمة كخطوة إعداد إجبارية. بدونها الجدولة "تنجح"
+             ظاهريًا: AlarmManager يسجّل الموعد ويطلقه بوقته، لكن البثّ يروح
+             لمُستقبِل غير موجود بالتطبيق فما ينفّذ reminderAlarmCallback ولا
+             يظهر أي إشعار — وهذا بالضبط سبب إن التذكيرات ما تشتغل والتطبيق
+             مقفول. -->
+        <service
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver"
+            android:exported="false" />
+        <!-- ‏enabled=false مقصود: الحزمة تفعّل هذا المُستقبِل وقت التشغيل أول ما
+             تُجدول أول منبّه بـ rescheduleOnReboot: true، عشان ما ياخذ
+             BOOT_COMPLETED بدون داعي. -->
+        <receiver
+            android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- مُستقبِلات flutter_local_notifications: هذي هي اللي تعرض إشعار
+             التذكير وقت موعده. كود أصلي (Java) يشتغل من النظام مباشرة، بدون
+             ما يحتاج التطبيق يكون شغّالًا ولا يفتح عزلة Dart خلفية — وهذا
+             اللي يخلي التذكيرات المجدولة (zonedSchedule) موثوقة. الحزمة ما
+             تصرّح عنها بنفسها، لازم التطبيق يصرّح عنها زي حزمة المنبّهات.
+             ScheduledNotificationBootReceiver يعيد ضبط المواعيد بعد إعادة
+             تشغيل الجوال أو بعد تحديث التطبيق. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
