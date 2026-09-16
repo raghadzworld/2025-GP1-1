@@ -11,6 +11,7 @@ import 'screens/add_edit_category_screen.dart';
 import 'features/categories/data/services/category_service.dart';
 import 'features/categories/data/models/category_model.dart';
 import 'screens/stt_tts_screen.dart';
+import 'screens/intro_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/login_screen.dart';
@@ -56,6 +57,7 @@ class AppRoutes {
   static const login = '/login';
   static const home = '/home';
   static const main = '/main';
+  static const intro = '/intro';
   static const welcome = '/welcome';
   static const signup = '/signup';
   static const forgotPassword = '/forgot-password';
@@ -90,7 +92,9 @@ class NabeehApp extends StatelessWidget {
         // باقي المسارات
         switch (settings.name) {
           case AppRoutes.splash:
-            return MaterialPageRoute(builder: (_) => const SplashScreen());
+            return MaterialPageRoute(builder: (_) => const AppRoot());
+          case AppRoutes.intro:
+            return MaterialPageRoute(builder: (_) => const IntroScreen());
           case AppRoutes.welcome:
             return MaterialPageRoute(builder: (_) => const WelcomeScreen());
           case AppRoutes.signup:
@@ -111,7 +115,7 @@ class NabeehApp extends StatelessWidget {
               builder: (_) => const ForgotPasswordScreen(),
             );
           default:
-            return MaterialPageRoute(builder: (_) => const SplashScreen());
+            return MaterialPageRoute(builder: (_) => const AppRoot());
         }
       },
     );
@@ -168,118 +172,28 @@ class NabeehApp extends StatelessWidget {
   }
 }
 
-// ── Splash Screen ─────────────────────────────────────────────────────────────
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
+// ── جذر التطبيق: يقرر بصمت إذا نروح لـ MainScreen أو IntroScreen ───────────────
+// بدون أي شاشة سبلاش تظهر للمستخدمة أول ما تفتح التطبيق.
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _fade, _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-    _scale = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
-    _ctrl.forward();
-    Future.delayed(const Duration(milliseconds: 1200), () async {
-      if (!mounted) return;
-      final prefs = await SharedPreferences.getInstance();
-      final rememberMe = prefs.getBool('remember_me') ?? false;
-      final user = FirebaseAuth.instance.currentUser;
-      if (!mounted) return;
-      if (rememberMe && user != null) {
-        Navigator.pushReplacementNamed(context, AppRoutes.main);
-      } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
+  Future<bool> _isLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('remember_me') ?? false;
+    final user = FirebaseAuth.instance.currentUser;
+    return rememberMe && user != null;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF21277B), Color(0xFF1773CF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: FadeTransition(
-            opacity: _fade,
-            child: ScaleTransition(
-              scale: _scale,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.hearing_rounded,
-                      size: 52,
-                      color: Color(0xFF21277B),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'نبيه',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'مساعدك الذكي للتواصل',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 48),
-                  const CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    return FutureBuilder<bool>(
+      future: _isLoggedIn(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(backgroundColor: Color(0xFF1a1760));
+        }
+        return snapshot.data! ? const MainScreen() : const IntroScreen();
+      },
     );
   }
 }
