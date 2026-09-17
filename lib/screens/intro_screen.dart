@@ -115,24 +115,35 @@ class _IntroScreenState extends State<IntroScreen> {
   }
 
   Widget _buildPageContent(_IntroPageData data) {
-    return Column(
-      children: [
-        const Spacer(flex: 3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxHeight < 600;
+        final imageSize = isCompact
+            ? (constraints.maxHeight * 0.42).clamp(150.0, data.imageSize)
+            : data.imageSize;
+
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(height: isCompact ? 12 : 36),
 
         if (data.image != null)
           Transform.rotate(
             angle: data.rotationDegrees * (pi / 180),
             child: Image.asset(
               data.image!,
-              width: data.imageSize,
-              height: data.imageSize,
+              width: imageSize,
+              height: imageSize,
               fit: BoxFit.contain,
             ),
           )
         else
           Container(
-            width: data.imageSize,
-            height: data.imageSize,
+            width: imageSize,
+            height: imageSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white.withValues(alpha: 0.12),
@@ -141,10 +152,10 @@ class _IntroScreenState extends State<IntroScreen> {
                 width: 1.5,
               ),
             ),
-            child: Icon(data.icon, size: data.imageSize * 0.5, color: Colors.white),
+            child: Icon(data.icon, size: imageSize * 0.5, color: Colors.white),
           ),
 
-        const Spacer(flex: 1),
+        SizedBox(height: isCompact ? 16 : 36),
 
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -176,8 +187,12 @@ class _IntroScreenState extends State<IntroScreen> {
           ),
         ),
 
-        const SizedBox(height: 40),
-      ],
+                SizedBox(height: isCompact ? 20 : 40),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

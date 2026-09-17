@@ -15,8 +15,12 @@ class WelcomeScreen extends StatelessWidget {
             const Positioned.fill(child: NabeehBubbleBackground()),
 
             SafeArea(
-              child: Column(
-                children: [
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      children: [
                   // ── زر لغة الإشارة ──────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.only(left: 20, top: 12),
@@ -55,7 +59,7 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const Spacer(),
+                  const SizedBox(height: 24),
 
                   // ── شعار نبيه ───────────────────────────────────────────
                   Image.asset(
@@ -195,8 +199,11 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 40),
-                ],
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

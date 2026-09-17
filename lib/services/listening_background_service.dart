@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../firebase_options.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
@@ -86,9 +85,7 @@ Future<void> initializeBackgroundService() async {
       // (Android يرفضه بـ SecurityException بدونها) — اتصالنا بالساعة واي
       // فاي/TCP عادي وما له علاقة بالبلوتوث، فـ dataSync وحده يوصف حالتنا صح
       // بدون هذا الشرط الإضافي.
-      foregroundServiceTypes: [
-        AndroidForegroundType.dataSync,
-      ],
+      foregroundServiceTypes: [AndroidForegroundType.dataSync],
     ),
   );
 }
@@ -105,8 +102,9 @@ void onListeningServiceStart(ServiceInstance service) async {
   // البلجن يتجاهله بصمت بدون أي إعادة محاولة (لا استثناء ولا خطأ)، فتضل
   // الواجهة عالقة على "جاري الاتصال" للأبد. تسجيل المستمعين فورًا يقلّل
   // نافذة السباق هذي لأقل قدر ممكن.
-  final firebaseReady =
-      Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final firebaseReady = Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final watchSocket = WatchAudioSocket();
   // ما نبنيه إلا بعد ما نتأكد إن Firebase انتهت تهيئته — بناؤه فورًا هنا
@@ -123,6 +121,7 @@ void onListeningServiceStart(ServiceInstance service) async {
   bool isListening = false;
   bool isConnecting = false;
   bool isClassifying = false;
+  bool hasReceivedAudio = false;
   double audioLevel = 0.0;
   String statusText = 'الميكروفون متوقف';
 
@@ -162,14 +161,19 @@ void onListeningServiceStart(ServiceInstance service) async {
 
   Future<void> classifyChunk(Uint8List pcmChunk) async {
     isClassifying = true;
-    final wavBytes = pcm16ToWav(pcmChunk, sampleRate: WatchAudioSocket.sampleRate);
+    final wavBytes = pcm16ToWav(
+      pcmChunk,
+      sampleRate: WatchAudioSocket.sampleRate,
+    );
     try {
       final result = await EventClassifierService.classifyWavChunk(wavBytes);
       if (!isListening) return;
 
       final emoji = _kAlertEmojis[result.label];
       final soundId = _kApiLabelToSoundId[result.label];
-      final soundSetting = soundId != null ? activeSoundSettings[soundId] : null;
+      final soundSetting = soundId != null
+          ? activeSoundSettings[soundId]
+          : null;
       final isSoundEnabled = soundSetting?.isEnabled ?? false;
 
       if (result.shouldAlert && emoji != null && isSoundEnabled) {
@@ -210,6 +214,10 @@ void onListeningServiceStart(ServiceInstance service) async {
 
   DateTime lastLevelEmit = DateTime.fromMillisecondsSinceEpoch(0);
   void onAudioData(Uint8List data) {
+    if (!hasReceivedAudio) {
+      hasReceivedAudio = true;
+      debugPrint('listening: first audio packet received (${data.length} bytes)');
+    }
     audioLevel = pcm16PeakAmplitude(data);
     // نحدّث التطبيق بمستوى الصوت كل ١٥٠ملي ثانية بس (مو كل حزمة توصل) —
     // كافي لرسم موجة حية بدون إغراق قناة الاتصال بين الـ isolate والواجهة.
@@ -234,6 +242,7 @@ void onListeningServiceStart(ServiceInstance service) async {
     pcmBuffer.clear();
     isListening = false;
     isConnecting = false;
+    hasReceivedAudio = false;
     audioLevel = 0.0;
     statusText = 'الميكروفون متوقف';
     emitUpdate();
@@ -253,17 +262,21 @@ void onListeningServiceStart(ServiceInstance service) async {
       return;
     }
 
-    final ip = event?['watchIp'] as String? ??
-        (await SharedPreferences.getInstance()).getString('watch_ip');
-    if (ip == null || ip.isEmpty) {
-      statusText = 'تعذّر الاتصال — لا يوجد عنوان IP محفوظ للساعة';
-      emitUpdate();
-      return;
-    }
-
+    // Mark the request as in progress before discovery. Discovery can take
+    // several seconds, and without this guard repeated UI retries could start
+    // multiple TCP streams before the first one had finished resolving.
     isConnecting = true;
     statusText = 'جاري الاتصال بالساعة...';
     emitUpdate();
+
+    final requestedHost = event?['watchIp'] as String?;
+    final host = await WatchAudioSocket.resolveWatchHost(requestedHost);
+    if (host == null || host.isEmpty) {
+      isConnecting = false;
+      statusText = 'لم نعثر على الساعة على الشبكة';
+      emitUpdate();
+      return;
+    }
 
     // نغلّف كل خطوات الاتصال بسقف زمني واحد — لو أي خطوة تعلّقت لأي سبب
     // (تهيئة Firebase، جلب الإعدادات، أو اتصال الساعة نفسه)، ما نخلي
@@ -276,7 +289,7 @@ void onListeningServiceStart(ServiceInstance service) async {
         detections.clear();
         await loadActiveSoundSettings();
         await watchSocket.connect(
-          host: ip,
+          host: host,
           onData: onAudioData,
           onError: (_) => stopListening(),
           onDone: onSocketDone,
@@ -290,7 +303,7 @@ void onListeningServiceStart(ServiceInstance service) async {
     } catch (e) {
       isConnecting = false;
       isListening = false;
-      statusText = 'تعذّر الاتصال بالساعة — تأكد من عنوان IP والشبكة';
+      statusText = 'تعذّر الاتصال بالساعة — تأكدي من الشبكة';
       emitUpdate();
       await service.stopSelf();
     }

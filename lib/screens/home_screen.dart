@@ -14,12 +14,12 @@ import '../services/watch_audio_socket.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
-  static const darkNavy  = Color(0xFF181059);
-  static const darkBlue  = Color(0xFF21277B);
+  static const darkNavy = Color(0xFF181059);
+  static const darkBlue = Color(0xFF21277B);
   static const lightBlue = Color(0xFF1773CF);
-  static const yellow    = Color(0xFFFFD350);
-  static const green     = Color(0xFF00AA5B);
-  static const gray      = Color(0xFFA4ACB0);
+  static const yellow = Color(0xFFFFD350);
+  static const green = Color(0xFF00AA5B);
+  static const gray = Color(0xFFA4ACB0);
   static const background = Color(0xFFFFFFFF);
   static const cardBorder = Color(0xFFA4ACB0);
 }
@@ -73,8 +73,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _queryWatchStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final ip = prefs.getString(kWatchIpPrefsKey);
-    if (ip == null || ip.isEmpty) return;
+    final host = await WatchAudioSocket.resolveWatchHost(
+      prefs.getString(kWatchIpPrefsKey),
+    );
+    if (host == null || host.isEmpty) return;
 
     // خدمة الاستماع بالخلفية (لو شغّالة) ماسكة الاتصال الوحيد اللي الساعة
     // تقبله — فتح اتصال ثاني للاستعلام بينافسه ويفشل. وجود الخدمة شغّالة
@@ -85,9 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final status = await WatchAudioSocket.queryStatus(ip);
+    final status = await WatchAudioSocket.queryStatus(host);
     if (!mounted) return;
-    setState(() => _isWatchConnected = status?.isConnected ?? false);
+    // A valid response confirms that this phone can reach the watch.
+    setState(() => _isWatchConnected = status != null);
   }
 
   @override
@@ -154,24 +157,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         child: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 12),
-                  _buildWatchCard(),
-                  const SizedBox(height: 14),
-                  _buildFeaturesSection(),
-                  const SizedBox(height: 12),
-                ],
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildWatchCard(),
+                    const SizedBox(height: 14),
+                    _buildFeaturesSection(),
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -388,7 +391,10 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: 'assets/images/icon_YReco.png',
               onTap: () => _handleTap(
                 'assets/videos/sign_listening.mp4',
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ListeningScreen())),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ListeningScreen()),
+                ),
               ),
             ),
             _buildGridCard(
@@ -396,7 +402,10 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: 'assets/images/icon_YCom.png',
               onTap: () => _handleTap(
                 'assets/videos/sign_communication.mp4',
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SttTtsScreen())),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SttTtsScreen()),
+                ),
               ),
             ),
             _buildGridCard(
@@ -404,7 +413,10 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: 'assets/images/icon_YRima.png',
               onTap: () => _handleTap(
                 'assets/videos/sign_reminders.mp4',
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersScreen())),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RemindersScreen()),
+                ),
               ),
             ),
           ],
@@ -438,7 +450,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Positioned(
               top: 16,
               right: 16,
-              child: Image.asset(icon, width: 38, height: 38, fit: BoxFit.contain),
+              child: Image.asset(
+                icon,
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+              ),
             ),
             Center(
               child: Padding(

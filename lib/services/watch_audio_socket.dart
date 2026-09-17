@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:multicast_dns/multicast_dns.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// مفتاح SharedPreferences المشترك لعنوان IP الخاص بالساعة — نفس المفتاح
 /// تستخدمه كل الشاشات (الاستماع، الساعة، الرئيسية) عشان يبقى IP واحد فقط.
 const kWatchIpPrefsKey = 'watch_ip';
+const _watchServiceType = '_nabeeh._tcp';
+const _watchServiceName = 'nabeeh-watch';
 
 class WatchStatus {
   final bool isConnected;
@@ -33,23 +37,195 @@ class WatchAudioSocket {
 
   bool get isConnected => _socket != null;
 
+  /// Finds the watch on the local Wi-Fi network without asking the user for
+  /// its changing DHCP address. The cached IP remains a fallback for networks
+  /// that block multicast DNS.
+  static Future<String?> discoverWatchHost({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    final client = MDnsClient();
+    try {
+      await client.start();
+      final deadline = DateTime.now().add(timeout);
+      await for (final ptr in client.lookup<PtrResourceRecord>(
+        ResourceRecordQuery.serverPointer('$_watchServiceType.local'),
+      )) {
+        if (DateTime.now().isAfter(deadline)) break;
+        if (!ptr.domainName.startsWith('$_watchServiceName.')) continue;
+
+        await for (final srv in client.lookup<SrvResourceRecord>(
+          ResourceRecordQuery.service(ptr.domainName),
+        )) {
+          await for (final address in client.lookup<IPAddressResourceRecord>(
+            ResourceRecordQuery.addressIPv4(srv.target),
+          )) {
+            debugPrint(
+              'Discovered Nabeeh Watch at ${address.address.address}:$port',
+            );
+            return address.address.address;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Watch mDNS discovery failed: $e');
+    } finally {
+      client.stop();
+    }
+    return discoverWatchHostByScan(timeout: timeout);
+  }
+
+  /// Fallback for networks that block multicast DNS. The probe is limited to
+  /// the phone's current IPv4 subnets, so a saved address from another Wi-Fi
+  /// network can never be treated as a live watch connection.
+  static Future<String?> discoverWatchHostByScan({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+      includeLinkLocal: false,
+    );
+    final prefixes = <String>{};
+    for (final networkInterface in interfaces) {
+      for (final address in networkInterface.addresses) {
+        final octets = address.address.split('.');
+        if (octets.length == 4) {
+          prefixes.add('${octets[0]}.${octets[1]}.${octets[2]}');
+        }
+      }
+    }
+
+    final candidates = [
+      for (final prefix in prefixes)
+        for (var lastOctet = 1; lastOctet <= 254; lastOctet++)
+          '$prefix.$lastOctet',
+    ];
+    final probeTimeout = timeout < const Duration(milliseconds: 300)
+        ? timeout
+        : const Duration(milliseconds: 300);
+
+    for (var offset = 0; offset < candidates.length; offset += 32) {
+      final batch = candidates.skip(offset).take(32);
+      final results = await Future.wait(
+        batch.map((candidate) => _probeWatchHost(candidate, probeTimeout)),
+      );
+      for (final candidate in results) {
+        if (candidate != null) {
+          debugPrint(
+            'Discovered Nabeeh Watch by network scan at $candidate:$port',
+          );
+          return candidate;
+        }
+      }
+    }
+    return null;
+  }
+
+  static Future<String?> _probeWatchHost(String host, Duration timeout) async {
+    Socket? socket;
+    try {
+      socket = await Socket.connect(host, port, timeout: timeout);
+      socket.add([0x69]); // 'i' — request watch status
+      final line = await socket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first
+          .timeout(timeout);
+      final parts = line.split(',');
+      if (parts.length == 4 &&
+          parts[0] == 'I' &&
+          int.tryParse(parts[2]) != null &&
+          int.tryParse(parts[3]) != null) {
+        return host;
+      }
+    } catch (_) {
+      // Most addresses in the local subnet are expected to refuse the probe.
+    } finally {
+      await socket?.close();
+    }
+    return null;
+  }
+
+  /// Resolve the watch on the current network only. A cached address is kept
+  /// for display/diagnostics, but is never trusted as an automatic connection.
+  static Future<String?> resolveWatchHost([String? preferredHost]) async {
+    if (preferredHost != null && preferredHost.isNotEmpty) {
+      if (!await isOnSameLocalNetwork(preferredHost)) {
+        debugPrint(
+          'Ignoring watch address $preferredHost: it is outside the phone local network',
+        );
+      } else {
+      final verified = await _probeWatchHost(
+        preferredHost,
+        const Duration(milliseconds: 500),
+      );
+      if (verified != null) return verified;
+      }
+    }
+
+    final discovered = await discoverWatchHost();
+    if (discovered != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(kWatchIpPrefsKey, discovered);
+      return discovered;
+    }
+    return null;
+  }
+
+  /// Checks the local IPv4 /24 network before accepting a watch address.
+  /// This prevents a previously saved, routable address from looking like a
+  /// local watch connection while the phone is on another Wi-Fi network.
+  static Future<bool> isOnSameLocalNetwork(String host) async {
+    final watchAddress = InternetAddress.tryParse(host);
+    if (watchAddress == null || watchAddress.type != InternetAddressType.IPv4) {
+      return false;
+    }
+
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+      includeLinkLocal: false,
+    );
+    final watchBytes = watchAddress.rawAddress;
+    for (final networkInterface in interfaces) {
+      for (final address in networkInterface.addresses) {
+        final localBytes = address.rawAddress;
+        if (localBytes.length == 4 &&
+            localBytes[0] == watchBytes[0] &&
+            localBytes[1] == watchBytes[1] &&
+            localBytes[2] == watchBytes[2]) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   Future<void> connect({
-    required String host,
+    String? host,
     required void Function(Uint8List data) onData,
     required void Function(Object error) onError,
     required void Function() onDone,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    host = await resolveWatchHost(host);
+    if (host == null || host.isEmpty) {
+      throw StateError('Nabeeh Watch was not found on the local network');
+    }
     final socket = await Socket.connect(host, port, timeout: timeout);
     _socket = socket;
     _host = host;
-    socket.add([0x72]); // 'r' — start streaming
     _subscription = socket.listen(
       onData,
       onError: onError,
       onDone: onDone,
       cancelOnError: true,
     );
+    debugPrint('connect: TCP connected to $host:$port, starting audio stream');
+    socket.add([0x72]); // 'r' — start streaming
+    await socket.flush();
+    debugPrint('connect: start audio command sent to $host:$port');
   }
 
   Future<void> stop() async {
@@ -86,9 +262,7 @@ class WatchAudioSocket {
       try {
         _socket!.add(message);
         await _socket!.flush();
-        debugPrint(
-          'sendDetectionCode: sent "$asText" over existing socket',
-        );
+        debugPrint('sendDetectionCode: sent "$asText" over existing socket');
         return;
       } catch (e) {
         debugPrint(
@@ -128,12 +302,14 @@ class WatchAudioSocket {
   /// تمامًا (AlarmManager) عند وصول وقته. تفتح اتصال TCP مؤقت للإرسال فقط
   /// وتقفله، بالضبط متل الفرع الاحتياطي بـ sendDetectionCode.
   static Future<bool> sendCodeToHostDirect(
-    String host,
+    String? host,
     String code, {
     required int pattern,
     required int power,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    host = await resolveWatchHost(host);
+    if (host == null || host.isEmpty) return false;
     final message = [
       0x23, // '#'
       ...code.codeUnits,
@@ -145,7 +321,9 @@ class WatchAudioSocket {
       tempSocket = await Socket.connect(host, port, timeout: timeout);
       tempSocket.add(message);
       await tempSocket.flush();
-      debugPrint('sendCodeToHostDirect: sent "$code$pattern$power" to $host:$port');
+      debugPrint(
+        'sendCodeToHostDirect: sent "$code$pattern$power" to $host:$port',
+      );
       return true;
     } catch (e) {
       debugPrint('sendCodeToHostDirect: failed to send "$code" to $host — $e');
@@ -166,10 +344,12 @@ class WatchAudioSocket {
   /// ونص فاضي معناه "امسح كل التذكيرات المحفوظة بالساعة".
   /// يرجّع عدد التذكيرات اللي أكّدت الساعة إنها حفظتها، أو null لو ما وصل ردّ.
   static Future<int?> sendRemindersToHost(
-    String host,
+    String? host,
     String payload, {
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    host = await resolveWatchHost(host);
+    if (host == null || host.isEmpty) return null;
     Socket? tempSocket;
     try {
       tempSocket = await Socket.connect(host, port, timeout: timeout);
@@ -205,9 +385,11 @@ class WatchAudioSocket {
   /// يفتح اتصال قصير مستقل بالساعة، يرسل 'i'، ويرجع حالتها الحالية.
   /// يستخدم من شاشات ما فيها اتصال بث مفتوح أصلاً (الساعة، الرئيسية).
   static Future<WatchStatus?> queryStatus(
-    String host, {
+    String? host, {
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    host = await resolveWatchHost(host);
+    if (host == null || host.isEmpty) return null;
     Socket? socket;
     try {
       socket = await Socket.connect(host, port, timeout: timeout);

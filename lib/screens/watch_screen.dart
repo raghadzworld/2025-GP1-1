@@ -9,7 +9,6 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import '../services/watch_audio_socket.dart';
 import '../services/wifi_provisioning_service.dart';
 import '../widgets/custom_widgets.dart';
-import '../widgets/watch_ip_dialog.dart';
 import 'nabeeh_colors.dart';
 
 class WatchScreen extends StatefulWidget {
@@ -25,64 +24,99 @@ class _WatchScreenState extends State<WatchScreen> {
   int? _batteryPercent; // null = لم يُستعلَم بعد، -1 = غير متوفرة
   int? _lastSyncSecondsAgo;
   bool _isLoading = false;
+  bool _isDiscovering = false;
   Timer? _statusTimer;
+  StreamSubscription<Map<String, dynamic>?>? _serviceSub;
 
   @override
   void initState() {
     super.initState();
     _loadIpAndQuery();
+    _serviceSub = FlutterBackgroundService().on('update').listen((event) {
+      if (!mounted || event == null) return;
+      setState(() {
+        _isConnected = event['isListening'] as bool? ?? false;
+        _isLoading = false;
+      });
+    });
     // نفس فكرة نقطة الاتصال على الساعة نفسها: بدون تحديث دوري، هذي الشاشة
     // تجمّد على نتيجة أول استعلام لين المستخدمة تسحب للتحديث يدويًا. تكرار
     // الاستعلام كل ٥ ثوانٍ يخلي "متصلة/غير متصلة" هنا تتبع الحالة الحقيقية
     // بدل ما تضل قديمة.
     _statusTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => _queryStatus(),
+      (_) => _watchIp == null ? _loadIpAndQuery() : _queryStatus(),
     );
   }
 
   @override
   void dispose() {
     _statusTimer?.cancel();
+    _serviceSub?.cancel();
     super.dispose();
   }
 
   Future<void> _loadIpAndQuery() async {
+    if (_isDiscovering) return;
+    _isDiscovering = true;
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    setState(() => _watchIp = prefs.getString(kWatchIpPrefsKey));
-    await _queryStatus();
+    try {
+      final host = await WatchAudioSocket.resolveWatchHost(
+        prefs.getString(kWatchIpPrefsKey),
+      );
+      if (!mounted) return;
+      setState(() => _watchIp = host);
+      await _queryStatus();
+    } finally {
+      _isDiscovering = false;
+    }
   }
 
   Future<void> _queryStatus() async {
-    final ip = _watchIp;
-    if (ip == null || ip.isEmpty) return;
-
     setState(() => _isLoading = true);
+
+    final host = await WatchAudioSocket.resolveWatchHost(_watchIp);
+    if (host == null || host.isEmpty) {
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(kWatchIpPrefsKey);
+      setState(() {
+        _watchIp = null;
+        _isLoading = false;
+        _isConnected = false;
+        _batteryPercent = null;
+        _lastSyncSecondsAgo = null;
+      });
+      return;
+    }
+    if (mounted && _watchIp != host) {
+      setState(() => _watchIp = host);
+    }
 
     // خدمة الاستماع بالخلفية (لو شغّالة) ماسكة الاتصال الوحيد اللي الساعة
     // تقبله — فتح اتصال ثاني للاستعلام بينافسه ويفشل. وجود الخدمة شغّالة
     // أصلاً دليل كافٍ إن الساعة متصلة، بدون داعي لاستعلام TCP منفصل.
     if (await FlutterBackgroundService().isRunning()) {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _isConnected = true;
-      });
+      setState(() => _isLoading = false);
+      FlutterBackgroundService().invoke('request_status');
       return;
     }
 
-    final status = await WatchAudioSocket.queryStatus(ip);
+    final status = await WatchAudioSocket.queryStatus(host);
     debugPrint(
       status == null
-          ? 'WatchAudioSocket.queryStatus($ip) failed — no response'
-          : 'WatchAudioSocket.queryStatus($ip) => isConnected=${status.isConnected} battery=${status.batteryPercent} lastSync=${status.lastSyncSecondsAgo}',
+          ? 'WatchAudioSocket.queryStatus($host) failed — no response'
+          : 'WatchAudioSocket.queryStatus($host) => isConnected=${status.isConnected} battery=${status.batteryPercent} lastSync=${status.lastSyncSecondsAgo}',
     );
     if (!mounted) return;
     setState(() {
       _isLoading = false;
       if (status != null) {
-        _isConnected = status.isConnected;
+        // A valid status response proves the phone can reach the watch.
+        // status.isConnected describes the watch's own Wi-Fi state, not the
+        // connection between this phone and the watch.
+        _isConnected = true;
         _batteryPercent = status.batteryPercent;
         _lastSyncSecondsAgo = status.lastSyncSecondsAgo;
       } else {
@@ -91,13 +125,10 @@ class _WatchScreenState extends State<WatchScreen> {
         _lastSyncSecondsAgo = null;
       }
     });
-  }
-
-  Future<void> _editWatchIp() async {
-    final ip = await promptForWatchIp(context);
-    if (ip != null && mounted) {
-      setState(() => _watchIp = ip);
-      await _queryStatus();
+    if (status == null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(kWatchIpPrefsKey);
+      if (mounted) setState(() => _watchIp = null);
     }
   }
 
@@ -133,39 +164,39 @@ class _WatchScreenState extends State<WatchScreen> {
             ),
           ),
           child: Column(
-          children: [
-            _buildHeader(context),
-            _buildWatchIpRow(),
-            Expanded(
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
-                child: RefreshIndicator(
-                  onRefresh: _queryStatus,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: BouncingScrollPhysics(),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          _buildWatchHeroCard(),
-                          const SizedBox(height: 16),
-                          _buildMetricsGrid(),
-                          const SizedBox(height: 16),
-                          // معطّل مؤقتاً — البلوتوث يسبب تعطّل، نبي نتأكد أول
-                          // من استقرار API/الساعة/الاتصال عالشبكة الحالية قبل
-                          // ما نرجّع ميزة تغيير الواي فاي.
-                          // _buildWifiProvisionButton(),
-                          const SizedBox(height: 20),
-                        ],
+            children: [
+              _buildHeader(context),
+              if (!_isConnected) _buildWatchIpRow(),
+              Expanded(
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                  child: RefreshIndicator(
+                    onRefresh: _queryStatus,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          children: [
+                            _buildWatchHeroCard(),
+                            const SizedBox(height: 16),
+                            _buildMetricsGrid(),
+                            const SizedBox(height: 16),
+                            // معطّل مؤقتاً — البلوتوث يسبب تعطّل، نبي نتأكد أول
+                            // من استقرار API/الساعة/الاتصال عالشبكة الحالية قبل
+                            // ما نرجّع ميزة تغيير الواي فاي.
+                            // _buildWifiProvisionButton(),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),
@@ -243,28 +274,21 @@ class _WatchScreenState extends State<WatchScreen> {
   Widget _buildWatchIpRow() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: _editWatchIp,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.watch, size: 14, color: NabeehColors.gray),
-            const SizedBox(width: 6),
-            Text(
-              _watchIp == null || _watchIp!.isEmpty
-                  ? 'اضغط لتحديد عنوان IP للساعة'
-                  : 'الساعة: $_watchIp',
-              style: const TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 12,
-                color: NabeehColors.gray,
-                fontWeight: FontWeight.w600,
-              ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(LucideIcons.watch, size: 14, color: NabeehColors.gray),
+          const SizedBox(width: 6),
+          Text(
+            'للاتصال بالساعة، تأكد من أن الجوال والساعة على نفس الشبكة',
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 12,
+              color: NabeehColors.gray,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(width: 6),
-            Icon(LucideIcons.pencil, size: 12, color: NabeehColors.gray),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -339,7 +363,8 @@ class _WatchScreenState extends State<WatchScreen> {
                         ),
                       )
                       .animate(
-                        onPlay: (controller) => controller.repeat(reverse: true),
+                        onPlay: (controller) =>
+                            controller.repeat(reverse: true),
                       )
                       .scale(
                         begin: const Offset(0.95, 0.95),
@@ -468,7 +493,9 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   Widget _buildSyncCard() {
-    final accent = _isConnected ? const Color(0xFF22C55E) : const Color(0xFF1773CF);
+    final accent = _isConnected
+        ? const Color(0xFF22C55E)
+        : const Color(0xFF1773CF);
     return SizedBox(
       height: 220,
       child: BentoCard(
@@ -671,7 +698,9 @@ class _WatchScreenState extends State<WatchScreen> {
 
           Future<void> submit() async {
             if (ssidCtrl.text.trim().isEmpty || passwordCtrl.text.isEmpty) {
-              setSheetState(() => errorText = 'يرجى تعبئة اسم الشبكة وكلمة السر');
+              setSheetState(
+                () => errorText = 'يرجى تعبئة اسم الشبكة وكلمة السر',
+              );
               return;
             }
             setSheetState(() {

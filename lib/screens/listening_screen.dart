@@ -7,7 +7,6 @@ import 'dart:async';
 import 'nabeeh_colors.dart';
 import '../services/sign_language_mode.dart';
 import '../services/watch_audio_socket.dart';
-import '../widgets/watch_ip_dialog.dart';
 import 'sign_language_player_screen.dart';
 
 class ListeningScreen extends StatefulWidget {
@@ -38,7 +37,9 @@ class _ListeningScreenState extends State<ListeningScreen>
       duration: const Duration(milliseconds: 1500),
     );
     _loadWatchIp();
-    _updateSub = FlutterBackgroundService().on('update').listen(_onServiceUpdate);
+    _updateSub = FlutterBackgroundService()
+        .on('update')
+        .listen(_onServiceUpdate);
     _syncWithRunningService();
   }
 
@@ -54,7 +55,14 @@ class _ListeningScreenState extends State<ListeningScreen>
 
   void _onServiceUpdate(Map<String, dynamic>? event) {
     if (event == null || !mounted) return;
-    _serviceAcknowledged = true;
+    final serviceIsConnecting = event['isConnecting'] as bool? ?? false;
+    final serviceIsListening = event['isListening'] as bool? ?? false;
+    final statusText = event['statusText'] as String?;
+    // The service emits an initial stopped update before it handles commands.
+    _serviceAcknowledged =
+        serviceIsConnecting ||
+        serviceIsListening ||
+        (statusText != null && statusText != 'الميكروفون متوقف');
     setState(() {
       isListening = event['isListening'] as bool? ?? false;
       _isConnecting = event['isConnecting'] as bool? ?? false;
@@ -76,8 +84,11 @@ class _ListeningScreenState extends State<ListeningScreen>
 
   Future<void> _loadWatchIp() async {
     final prefs = await SharedPreferences.getInstance();
+    final host = await WatchAudioSocket.resolveWatchHost(
+      prefs.getString(kWatchIpPrefsKey),
+    );
     if (!mounted) return;
-    setState(() => _watchIp = prefs.getString(kWatchIpPrefsKey));
+    setState(() => _watchIp = host);
   }
 
   void _handleTap(String videoAsset, VoidCallback action) {
@@ -95,12 +106,6 @@ class _ListeningScreenState extends State<ListeningScreen>
     }
   }
 
-  Future<String?> _promptForWatchIp() async {
-    final ip = await promptForWatchIp(context);
-    if (ip != null && mounted) setState(() => _watchIp = ip);
-    return ip;
-  }
-
   @override
   void dispose() {
     _waveController.dispose();
@@ -116,15 +121,9 @@ class _ListeningScreenState extends State<ListeningScreen>
       return;
     }
 
-    var ip = _watchIp;
-    if (ip == null || ip.isEmpty) {
-      ip = await _promptForWatchIp();
-      if (ip == null) return;
-    }
-
     setState(() {
       _isConnecting = true;
-      detectedSound = 'جاري الاتصال بالساعة...';
+      detectedSound = 'جاري البحث عن الساعة...';
     });
 
     await FlutterBackgroundService().startService();
@@ -133,8 +132,14 @@ class _ListeningScreenState extends State<ListeningScreen>
     // لو وصل أمرنا قبل ما يسجّل مستمعه، البلجن يتجاهله بصمت بدون أي رد.
     // نعيد الإرسال كل شوي لين يوصلنا أول رد يؤكد إن الخدمة استلمت.
     _serviceAcknowledged = false;
-    for (var attempt = 0; attempt < 8 && !_serviceAcknowledged && mounted; attempt++) {
-      FlutterBackgroundService().invoke('start_listening', {'watchIp': ip});
+    for (
+      var attempt = 0;
+      attempt < 8 && !_serviceAcknowledged && mounted;
+      attempt++
+    ) {
+      FlutterBackgroundService().invoke('start_listening', {
+        'watchIp': _watchIp,
+      });
       await Future.delayed(const Duration(milliseconds: 500));
     }
   }
@@ -164,7 +169,7 @@ class _ListeningScreenState extends State<ListeningScreen>
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        _buildWatchIpRow(),
+                        if (_isConnecting) _buildWatchIpRow(),
                         const SizedBox(height: 40),
                         _buildMicAndWaves(),
                         const SizedBox(height: 60),
@@ -196,10 +201,7 @@ class _ListeningScreenState extends State<ListeningScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withValues(alpha: 0.15),
-                border: Border.all(
-                  color: const Color(0xFF181059),
-                  width: 1.5,
-                ),
+                border: Border.all(color: const Color(0xFF181059), width: 1.5),
               ),
               child: const Directionality(
                 textDirection: TextDirection.ltr,
@@ -281,34 +283,21 @@ class _ListeningScreenState extends State<ListeningScreen>
   Widget _buildWatchIpRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: GestureDetector(
-        onTap: isListening ? null : _promptForWatchIp,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.watch, size: 14, color: NabeehColors.slate500),
-            const SizedBox(width: 6),
-            Text(
-              _watchIp == null || _watchIp!.isEmpty
-                  ? 'اضغط لتحديد عنوان IP للساعة'
-                  : 'الساعة: $_watchIp',
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 12,
-                color: NabeehColors.slate500,
-                fontWeight: FontWeight.w600,
-              ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(LucideIcons.watch, size: 14, color: NabeehColors.slate500),
+          const SizedBox(width: 6),
+          const Text(
+            'جاري الاتصال بالساعة عبر الجوال...',
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 12,
+              color: NabeehColors.slate500,
+              fontWeight: FontWeight.w600,
             ),
-            if (!isListening) ...[
-              const SizedBox(width: 6),
-              Icon(
-                LucideIcons.pencil,
-                size: 12,
-                color: NabeehColors.slate500,
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -371,9 +360,10 @@ class _ListeningScreenState extends State<ListeningScreen>
                 children: List.generate(15, (index) {
                   final offset = index * 0.4;
 
-                  final baseRipple = (math.sin(
-                              (_waveController.value * 2 * math.pi) +
-                                  offset) +
+                  final baseRipple =
+                      (math.sin(
+                            (_waveController.value * 2 * math.pi) + offset,
+                          ) +
                           1) /
                       2;
 
