@@ -59,7 +59,10 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  if (constraints.maxHeight >= 600)
+                    const Spacer()
+                  else
+                    const SizedBox(height: 24),
 
                   // ── شعار نبيه ───────────────────────────────────────────
                   Image.asset(
