@@ -11,6 +11,8 @@ import '../features/categories/data/services/category_service.dart';
 import 'audio_utils.dart';
 import 'event_classifier_service.dart';
 import 'watch_audio_socket.dart';
+import 'watch_auth.dart';
+import 'watch_link.dart';
 
 const kListeningNotificationChannelId = 'nabeeh_listening_channel';
 const kListeningNotificationId = 8901;
@@ -106,7 +108,9 @@ void onListeningServiceStart(ServiceInstance service) async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  final watchSocket = WatchAudioSocket();
+  // الاتصال الدائم بالساعة — الخدمة تستلمه من عزلة الواجهة طول جلسة
+  // الاستماع (takeOver) وترجّعه لها بعدها (release).
+  final watchLink = WatchLink.instance;
   // ما نبنيه إلا بعد ما نتأكد إن Firebase انتهت تهيئته — بناؤه فورًا هنا
   // كان يفجّر استثناء غير ملتقط (Firebase.app() قبل ما initializeApp يخلص)
   // يوقف onListeningServiceStart بالكامل قبل ما يوصل لتسجيل service.on(...)،
@@ -198,7 +202,7 @@ void onListeningServiceStart(ServiceInstance service) async {
 
         final watchCode = _kWatchDetectionCodes[result.label];
         if (watchCode != null) {
-          await watchSocket.sendDetectionCode(
+          await watchLink.sendDetectionCode(
             watchCode,
             pattern: _toWatchVibrationCode(soundSetting!.vibrationPattern),
             power: _toWatchVibrationCode(soundSetting.vibrationPower),
@@ -238,7 +242,8 @@ void onListeningServiceStart(ServiceInstance service) async {
   }
 
   Future<void> stopListening() async {
-    await watchSocket.stop();
+    await watchLink.stopAudio();
+    await watchLink.release();
     pcmBuffer.clear();
     isListening = false;
     isConnecting = false;
@@ -249,9 +254,29 @@ void onListeningServiceStart(ServiceInstance service) async {
     await service.stopSelf();
   }
 
-  void onSocketDone() {
-    if (isListening) stopListening();
+  // انقطاع الاتصال (واي فاي، إعادة تشغيل الساعة) ما يوقف الاستماع —
+  // WatchLink يعيد الاتصال بتأخير متزايد ويرجّع البث تلقائيًا، واحنا بس
+  // نوضّح للمستخدمة إن الاستماع معلّق مؤقتًا.
+  void onLinkStateChanged() {
+    if (!isListening) return;
+    if (watchLink.connected.value) {
+      statusText = 'جاري الاستماع من الساعة...';
+      setNotification('يستمع لصوت الساعة الآن');
+    } else if (watchLink.needsPairing.value) {
+      // المفتاح انرفض/انمسح — إعادة الاتصال ما راح تنجح لين تعيد الإقران.
+      statusText = kWatchRepairMessage;
+      setNotification('الساعة تحتاج إعادة إقران');
+    } else {
+      pcmBuffer.clear();
+      audioLevel = 0.0;
+      statusText = 'انقطع الاتصال بالساعة — جاري إعادة المحاولة...';
+      setNotification('انقطع الاتصال بالساعة — جاري إعادة المحاولة');
+    }
+    emitUpdate();
   }
+
+  watchLink.connected.addListener(onLinkStateChanged);
+  watchLink.needsPairing.addListener(onLinkStateChanged);
 
   service.on('start_listening').listen((event) async {
     // الواجهة تعيد إرسال هذا الطلب كم مرة لين تتأكد إنه وصل (تحسّبًا لسباق
@@ -269,15 +294,6 @@ void onListeningServiceStart(ServiceInstance service) async {
     statusText = 'جاري الاتصال بالساعة...';
     emitUpdate();
 
-    final requestedHost = event?['watchIp'] as String?;
-    final host = await WatchAudioSocket.resolveWatchHost(requestedHost);
-    if (host == null || host.isEmpty) {
-      isConnecting = false;
-      statusText = 'لم نعثر على الساعة على الشبكة';
-      emitUpdate();
-      return;
-    }
-
     // نغلّف كل خطوات الاتصال بسقف زمني واحد — لو أي خطوة تعلّقت لأي سبب
     // (تهيئة Firebase، جلب الإعدادات، أو اتصال الساعة نفسه)، ما نخلي
     // الواجهة تعلّق للأبد بانتظار رد ما راح يوصل؛ نطلع خطأ واضح بدلها.
@@ -288,22 +304,27 @@ void onListeningServiceStart(ServiceInstance service) async {
         pcmBuffer.clear();
         detections.clear();
         await loadActiveSoundSettings();
-        await watchSocket.connect(
-          host: host,
-          onData: onAudioData,
-          onError: (_) => stopListening(),
-          onDone: onSocketDone,
-        );
-      }).timeout(const Duration(seconds: 15));
+        await watchLink.takeOver();
+        if (!await watchLink.startAudio(
+          onAudioData,
+          timeout: const Duration(seconds: 25),
+        )) {
+          throw StateError('Nabeeh Watch was not found on the local network');
+        }
+      }).timeout(const Duration(seconds: 40));
       isConnecting = false;
       isListening = true;
       statusText = 'جاري الاستماع من الساعة...';
       emitUpdate();
       await setNotification('يستمع لصوت الساعة الآن');
     } catch (e) {
+      await watchLink.stopAudio();
+      await watchLink.release();
       isConnecting = false;
       isListening = false;
-      statusText = 'تعذّر الاتصال بالساعة — تأكدي من الشبكة';
+      statusText = watchLink.needsPairing.value
+          ? kWatchRepairMessage
+          : 'تعذّر الاتصال بالساعة — تأكدي من الشبكة';
       emitUpdate();
       await service.stopSelf();
     }
