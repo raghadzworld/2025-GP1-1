@@ -3,10 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
-
-import '../services/watch_audio_socket.dart';
+import '../services/watch_auth.dart';
+import '../services/watch_link.dart';
 import '../services/wifi_provisioning_service.dart';
 import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
@@ -19,117 +17,48 @@ class WatchScreen extends StatefulWidget {
 }
 
 class _WatchScreenState extends State<WatchScreen> {
-  String? _watchIp;
   bool _isConnected = false;
   int? _batteryPercent; // null = لم يُستعلَم بعد، -1 = غير متوفرة
   int? _lastSyncSecondsAgo;
   bool _isLoading = false;
-  bool _isDiscovering = false;
-  Timer? _statusTimer;
-  StreamSubscription<Map<String, dynamic>?>? _serviceSub;
+  bool _needsPairing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadIpAndQuery();
-    _serviceSub = FlutterBackgroundService().on('update').listen((event) {
-      if (!mounted || event == null) return;
-      setState(() {
-        _isConnected = event['isListening'] as bool? ?? false;
-        _isLoading = false;
-      });
-    });
-    // نفس فكرة نقطة الاتصال على الساعة نفسها: بدون تحديث دوري، هذي الشاشة
-    // تجمّد على نتيجة أول استعلام لين المستخدمة تسحب للتحديث يدويًا. تكرار
-    // الاستعلام كل ٥ ثوانٍ يخلي "متصلة/غير متصلة" هنا تتبع الحالة الحقيقية
-    // بدل ما تضل قديمة.
-    _statusTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _watchIp == null ? _loadIpAndQuery() : _queryStatus(),
-    );
+    // الاتصال الدائم بالساعة يستطلع حالتها كل ٥ ثوانٍ على نفس الاتصال
+    // المفتوح (أو يسأل خدمة الاستماع لو هي ماسكته) — هذي الشاشة بس تعرض آخر
+    // حالة وصلت، بدون مؤقت ولا اتصال خاص فيها.
+    _applyStatus();
+    WatchLink.instance.status.addListener(_applyStatus);
+    WatchLink.instance.needsPairing.addListener(_applyStatus);
   }
 
   @override
   void dispose() {
-    _statusTimer?.cancel();
-    _serviceSub?.cancel();
+    WatchLink.instance.status.removeListener(_applyStatus);
+    WatchLink.instance.needsPairing.removeListener(_applyStatus);
     super.dispose();
   }
 
-  Future<void> _loadIpAndQuery() async {
-    if (_isDiscovering) return;
-    _isDiscovering = true;
-    final prefs = await SharedPreferences.getInstance();
-    try {
-      final host = await WatchAudioSocket.resolveWatchHost(
-        prefs.getString(kWatchIpPrefsKey),
-      );
-      if (!mounted) return;
-      setState(() => _watchIp = host);
-      await _queryStatus();
-    } finally {
-      _isDiscovering = false;
-    }
+  void _applyStatus() {
+    if (!mounted) return;
+    final status = WatchLink.instance.status.value;
+    setState(() {
+      _needsPairing = WatchLink.instance.needsPairing.value;
+      // A valid status response proves the phone can reach the watch.
+      // status.isConnected describes the watch's own Wi-Fi state, not the
+      // connection between this phone and the watch.
+      _isConnected = status != null;
+      _batteryPercent = status?.batteryPercent;
+      _lastSyncSecondsAgo = status?.lastSyncSecondsAgo;
+    });
   }
 
   Future<void> _queryStatus() async {
     setState(() => _isLoading = true);
-
-    final host = await WatchAudioSocket.resolveWatchHost(_watchIp);
-    if (host == null || host.isEmpty) {
-      if (!mounted) return;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(kWatchIpPrefsKey);
-      setState(() {
-        _watchIp = null;
-        _isLoading = false;
-        _isConnected = false;
-        _batteryPercent = null;
-        _lastSyncSecondsAgo = null;
-      });
-      return;
-    }
-    if (mounted && _watchIp != host) {
-      setState(() => _watchIp = host);
-    }
-
-    // خدمة الاستماع بالخلفية (لو شغّالة) ماسكة الاتصال الوحيد اللي الساعة
-    // تقبله — فتح اتصال ثاني للاستعلام بينافسه ويفشل. وجود الخدمة شغّالة
-    // أصلاً دليل كافٍ إن الساعة متصلة، بدون داعي لاستعلام TCP منفصل.
-    if (await FlutterBackgroundService().isRunning()) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      FlutterBackgroundService().invoke('request_status');
-      return;
-    }
-
-    final status = await WatchAudioSocket.queryStatus(host);
-    debugPrint(
-      status == null
-          ? 'WatchAudioSocket.queryStatus($host) failed — no response'
-          : 'WatchAudioSocket.queryStatus($host) => isConnected=${status.isConnected} battery=${status.batteryPercent} lastSync=${status.lastSyncSecondsAgo}',
-    );
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      if (status != null) {
-        // A valid status response proves the phone can reach the watch.
-        // status.isConnected describes the watch's own Wi-Fi state, not the
-        // connection between this phone and the watch.
-        _isConnected = true;
-        _batteryPercent = status.batteryPercent;
-        _lastSyncSecondsAgo = status.lastSyncSecondsAgo;
-      } else {
-        _isConnected = false;
-        _batteryPercent = null;
-        _lastSyncSecondsAgo = null;
-      }
-    });
-    if (status == null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(kWatchIpPrefsKey);
-      if (mounted) setState(() => _watchIp = null);
-    }
+    await WatchLink.instance.refresh();
+    if (mounted) setState(() => _isLoading = false);
   }
 
   // القيمة الخام بالثواني تمثّل مدة الاتصال الحالي وهي متصلة (تزيد من صفر)،
@@ -277,15 +206,24 @@ class _WatchScreenState extends State<WatchScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(LucideIcons.watch, size: 14, color: NabeehColors.gray),
+          Icon(
+            _needsPairing ? LucideIcons.alertTriangle : LucideIcons.watch,
+            size: 14,
+            color: _needsPairing ? Colors.redAccent : NabeehColors.gray,
+          ),
           const SizedBox(width: 6),
-          Text(
-            'للاتصال بالساعة، تأكد من أن الجوال والساعة على نفس الشبكة',
-            style: const TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              fontSize: 12,
-              color: NabeehColors.gray,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              _needsPairing
+                  ? kWatchRepairMessage
+                  : 'للاتصال بالساعة، تأكد من أن الجوال والساعة على نفس الشبكة',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 12,
+                color: _needsPairing ? Colors.redAccent : NabeehColors.gray,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
