@@ -18,17 +18,19 @@ import 'nabeeh_colors.dart';
 // =====================================================================
 // إعدادات Azure Speech Services — عدّليها بمفاتيحك من Azure Portal
 // =====================================================================
-const String _kAzureSpeechKey = '9lz61KqwP59MlMj2RS7yTugTWEkRDXBrZ49UDKnxCPAA05XOTpNQJQQJ99CHACI8hq2XJ3w3AAAYACOGYzD0';
-const String _kAzureRegion = 'switzerlandnorth'; // مثلاً: uaenorth, westeurope ...
+const String _kAzureSpeechKey =
+    '9lz61KqwP59MlMj2RS7yTugTWEkRDXBrZ49UDKnxCPAA05XOTpNQJQQJ99CHACI8hq2XJ3w3AAAYACOGYzD0';
+const String _kAzureRegion =
+    'switzerlandnorth'; // مثلاً: uaenorth, westeurope ...
 const String _kSttLanguageCode = 'ar-SA'; // أو ar-EG, ar-AE حسب اللهجة
 const String _kTtsLanguageCode = 'ar-KW';
 const String _kTtsVoiceName = 'ar-KW-FahedNeural';
 
 // ------------------- إعدادات كشف الكلام (لعرض الويف فقط) -------------------
-const double _kSilenceDbThreshold = -35.0; // فوق هذا القدر = "فيه كلام"، وتحته "سكوت"
+const double _kSilenceDbThreshold =
+    -35.0; // فوق هذا القدر = "فيه كلام"، وتحته "سكوت"
 
 // ------------------- إعدادات سرعة النطق (TTS) -------------------
-// راوح بين هالحدين عشان تتحكمين بسرعة الصوت. قللناهم شوي عشان النطق يصير أبطأ.
 const double _kTtsMinRate = 0.93;
 const double _kTtsMaxRate = 1.02;
 
@@ -44,6 +46,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   bool _isSttMode = true;
   bool _isRecording = false;
   bool _isSpeaking = false;
+  bool _isTtsLoading = false; // 👈 جديد (AC5): "جاري التحميل" منفصل عن "يتكلم"
   String _textContent = '';
   Timer? _speakingTimer;
   final FocusNode _textFocusNode = FocusNode();
@@ -78,6 +81,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   @override
   void dispose() {
     _speakingTimer?.cancel();
+    _sttConnectTimeoutTimer?.cancel();
     _recorderSubscription?.cancel();
     _pcmSubscription?.cancel();
     _pcmStreamController?.close();
@@ -108,28 +112,27 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     }
   }
 
+  bool _isStartingStt = false;
+
   void _toggleRecording() async {
+    if (_isStartingStt) return;
     if (_isRecording) {
       await _stopListening();
-    } else {
-      setState(() => _textContent = '');
-      await _startListening();
+      if (mounted) setState(() => _isRecording = false);
+      return;
     }
-    setState(() => _isRecording = !_isRecording);
+    setState(() => _textContent = '');
+    // ما نعرض حالة "يستمع" إلا بعد ما يتأكد فعلًا إن الاتصال بخدمة التعرّف
+    // على الكلام نجح — قبل كانت تتقلب لـ"يستمع" حتى لو ما فيه إنترنت.
+    _isStartingStt = true;
+    final started = await _startListening();
+    _isStartingStt = false;
+    if (mounted) setState(() => _isRecording = started);
   }
 
   // =====================================================================
   // Real-time Speech-to-Text عبر بروتوكول Azure الـ WebSocket (بث حي)
   // =====================================================================
-  //
-  // بدل الإرسال دفعة-دفعة (REST) بعد كل سكوت، نفتح اتصال WebSocket مع Azure
-  // ونبث الصوت أول بأول أثناء ما تتكلمين، وياخذين ردود جزئية (speech.hypothesis)
-  // تتحدث لحظياً، وردود نهائية (speech.phrase) بعد كل جملة — تماماً مثل ترجمة
-  // قوقل. ملاحظة: بروتوكول Azure الخام (framing) موثّق جزئياً وغير رسمي لـ
-  // Flutter، فالكود جرّبته بأفضل معرفتي لكنه ما اختُبر فعلياً على سيرفر Azure
-  // حي (ما عندي وصول شبكة لـ Azure هنا) — لازم تجربينه وتتابعين الـ debug
-  // console لو صار خطأ بتنسيق الرسائل.
-
   IOWebSocketChannel? _sttChannel;
   StreamSubscription? _sttSub;
   StreamController<Uint8List>? _pcmStreamController;
@@ -141,27 +144,55 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   bool _isFirstAudioFrame = true;
 
   bool _isUserSpeaking = false;
+  Timer? _sttConnectTimeoutTimer;
+  bool _hasReceivedAnySttMessage = false;
 
-  Future<void> _startListening() async {
+  static const _kNoInternetMessage =
+      'لا يوجد اتصال بالإنترنت، تحقق من الشبكة وحاول مرة أخرى';
+
+  /// فحص سريع إن الجوال يقدر يوصل لسيرفر Azure فعلًا (مو بس متصل بواي فاي).
+  Future<bool> _hasInternet() async {
+    try {
+      final result = await InternetAddress.lookup(
+        '$_kAzureRegion.stt.speech.microsoft.com',
+      ).timeout(const Duration(seconds: 3));
+      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// يرجّع true فقط لو الاستماع بدأ فعلًا.
+  Future<bool> _startListening() async {
     final status = await Permission.microphone.request();
     if (!status.isGranted) {
       debugPrint('Microphone permission denied');
       _showEmptyTextWarning('صلاحية الوصول للمايكروفون مطلوبة');
-      return;
+      return false;
+    }
+
+    if (!await _hasInternet()) {
+      _showEmptyTextWarning(_kNoInternetMessage);
+      return false;
     }
 
     _confirmedTranscript = '';
     _currentHypothesis = '';
     _isFirstAudioFrame = true;
+    _hasReceivedAnySttMessage = false;
     _sttRequestId = _newId();
 
     try {
       await _connectSttSocket();
       await _startStreamingAudio();
+      return true;
     } catch (e) {
       debugPrint('STT START ERROR: $e');
-      _showEmptyTextWarning('تعذر بدء الاستماع');
       await _stopListening();
+      _showEmptyTextWarning(
+        await _hasInternet() ? 'تعذر بدء الاستماع' : _kNoInternetMessage,
+      );
+      return false;
     }
   }
 
@@ -179,14 +210,36 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         'X-ConnectionId': connectionId,
       },
     );
+    // ننتظر لين يكتمل الاتصال فعلًا — لو فشل (ما فيه إنترنت) يطلع خطأ هنا
+    // ويوصل لـ catch في _startListening بدل ما يضيع بصمت.
+    await _sttChannel!.ready.timeout(const Duration(seconds: 8));
 
     _sttSub = _sttChannel!.stream.listen(
       _handleSttMessage,
-      onError: (e) => debugPrint('STT SOCKET ERROR: $e'),
-      onDone: () => debugPrint('STT SOCKET CLOSED'),
+      onError: (e) {
+        debugPrint('STT SOCKET ERROR: $e');
+        if (_isRecording) {
+          _handleSttConnectionFailure();
+        }
+      },
+      onDone: () {
+        debugPrint('STT SOCKET CLOSED');
+        if (_isRecording) {
+          _handleSttConnectionFailure();
+        }
+      },
     );
 
-    // نضمن إن القناة جاهزة قبل ما نرسل speech.config
+    // شبكة أمان: لو ما وصل أي رد من Azure خلال 8 ثواني من بدء الاتصال
+    // (سيرفر بطيء جداً أو ما يرد)، نعتبرها فشل اتصال بدل ما نعلّق للأبد.
+    _sttConnectTimeoutTimer?.cancel();
+    _sttConnectTimeoutTimer = Timer(const Duration(seconds: 8), () {
+      if (_isRecording && !_hasReceivedAnySttMessage) {
+        debugPrint('STT SOCKET CONNECT TIMEOUT');
+        _handleSttConnectionFailure();
+      }
+    });
+
     await Future.delayed(const Duration(milliseconds: 100));
 
     final timestamp = DateTime.now().toUtc().toIso8601String();
@@ -226,12 +279,10 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       if (!mounted) return;
       final db = event.decibels ?? -160.0;
 
-      // تحديث الأمواج المرئية
       double normalized = ((db + 40) / 40).clamp(0.0, 1.0);
       double smooth = _amplitude + (normalized - _amplitude) * 0.3;
       setState(() => _amplitude = smooth);
 
-      // أول ما نكتشف كلام فعلي، الويف يفضل ظاهر لين تطفين المايك بنفسك
       if (db > _kSilenceDbThreshold && !_isUserSpeaking) {
         setState(() => _isUserSpeaking = true);
       }
@@ -248,13 +299,15 @@ class _SttTtsScreenState extends State<SttTtsScreen>
 
     if (_isFirstAudioFrame) {
       payload = Uint8List.fromList([..._buildWavHeader(), ...chunk]);
-      header = 'Path:audio\r\n'
+      header =
+          'Path:audio\r\n'
           'X-RequestId:$_sttRequestId\r\n'
           'X-Timestamp:$timestamp\r\n'
           'Content-Type:audio/x-wav\r\n';
       _isFirstAudioFrame = false;
     } else {
-      header = 'Path:audio\r\n'
+      header =
+          'Path:audio\r\n'
           'X-RequestId:$_sttRequestId\r\n'
           'X-Timestamp:$timestamp\r\n';
     }
@@ -277,7 +330,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     channel.sink.add(frame.toBytes());
   }
 
-  /// رأس WAV بسيط (44 بايت) بحجم بيانات غير معروف (بث حي)
   List<int> _buildWavHeader() {
     const sampleRate = 16000;
     const bitsPerSample = 16;
@@ -302,8 +354,12 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     return header.toBytes();
   }
 
-  List<int> _uint32le(int v) =>
-      [v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF];
+  List<int> _uint32le(int v) => [
+    v & 0xFF,
+    (v >> 8) & 0xFF,
+    (v >> 16) & 0xFF,
+    (v >> 24) & 0xFF,
+  ];
   List<int> _uint16le(int v) => [v & 0xFF, (v >> 8) & 0xFF];
 
   String _newId() {
@@ -313,10 +369,15 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   void _handleSttMessage(dynamic message) {
-    if (message is! String) return; // ما نتوقع بيانات ثنائية من السيرفر هنا
+    if (message is! String) return;
+
+    _hasReceivedAnySttMessage = true; // 👈 وصل رد فعلي، الاتصال شغّال
+    _sttConnectTimeoutTimer?.cancel();
 
     final sepIndex = message.indexOf('\r\n\r\n');
-    final headerPart = sepIndex == -1 ? message : message.substring(0, sepIndex);
+    final headerPart = sepIndex == -1
+        ? message
+        : message.substring(0, sepIndex);
     final bodyPart = sepIndex == -1 ? '' : message.substring(sepIndex + 4);
 
     String? path;
@@ -340,7 +401,10 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         _currentHypothesis = text;
         if (mounted) {
           setState(() {
-            _textContent = _joinTranscript(_confirmedTranscript, _currentHypothesis);
+            _textContent = _joinTranscript(
+              _confirmedTranscript,
+              _currentHypothesis,
+            );
           });
         }
         break;
@@ -356,8 +420,26 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         break;
 
       default:
-        break; // turn.start / speech.startDetected / speech.endDetected / turn.end
+        break;
     }
+  }
+
+  /// AC6: لو انقطع اتصال WebSocket فجأة أثناء الاستماع (فشل شبكة، انقطاع
+  /// سيرفر، إلخ)، نعرض رسالة واضحة للمستخدم ونوقف الاستماع بأمان بدل ما
+  /// نسيبه بحالة معلّقة يظن فيها إنه لسا يستمع.
+  bool _isHandlingSttFailure = false;
+
+  Future<void> _handleSttConnectionFailure() async {
+    if (_isHandlingSttFailure) return;
+    _isHandlingSttFailure = true;
+
+    await _stopListening();
+    if (mounted) {
+      setState(() => _isRecording = false);
+      _showEmptyTextWarning('انقطع الاتصال، تحقق من الإنترنت وحاول مرة أخرى');
+    }
+
+    _isHandlingSttFailure = false;
   }
 
   String _joinTranscript(String base, String addition) {
@@ -367,6 +449,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   Future<void> _stopListening() async {
+    _sttConnectTimeoutTimer?.cancel();
+    _sttConnectTimeoutTimer = null;
     _recorderSubscription?.cancel();
     _recorderSubscription = null;
 
@@ -379,7 +463,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     await _pcmStreamController?.close();
     _pcmStreamController = null;
 
-    // نرسل إشارة "خلصت الصوت" للسيرفر (frame فارغ) بعدها نقفل
     final channel = _sttChannel;
     if (channel != null) {
       try {
@@ -416,7 +499,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     });
   }
 
-  // --- Shared warning SnackBar style (red ribbon) for empty-text actions ---
   void _showEmptyTextWarning(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -489,7 +571,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       return;
     }
 
-    setState(() => _isSpeaking = true);
+    // AC5: نظهر مؤشر التحميل فوراً، بدل ما نغيّر حالة "يتكلم" مباشرة
+    setState(() => _isTtsLoading = true);
 
     final url = Uri.parse(
       'https://$_kAzureRegion.tts.speech.microsoft.com/cognitiveservices/v1',
@@ -497,27 +580,41 @@ class _SttTtsScreenState extends State<SttTtsScreen>
 
     final preparedText = _prepareTextForNaturalSpeech(_textContent);
 
-    final ssml = '''<speak version='1.0' xml:lang='$_kTtsLanguageCode'>
+    final ssml =
+        '''<speak version='1.0' xml:lang='$_kTtsLanguageCode'>
   <voice xml:lang='$_kTtsLanguageCode' name='$_kTtsVoiceName'>
     ${_buildExpressiveSsml(preparedText)}
   </voice>
 </speak>''';
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
-        },
-        body: utf8.encode(ssml),
-      );
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
+              'Content-Type': 'application/ssml+xml',
+              'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
+            },
+            body: utf8.encode(ssml),
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw TimeoutException('TTS request timed out'),
+          );
 
       if (response.statusCode == 200) {
         final dir = await getTemporaryDirectory();
         final file = File('${dir.path}/tts_output.mp3');
         await file.writeAsBytes(response.bodyBytes);
+
+        // AC5: نطفي مؤشر التحميل ونفعّل "يتكلم" بنفس لحظة بدء التشغيل الفعلي
+        if (mounted) {
+          setState(() {
+            _isTtsLoading = false;
+            _isSpeaking = true;
+          });
+        }
 
         await _audioPlayer.play(DeviceFileSource(file.path));
         _audioPlayer.onPlayerComplete.listen((_) {
@@ -526,14 +623,29 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       } else {
         debugPrint('Azure TTS Error: ${response.statusCode} ${response.body}');
         if (mounted) {
-          setState(() => _isSpeaking = false);
+          setState(() {
+            _isTtsLoading = false;
+            _isSpeaking = false;
+          });
           _showEmptyTextWarning('تعذر تحويل النص إلى صوت');
         }
+      }
+    } on TimeoutException {
+      debugPrint('Azure TTS Timeout');
+      if (mounted) {
+        setState(() {
+          _isTtsLoading = false;
+          _isSpeaking = false;
+        });
+        _showEmptyTextWarning('الاتصال بطيء جداً، حاولي مرة أخرى');
       }
     } catch (e) {
       debugPrint('Azure TTS Exception: $e');
       if (mounted) {
-        setState(() => _isSpeaking = false);
+        setState(() {
+          _isTtsLoading = false;
+          _isSpeaking = false;
+        });
         _showEmptyTextWarning('تحقق من الاتصال بالإنترنت');
       }
     }
@@ -556,16 +668,10 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         .replaceAll("'", '&apos;');
   }
 
-  /// يضيف سكتات قصيرة بعد علامات الترقيم داخل الجملة الواحدة (بعد الفواصل
-  /// مثلاً)، يُستدعى بعد الـ escape.
   String _addNaturalPauses(String escapedText) {
     return escapedText.replaceAll('، ', '،<break time="180ms"/> ');
   }
 
-  /// يقسم النص لجمل، وكل جملة يديها نبرة/سرعة مختلفة شوي بشكل عشوائي
-  /// بسيط، عشان نكسر الرتابة الآلية اللي تصير لما كل النص يتنطق بنفس
-  /// النبرة الثابتة من أول لآخر. السرعة الأساسية دحين أبطأ شوي
-  /// (_kTtsMinRate إلى _kTtsMaxRate) حسب طلبك.
   String _buildExpressiveSsml(String text) {
     final sentences = _splitIntoSentences(text);
     if (sentences.isEmpty) {
@@ -579,7 +685,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       final sentence = sentences[i].trim();
       if (sentence.isEmpty) continue;
 
-      final pitchOffset = -3 + rnd.nextInt(7); // بين -3% و +3%
+      final pitchOffset = -3 + rnd.nextInt(7);
       final rate = _kTtsMinRate + rnd.nextDouble() * rateRange;
       final pitchStr = pitchOffset >= 0 ? '+$pitchOffset%' : '$pitchOffset%';
 
@@ -626,47 +732,65 @@ class _SttTtsScreenState extends State<SttTtsScreen>
               end: Alignment.bottomCenter,
             ),
           ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 40),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildModeSwitcher(),
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: DefaultTextStyle.merge(
-                    style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
-                    child: AnimatedSwitcher(
-                      duration: 250.ms,
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      layoutBuilder: (currentChild, previousChildren) => Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ...previousChildren,
-                          if (currentChild case final child?) child,
-                        ],
-                      ),
-                      child: _isSttMode
-                          ? KeyedSubtree(
-                              key: const ValueKey('stt'),
-                              child: _buildSttView(),
-                            )
-                          : KeyedSubtree(
-                              key: const ValueKey('tts'),
-                              child: _buildTtsView(),
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: SafeArea(top: false, child: _buildBody(context)),
         ),
+      ),
+    );
+  }
+
+  // ارتفاع محتوى كل وضع: بطاقة ٣٤٠ + مسافة ٤٠ + زر ١٢٠ + مسافة ٢٠.
+  static const double _kModeContentHeight = 520;
+
+  Widget _buildBody(BuildContext context) {
+    final content = _buildModeContent();
+    // بالوضع الأفقي الارتفاع المتاح (~٣٩٠) أقل بكثير من الهيدر + المحتوى،
+    // فنخلي الصفحة كلها تتمرر بدل ما يتبقى للمحتوى شريط صغير ويطلع overflow.
+    if (MediaQuery.orientationOf(context) == Orientation.landscape) {
+      return SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(context),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _buildModeSwitcher(),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(height: _kModeContentHeight, child: content),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        _buildHeader(context),
+        const SizedBox(height: 40),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildModeSwitcher(),
+        ),
+        const SizedBox(height: 20),
+        Expanded(child: content),
+      ],
+    );
+  }
+
+  Widget _buildModeContent() {
+    return DefaultTextStyle.merge(
+      style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+      child: AnimatedSwitcher(
+        duration: 250.ms,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (currentChild, previousChildren) => Stack(
+          fit: StackFit.expand,
+          children: [
+            ...previousChildren,
+            if (currentChild case final child?) child,
+          ],
+        ),
+        child: _isSttMode
+            ? KeyedSubtree(key: const ValueKey('stt'), child: _buildSttView())
+            : KeyedSubtree(key: const ValueKey('tts'), child: _buildTtsView()),
       ),
     );
   }
@@ -854,131 +978,136 @@ class _SttTtsScreenState extends State<SttTtsScreen>
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 340,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: NabeehColors.slate100),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  if (!hasText) ...[
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (showWaveform) ...[
-                              _buildRecordingWaveform(),
-                              const SizedBox(height: 16),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            SizedBox(
+              height: 340,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: NabeehColors.slate100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    if (!hasText) ...[
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (showWaveform) ...[
+                                _buildRecordingWaveform(),
+                                const SizedBox(height: 16),
+                              ],
+                              Text(
+                                !_isRecording
+                                    ? 'اضغط على المايك للبدء'
+                                    : (showWaveform
+                                          ? 'جارِ الاستماع...'
+                                          : 'ابدأ التحدث الآن...'),
+                                style: const TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  color: NabeehColors.slate500,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _isRecording
+                                    ? 'سيظهر النص الملتقط هنا مباشرة'
+                                    : 'سيظهر النص الملتقط هنا عند البدء بالاستماع',
+                                style: const TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  color: NabeehColors.slate400,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ],
-                            Text(
-                              !_isRecording
-                                  ? 'اضغط على المايك للبدء'
-                                  : (showWaveform
-                                      ? 'جارِ الاستماع...'
-                                      : 'ابدأ التحدث الآن...'),
-                              style: const TextStyle(
-                                fontFamily: 'IBMPlexSansArabic',
-                                color: NabeehColors.slate500,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                height: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _isRecording
-                                  ? 'سيظهر النص الملتقط هنا مباشرة'
-                                  : 'سيظهر النص الملتقط هنا عند البدء بالاستماع',
-                              style: const TextStyle(
-                                fontFamily: 'IBMPlexSansArabic',
-                                color: NabeehColors.slate400,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    if (showWaveform) ...[
-                      _buildRecordingWaveform(),
-                      const SizedBox(height: 16),
-                      const Divider(color: NabeehColors.slate100),
-                      const SizedBox(height: 16),
-                    ],
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Text(
-                          _textContent,
-                          style: const TextStyle(
-                            fontFamily: 'IBMPlexSansArabic',
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: NabeehColors.dark,
-                            letterSpacing: -0.5,
-                            height: 1.4,
                           ),
                         ),
                       ),
-                    ),
-                    if (!_isRecording) ...[
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          _buildToolsIcon(LucideIcons.copy, onTap: _copyText),
-                        ],
+                    ] else ...[
+                      if (showWaveform) ...[
+                        _buildRecordingWaveform(),
+                        const SizedBox(height: 16),
+                        const Divider(color: NabeehColors.slate100),
+                        const SizedBox(height: 16),
+                      ],
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Text(
+                            _textContent,
+                            style: const TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: NabeehColors.dark,
+                              letterSpacing: -0.5,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
                       ),
+                      if (!_isRecording) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            _buildToolsIcon(LucideIcons.copy, onTap: _copyText),
+                          ],
+                        ),
+                      ],
                     ],
                   ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
-          GestureDetector(
-            onTap: _toggleRecording,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isRecording
-                    ? NabeehColors.lightBlue.withValues(alpha: 0.1)
-                    : NabeehColors.slate200.withValues(alpha: 0.5),
-                boxShadow: _isRecording
-                    ? [
-                        BoxShadow(
-                          color: NabeehColors.lightBlue.withValues(alpha: 0.2),
-                          blurRadius: 40,
-                          spreadRadius: 10,
-                        ),
-                      ]
-                    : [],
-              ),
-              child: Center(
-                child: Icon(
-                  _isRecording ? LucideIcons.mic : LucideIcons.micOff,
-                  size: 50,
-                  color:
-                      _isRecording ? NabeehColors.lightBlue : NabeehColors.slate400,
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 40),
+            GestureDetector(
+              onTap: _toggleRecording,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isRecording
+                      ? NabeehColors.lightBlue.withValues(alpha: 0.1)
+                      : NabeehColors.slate200.withValues(alpha: 0.5),
+                  boxShadow: _isRecording
+                      ? [
+                          BoxShadow(
+                            color: NabeehColors.lightBlue.withValues(
+                              alpha: 0.2,
+                            ),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: Icon(
+                    _isRecording ? LucideIcons.mic : LucideIcons.micOff,
+                    size: 50,
+                    color: _isRecording
+                        ? NabeehColors.lightBlue
+                        : NabeehColors.slate400,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -992,139 +1121,153 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         ),
         child: Column(
           children: [
-          SizedBox(
-            height: 340,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: NabeehColors.slate100),
-              ),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ttsController,
-                      focusNode: _textFocusNode,
-                      maxLines: null,
-                      expands: true,
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.right,
-                      onChanged: (value) => setState(() => _textContent = value),
-                      decoration: const InputDecoration(
-                        hintText: 'اكتب ما تريد قوله هنا...',
-                        hintStyle: TextStyle(
-                          fontFamily: 'IBMPlexSansArabic',
-                          color: NabeehColors.slate400,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+            SizedBox(
+              height: 340,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: NabeehColors.slate100),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ttsController,
+                        focusNode: _textFocusNode,
+                        maxLines: null,
+                        expands: true,
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.right,
+                        onChanged: (value) =>
+                            setState(() => _textContent = value),
+                        decoration: const InputDecoration(
+                          hintText: 'اكتب ما تريد قوله هنا...',
+                          hintStyle: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            color: NabeehColors.slate400,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                         ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                      ),
-                      cursorColor: NabeehColors.darkBlue,
-                      style: const TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                        height: 1.6,
-                      ),
-                    ),
-                  ),
-                  if (_textContent.trim().isEmpty)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          'مرحبا',
-                          'كيف حالك؟',
-                          'أنا بحاجة للمساعدة',
-                          'شكراً لك',
-                        ]
-                            .map(
-                              (phrase) => Padding(
-                                padding:
-                                    const EdgeInsetsDirectional.only(start: 8),
-                                child: _buildPhrase(phrase),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  const Divider(color: NabeehColors.slate100),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          _buildToolsIcon(LucideIcons.x, onTap: _clearText),
-                        ],
-                      ),
-                      Text(
-                        '${_textContent.length} أحرف',
+                        cursorColor: NabeehColors.darkBlue,
                         style: const TextStyle(
                           fontFamily: 'IBMPlexSansArabic',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: NabeehColors.slate400,
-                          letterSpacing: 1,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                          height: 1.6,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
-          GestureDetector(
-            onTap: _speakText,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isSpeaking
-                    ? NabeehColors.lightBlue.withValues(alpha: 0.1)
-                    : NabeehColors.slate200.withValues(alpha: 0.5),
-                boxShadow: _isSpeaking
-                    ? [
-                        BoxShadow(
-                          color: NabeehColors.lightBlue.withValues(alpha: 0.2),
-                          blurRadius: 40,
-                          spreadRadius: 10,
+                    ),
+                    if (_textContent.trim().isEmpty)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children:
+                              [
+                                    'مرحبا',
+                                    'كيف حالك؟',
+                                    'أنا بحاجة للمساعدة',
+                                    'شكراً لك',
+                                  ]
+                                  .map(
+                                    (phrase) => Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                        start: 8,
+                                      ),
+                                      child: _buildPhrase(phrase),
+                                    ),
+                                  )
+                                  .toList(),
                         ),
-                      ]
-                    : [],
-              ),
-              child: Center(
-                child: Icon(
-                  LucideIcons.volume2,
-                  size: 50,
-                  color:
-                      _isSpeaking ? NabeehColors.lightBlue : NabeehColors.slate400,
+                      ),
+                    const SizedBox(height: 8),
+                    const Divider(color: NabeehColors.slate100),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            _buildToolsIcon(LucideIcons.x, onTap: _clearText),
+                          ],
+                        ),
+                        Text(
+                          '${_textContent.length} أحرف',
+                          style: const TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: NabeehColors.slate400,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
+            const SizedBox(height: 40),
+            GestureDetector(
+              onTap: _isTtsLoading ? null : _speakText,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: (_isSpeaking || _isTtsLoading)
+                      ? NabeehColors.lightBlue.withValues(alpha: 0.1)
+                      : NabeehColors.slate200.withValues(alpha: 0.5),
+                  boxShadow: (_isSpeaking || _isTtsLoading)
+                      ? [
+                          BoxShadow(
+                            color: NabeehColors.lightBlue.withValues(
+                              alpha: 0.2,
+                            ),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: _isTtsLoading
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              NabeehColors.lightBlue,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          LucideIcons.volume2,
+                          size: 50,
+                          color: _isSpeaking
+                              ? NabeehColors.lightBlue
+                              : NabeehColors.slate400,
+                        ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRecordingWaveform() {
-    return SizedBox(
-      height: 90,
-      child: _buildWaveBars(isActive: _isRecording),
-    );
+    return SizedBox(height: 90, child: _buildWaveBars(isActive: _isRecording));
   }
 
   Widget _buildWaveBars({required bool isActive}) {
