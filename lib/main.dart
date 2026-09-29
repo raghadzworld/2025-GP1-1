@@ -18,6 +18,7 @@ import 'screens/login_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'services/listening_background_service.dart';
 import 'services/reminder_alarm_service.dart';
+import 'services/watch_link.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,9 @@ void main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
   runApp(const NabeehApp());
+  // اتصال واحد دائم بالساعة طول استخدام التطبيق — يُفتح مرة وحدة هنا وكل
+  // الشاشات والخدمات تستخدمه بدل ما تفتح اتصال جديد مع كل استعلام.
+  unawaited(WatchLink.instance.start());
   // نهيّئ خدمة الاستماع الخلفية بعد أول رسمة للواجهة، مو قبلها — لو تعلّقت
   // هذي الخطوة لأي سبب (مثلاً حالة خدمة تالفة بعد تعطّل سابق بنظام أندرويد)،
   // ما نبي المستخدم يعلق على شاشة بيضاء بدون أي واجهة للأبد بانتظارها.
