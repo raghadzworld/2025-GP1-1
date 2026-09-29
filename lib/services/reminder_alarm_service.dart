@@ -12,6 +12,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'watch_audio_socket.dart';
+import 'watch_link.dart';
 
 /// جدولة تذكيرات تشتغل حتى لو التطبيق مقفول بالكامل.
 ///
@@ -478,8 +479,8 @@ class ReminderAlarmService {
         }
       }
 
-      await WatchAudioSocket.sendRemindersToHost(
-        watchIp,
+      // عبر الاتصال الدائم (أو عبر مالكه لو هي خدمة الاستماع حاليًا).
+      await WatchLink.instance.sendReminders(
         buildWatchSchedulePayload(metas),
         timeout: const Duration(seconds: 3),
       ).timeout(const Duration(seconds: 6));
@@ -532,8 +533,9 @@ Future<void> reminderAlarmCallback(int id) async {
   final clampedPattern = vibrationPattern.clamp(1, 3);
   final clampedPower = vibrationPower.clamp(1, 3);
   try {
-    await WatchAudioSocket.sendCodeToHostDirect(
-      watchIp,
+    // لو التطبيق شغّال، الأمر يمر عبر اتصاله الدائم المفتوح؛ وإلا WatchLink
+    // يفتح اتصال مؤقت للإرسال فقط.
+    await WatchLink.instance.sendDetectionCode(
       'T', // تذكير — انظر main.cpp: result_codes[]
       pattern: 4 - clampedPattern,
       power: 4 - clampedPower,
