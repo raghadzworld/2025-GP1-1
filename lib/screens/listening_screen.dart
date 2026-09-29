@@ -7,6 +7,7 @@ import 'dart:async';
 import 'nabeeh_colors.dart';
 import '../services/sign_language_mode.dart';
 import '../services/watch_audio_socket.dart';
+import '../services/watch_link.dart';
 import 'sign_language_player_screen.dart';
 
 class ListeningScreen extends StatefulWidget {
@@ -83,10 +84,10 @@ class _ListeningScreenState extends State<ListeningScreen>
   }
 
   Future<void> _loadWatchIp() async {
+    // بدون فحص اتصال جديد — الساعة تقبل عميل واحد والاتصال الدائم ماسكه.
     final prefs = await SharedPreferences.getInstance();
-    final host = await WatchAudioSocket.resolveWatchHost(
-      prefs.getString(kWatchIpPrefsKey),
-    );
+    final host =
+        WatchLink.instance.host ?? prefs.getString(kWatchIpPrefsKey);
     if (!mounted) return;
     setState(() => _watchIp = host);
   }
