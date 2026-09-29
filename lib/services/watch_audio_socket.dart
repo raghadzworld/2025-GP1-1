@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'watch_auth.dart';
+import 'watch_link.dart';
+
 /// مفتاح SharedPreferences المشترك لعنوان IP الخاص بالساعة — نفس المفتاح
 /// تستخدمه كل الشاشات (الاستماع، الساعة، الرئيسية) عشان يبقى IP واحد فقط.
 const kWatchIpPrefsKey = 'watch_ip';
@@ -23,25 +26,26 @@ class WatchStatus {
   });
 }
 
-/// Raw-TCP client for the watch's audio streaming protocol.
+/// Discovery helpers and one-shot fallbacks for the watch's TCP protocol
+/// on `<watchIp>:3333`.
 ///
-/// Connects to `<watchIp>:3333`, sends 'r' (0x72) to start a continuous
-/// raw PCM16 mono 16kHz audio stream, and 's' (0x73) to stop it.
+/// The app talks to the watch over the single persistent connection in
+/// [WatchLink]; the `*Once` helpers below open a short-lived connection and
+/// are only used by [WatchLink] when no isolate owns that connection (e.g. a
+/// reminder alarm firing while the app itself is not running).
 class WatchAudioSocket {
-  Socket? _socket;
-  StreamSubscription<Uint8List>? _subscription;
-  String? _host;
-
   static const int port = 3333;
   static const int sampleRate = 16000;
-
-  bool get isConnected => _socket != null;
 
   /// Finds the watch on the local Wi-Fi network without asking the user for
   /// its changing DHCP address. The cached IP remains a fallback for networks
   /// that block multicast DNS.
+  ///
+  /// [cancelled] يوقف البحث بين الخطوات — WatchLink يستخدمه لما يتنازل عن
+  /// الاتصال لخدمة الاستماع، عشان ما يضل يفحص الساعة وقتها.
   static Future<String?> discoverWatchHost({
     Duration timeout = const Duration(seconds: 3),
+    bool Function()? cancelled,
   }) async {
     final client = MDnsClient();
     try {
@@ -51,6 +55,7 @@ class WatchAudioSocket {
         ResourceRecordQuery.serverPointer('$_watchServiceType.local'),
       )) {
         if (DateTime.now().isAfter(deadline)) break;
+        if (cancelled?.call() ?? false) return null;
         if (!ptr.domainName.startsWith('$_watchServiceName.')) continue;
 
         await for (final srv in client.lookup<SrvResourceRecord>(
@@ -71,7 +76,8 @@ class WatchAudioSocket {
     } finally {
       client.stop();
     }
-    return discoverWatchHostByScan(timeout: timeout);
+    if (cancelled?.call() ?? false) return null;
+    return discoverWatchHostByScan(timeout: timeout, cancelled: cancelled);
   }
 
   /// Fallback for networks that block multicast DNS. The probe is limited to
@@ -79,6 +85,7 @@ class WatchAudioSocket {
   /// network can never be treated as a live watch connection.
   static Future<String?> discoverWatchHostByScan({
     Duration timeout = const Duration(seconds: 3),
+    bool Function()? cancelled,
   }) async {
     final interfaces = await NetworkInterface.list(
       type: InternetAddressType.IPv4,
@@ -105,6 +112,7 @@ class WatchAudioSocket {
         : const Duration(milliseconds: 300);
 
     for (var offset = 0; offset < candidates.length; offset += 32) {
+      if (cancelled?.call() ?? false) return null;
       final batch = candidates.skip(offset).take(32);
       final results = await Future.wait(
         batch.map((candidate) => _probeWatchHost(candidate, probeTimeout)),
@@ -121,54 +129,24 @@ class WatchAudioSocket {
     return null;
   }
 
+  /// الساعة تبدأ كل اتصال بسطر PAIR أو AUTH — هذا يكفي للتعرّف عليها.
+  /// الفحص **ما يصادق** عمدًا: أي مصادقة تكتمل تطرد جلسة الساعة الحالية،
+  /// والإقران (X25519) يعيد نفسه بالاتصال الجاي لو ما ردّينا على PAIR.
   static Future<String?> _probeWatchHost(String host, Duration timeout) async {
     Socket? socket;
     try {
       socket = await Socket.connect(host, port, timeout: timeout);
-      socket.add([0x69]); // 'i' — request watch status
       final line = await socket
           .cast<List<int>>()
-          .transform(utf8.decoder)
+          .transform(const Utf8Decoder(allowMalformed: true))
           .transform(const LineSplitter())
           .first
-          .timeout(timeout);
-      final parts = line.split(',');
-      if (parts.length == 4 &&
-          parts[0] == 'I' &&
-          int.tryParse(parts[2]) != null &&
-          int.tryParse(parts[3]) != null) {
-        return host;
-      }
+          .timeout(const Duration(seconds: 2));
+      if (line.startsWith('PAIR,') || line.startsWith('AUTH,')) return host;
     } catch (_) {
       // Most addresses in the local subnet are expected to refuse the probe.
     } finally {
-      await socket?.close();
-    }
-    return null;
-  }
-
-  /// Resolve the watch on the current network only. A cached address is kept
-  /// for display/diagnostics, but is never trusted as an automatic connection.
-  static Future<String?> resolveWatchHost([String? preferredHost]) async {
-    if (preferredHost != null && preferredHost.isNotEmpty) {
-      if (!await isOnSameLocalNetwork(preferredHost)) {
-        debugPrint(
-          'Ignoring watch address $preferredHost: it is outside the phone local network',
-        );
-      } else {
-      final verified = await _probeWatchHost(
-        preferredHost,
-        const Duration(milliseconds: 500),
-      );
-      if (verified != null) return verified;
-      }
-    }
-
-    final discovered = await discoverWatchHost();
-    if (discovered != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(kWatchIpPrefsKey, discovered);
-      return discovered;
+      socket?.destroy();
     }
     return null;
   }
@@ -202,134 +180,56 @@ class WatchAudioSocket {
     return false;
   }
 
-  Future<void> connect({
+  /// يفتح اتصال مؤقت مصادَق — للاحتياط فقط لما ما فيه مالك للاتصال الدائم
+  /// (مثل منبّه يشتغل من عزلة AlarmManager والتطبيق مقفول). المفتاح ينقرأ
+  /// من flutter_secure_storage داخل نفس العزلة.
+  /// يرمي [WatchAuthException] لو الساعة تحتاج إقران.
+  static Future<WatchLineSocket?> _openOnce(
     String? host,
-    required void Function(Uint8List data) onData,
-    required void Function(Object error) onError,
-    required void Function() onDone,
-    Duration timeout = const Duration(seconds: 5),
-  }) async {
-    host = await resolveWatchHost(host);
-    if (host == null || host.isEmpty) {
-      throw StateError('Nabeeh Watch was not found on the local network');
-    }
-    final socket = await Socket.connect(host, port, timeout: timeout);
-    _socket = socket;
-    _host = host;
-    _subscription = socket.listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: true,
-    );
-    debugPrint('connect: TCP connected to $host:$port, starting audio stream');
-    socket.add([0x72]); // 'r' — start streaming
-    await socket.flush();
-    debugPrint('connect: start audio command sent to $host:$port');
-  }
-
-  Future<void> stop() async {
-    try {
-      _socket?.add([0x73]); // 's' — stop streaming
-      await _socket?.flush();
-    } catch (_) {
-      // الاتصال قد يكون مقطوعاً بالفعل
-    }
-    await _subscription?.cancel();
-    _subscription = null;
-    await _socket?.close();
-    _socket = null;
-  }
-
-  /// يرسل نتيجة التصنيف للساعة كـ٤ بايتات خام بإرسال واحد: '#' + رمز الفئة
-  /// + رمز نمط الاهتزاز + رمز شدة الاهتزاز (كل واحد رقم '1'/'2'/'3').
-  /// يستخدم اتصال البث المفتوح أصلاً إذا كان متاحاً، وإلا يفتح اتصال
-  /// مؤقت جديد فقط لإرسال هذي البايتات (بدون إعادة بث الصوت).
-  Future<void> sendDetectionCode(
-    String code, {
-    required int pattern,
-    required int power,
-  }) async {
-    final message = [
-      0x23, // '#'
-      ...code.codeUnits,
-      ...pattern.toString().codeUnits,
-      ...power.toString().codeUnits,
-    ];
-    final asText = String.fromCharCodes(message);
-
-    if (_socket != null) {
+    Duration timeout,
+  ) async {
+    if (host != null && host.isNotEmpty && await isOnSameLocalNetwork(host)) {
       try {
-        _socket!.add(message);
-        await _socket!.flush();
-        debugPrint('sendDetectionCode: sent "$asText" over existing socket');
-        return;
+        return await WatchLineSocket.connect(host, port, timeout: timeout);
+      } on WatchAuthException {
+        rethrow;
       } catch (e) {
-        debugPrint(
-          'sendDetectionCode: existing socket write failed ($e), retrying with temp connection',
-        );
+        debugPrint('WatchAudioSocket: $host unreachable — $e');
       }
     }
-
-    final host = _host;
-    if (host == null) {
-      debugPrint('sendDetectionCode: no known host — nothing sent');
-      return;
-    }
-
-    Socket? tempSocket;
+    final found = await discoverWatchHost();
+    if (found == null || found == host) return null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kWatchIpPrefsKey, found);
     try {
-      tempSocket = await Socket.connect(
-        host,
-        port,
-        timeout: const Duration(seconds: 5),
-      );
-      tempSocket.add(message);
-      await tempSocket.flush();
-      debugPrint(
-        'sendDetectionCode: sent "$asText" over temporary connection to $host:$port',
-      );
+      return await WatchLineSocket.connect(found, port, timeout: timeout);
+    } on WatchAuthException {
+      rethrow;
     } catch (e) {
-      debugPrint('sendDetectionCode: failed to send "$asText" — $e');
-    } finally {
-      await tempSocket?.close();
+      debugPrint('WatchAudioSocket: $found unreachable — $e');
+      return null;
     }
   }
 
-  /// نفس فكرة sendDetectionCode لكن بدون الحاجة لكائن WatchAudioSocket
-  /// موجود أصلاً (وبالتالي بدون _host محفوظ من اتصال بث سابق) — تُستخدم من
-  /// سياقات ما فيها أي اتصال بث مفتوح، مثل منبّه يشتغل من عزلة خلفية منفصلة
-  /// تمامًا (AlarmManager) عند وصول وقته. تفتح اتصال TCP مؤقت للإرسال فقط
-  /// وتقفله، بالضبط متل الفرع الاحتياطي بـ sendDetectionCode.
-  static Future<bool> sendCodeToHostDirect(
+  /// إرسال بايتات عبر اتصال مؤقت مصادَق.
+  static Future<bool> sendOnce(
     String? host,
-    String code, {
-    required int pattern,
-    required int power,
+    List<int> message, {
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    host = await resolveWatchHost(host);
-    if (host == null || host.isEmpty) return false;
-    final message = [
-      0x23, // '#'
-      ...code.codeUnits,
-      ...pattern.toString().codeUnits,
-      ...power.toString().codeUnits,
-    ];
-    Socket? tempSocket;
+    WatchLineSocket? conn;
     try {
-      tempSocket = await Socket.connect(host, port, timeout: timeout);
-      tempSocket.add(message);
-      await tempSocket.flush();
-      debugPrint(
-        'sendCodeToHostDirect: sent "$code$pattern$power" to $host:$port',
-      );
+      conn = await _openOnce(host, timeout);
+      if (conn == null) return false;
+      conn.socket.add(message);
+      await conn.socket.flush();
+      debugPrint('sendOnce: sent "${String.fromCharCodes(message)}"');
       return true;
     } catch (e) {
-      debugPrint('sendCodeToHostDirect: failed to send "$code" to $host — $e');
+      debugPrint('sendOnce: failed — $e');
       return false;
     } finally {
-      await tempSocket?.close();
+      await conn?.close();
     }
   }
 
@@ -343,89 +243,60 @@ class WatchAudioSocket {
   ///   H:M:daysMask:pattern:intensity:once  ومقاطعها مفصولة بـ ';'
   /// ونص فاضي معناه "امسح كل التذكيرات المحفوظة بالساعة".
   /// يرجّع عدد التذكيرات اللي أكّدت الساعة إنها حفظتها، أو null لو ما وصل ردّ.
-  static Future<int?> sendRemindersToHost(
+  /// (نسخة الاتصال المؤقت — التطبيق يستخدم [WatchLink.sendReminders].)
+  static Future<int?> sendRemindersOnce(
     String? host,
     String payload, {
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    host = await resolveWatchHost(host);
-    if (host == null || host.isEmpty) return null;
-    Socket? tempSocket;
+    WatchLineSocket? conn;
     try {
-      tempSocket = await Socket.connect(host, port, timeout: timeout);
-      tempSocket.add(utf8.encode('@$payload\n'));
-      await tempSocket.flush();
+      conn = await _openOnce(host, timeout);
+      if (conn == null) return null;
+      conn.socket.add(utf8.encode('@$payload\n'));
+      await conn.socket.flush();
 
-      // ننتظر ردّ الساعة "R,<count>" قبل ما نقفل الاتصال — مو بس للتأكيد:
-      // الانتظار نفسه ضروري. الفيرموير يقرأ من الاتصال داخل حلقة فيها
-      // تأخير، والجدول عشرات البايتات، فقفل الاتصال فور الإرسال كان يقطعه
-      // بالنص ويضيع بدون ما يظهر أي خطأ بالجوال. البقاء لين يوصل الردّ
-      // يضمن إن الساعة خلّصت قراءة كل شي.
-      final ack = await tempSocket
-          .cast<List<int>>()
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .firstWhere((line) => line.startsWith('R,'))
-          .timeout(timeout);
-
+      // ننتظر ردّ الساعة `R,<count>` قبل ما نقفل الاتصال — الفيرموير يقرأ
+      // الجدول داخل حلقة فيها تأخير، وقفل الاتصال فورًا كان يقطعه بالنص.
+      final ack = await conn.waitFor('R,', timeout);
       final count = int.tryParse(ack.substring(2).trim());
       debugPrint(
-        'sendRemindersToHost: sent "${payload.isEmpty ? '(cleared)' : payload}" '
-        'to $host:$port — الساعة حفظت $count تذكير',
+        'sendRemindersOnce: sent "${payload.isEmpty ? '(cleared)' : payload}" '
+        '— الساعة حفظت $count تذكير',
       );
       return count;
     } catch (e) {
-      debugPrint('sendRemindersToHost: failed to send schedule to $host — $e');
+      debugPrint('sendRemindersOnce: failed to send schedule — $e');
       return null;
     } finally {
-      await tempSocket?.close();
+      await conn?.close();
     }
   }
 
-  /// يفتح اتصال قصير مستقل بالساعة، يرسل 'i'، ويرجع حالتها الحالية.
-  /// يستخدم من شاشات ما فيها اتصال بث مفتوح أصلاً (الساعة، الرئيسية).
-  static Future<WatchStatus?> queryStatus(
+  /// اتصال قصير مصادَق، يرسل 'i'، ويرجع حالة الساعة.
+  /// احتياطي فقط — الشاشات تستخدم حالة [WatchLink] الحية.
+  static Future<WatchStatus?> queryStatusOnce(
     String? host, {
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    host = await resolveWatchHost(host);
-    if (host == null || host.isEmpty) return null;
-    Socket? socket;
+    WatchLineSocket? conn;
     try {
-      socket = await Socket.connect(host, port, timeout: timeout);
-      debugPrint('queryStatus: TCP connected to $host:$port, sending "i"');
-      socket.add([0x69]); // 'i'
-
-      String line;
-      try {
-        line = await socket
-            .cast<List<int>>()
-            .transform(utf8.decoder)
-            .transform(const LineSplitter())
-            .first
-            .timeout(timeout);
-      } catch (e) {
-        debugPrint('queryStatus: no line received within $timeout — $e');
-        return null;
-      }
-      debugPrint('queryStatus: raw line received: "$line"');
-
-      final parts = line.split(',');
-      if (parts.length != 4 || parts[0] != 'I') {
-        debugPrint('queryStatus: unexpected format (${parts.length} parts)');
-        return null;
-      }
-
+      conn = await _openOnce(host, timeout);
+      if (conn == null) return null;
+      conn.socket.add([0x69]); // 'i'
+      await conn.socket.flush();
+      final parts = (await conn.waitFor('I,', timeout)).split(',');
+      if (parts.length != 4) return null;
       return WatchStatus(
         isConnected: parts[1] == '1',
         batteryPercent: int.parse(parts[2]),
         lastSyncSecondsAgo: int.parse(parts[3]),
       );
     } catch (e) {
-      debugPrint('queryStatus: TCP connect to $host:$port failed — $e');
+      debugPrint('queryStatusOnce: failed — $e');
       return null;
     } finally {
-      await socket?.close();
+      await conn?.close();
     }
   }
 }
