@@ -3,14 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
 import 'listening_screen.dart';
 import 'reminders_screen.dart';
 import 'stt_tts_screen.dart';
 import 'sign_language_player_screen.dart';
 import '../services/sign_language_mode.dart';
-import '../services/watch_audio_socket.dart';
+import '../services/watch_link.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -43,59 +41,25 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _userName = '';
-  bool _isWatchConnected = false;
-  Timer? _watchStatusTimer;
+  bool _isWatchConnected = WatchLink.instance.connected.value;
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
-    _queryWatchStatus();
-    // استعلام لمرة وحدة عند فتح الصفحة كان يخلي هذي القيمة تتجمّد على أول
-    // نتيجة — لو الساعة انقطعت (أو اتصلت) بعدها بثوانٍ، ما فيه شي يحدّث
-    // الواجهة إلا لو المستخدمة تركت الصفحة ورجعت لها. تكرار الاستعلام كل ٥
-    // ثوانٍ يخلي هذي القيمة تعكس حالة الساعة الفعلية بشكل حي، نفس فكرة نقطة
-    // الاتصال بالساعة نفسها.
-    _watchStatusTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _queryWatchStatus(),
-    );
+    // الحالة تجي حيّة من الاتصال الدائم بالساعة (هو اللي يستطلعها دوريًا
+    // على نفس الاتصال) — ما نحتاج مؤقت ولا اتصال جديد من هذي الشاشة.
+    WatchLink.instance.connected.addListener(_onWatchConnectionChanged);
   }
 
-  @override
-  void didUpdateWidget(covariant HomeScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // MainScreen يبني كل التبويبات من جديد بأي تبديل تبويب (IndexedStack)،
-    // فـ didUpdateWidget يتفعّل بدل initState — نستخدمه لتحديث حالة الساعة
-    // كل ما ترجعين لهذي الصفحة، بدل ما تضل ثابتة على أول استعلام بالجلسة.
-    _queryWatchStatus();
-  }
-
-  Future<void> _queryWatchStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final host = await WatchAudioSocket.resolveWatchHost(
-      prefs.getString(kWatchIpPrefsKey),
-    );
-    if (host == null || host.isEmpty) return;
-
-    // خدمة الاستماع بالخلفية (لو شغّالة) ماسكة الاتصال الوحيد اللي الساعة
-    // تقبله — فتح اتصال ثاني للاستعلام بينافسه ويفشل. وجود الخدمة شغّالة
-    // أصلاً دليل كافٍ إن الساعة متصلة، بدون داعي لاستعلام TCP منفصل.
-    if (await FlutterBackgroundService().isRunning()) {
-      if (!mounted) return;
-      setState(() => _isWatchConnected = true);
-      return;
-    }
-
-    final status = await WatchAudioSocket.queryStatus(host);
+  void _onWatchConnectionChanged() {
     if (!mounted) return;
-    // A valid response confirms that this phone can reach the watch.
-    setState(() => _isWatchConnected = status != null);
+    setState(() => _isWatchConnected = WatchLink.instance.connected.value);
   }
 
   @override
   void dispose() {
-    _watchStatusTimer?.cancel();
+    WatchLink.instance.connected.removeListener(_onWatchConnectionChanged);
     super.dispose();
   }
 
