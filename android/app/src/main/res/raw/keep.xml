@@ -2,4 +2,4 @@
 <!-- أيقونة الإشعارات تنطلب بالاسم من Dart وقت التشغيل، فلازم ما تنشال
      بتقليص الموارد بنسخة الإصدار -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_nabeeh" />
+    tools:keep="@drawable/ic_stat_nabeeh,@drawable/ic_notification_large" />

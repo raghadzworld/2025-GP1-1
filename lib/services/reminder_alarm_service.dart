@@ -13,6 +13,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'watch_audio_socket.dart';
 import 'watch_link.dart';
+import 'notification_tap_handler.dart';
 
 /// جدولة تذكيرات تشتغل حتى لو التطبيق مقفول بالكامل.
 ///
@@ -314,6 +315,8 @@ class ReminderAlarmService {
         // أيقونة بيضاء بلون واحد — الملوّنة تطلع مربع فاضي بالإشعار
         android: AndroidInitializationSettings('@drawable/ic_stat_nabeeh'),
       ),
+      // نفس معالج الضغط حق باقي الإشعارات — آخر initialize هو اللي يثبت
+      onDidReceiveNotificationResponse: onNabeehNotificationTap,
     );
 
     final android = _notifications

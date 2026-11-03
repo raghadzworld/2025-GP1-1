@@ -6,6 +6,7 @@ import 'watch_screen.dart';
 // 👇 استيراد شاشات الملف الشخصي هنا
 import 'profile_info_screen.dart';
 import 'edit_profile_screen.dart';
+import '../services/notification_tap_handler.dart';
 
 // ─── Nav Item Model ───────────────────────────────────────────────────────────
 class _NavItem {
@@ -29,9 +30,26 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
+  // إشعار شحن الساعة انضغط — نفتح التبويب المطلوب (تبويب الساعة)
+  void _applyTabRequest() {
+    final index = mainTabRequest.value;
+    if (index == null) return;
+    mainTabRequest.value = null;
+    if (mounted) setState(() => _currentIndex = index);
+  }
+
+  @override
+  void dispose() {
+    mainTabRequest.removeListener(_applyTabRequest);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    mainTabRequest.addListener(_applyTabRequest);
+    // لو التطبيق انفتح من الإشعار قبل ما تنبني هذي الشاشة
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyTabRequest());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is Map && args['welcomeName'] != null) {

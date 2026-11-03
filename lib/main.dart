@@ -19,6 +19,8 @@ import 'screens/forgot_password_screen.dart';
 import 'services/listening_background_service.dart';
 import 'services/reminder_alarm_service.dart';
 import 'services/watch_link.dart';
+import 'widgets/watch_battery_banner.dart';
+import 'services/notification_tap_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +30,8 @@ void main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
   runApp(const NabeehApp());
+  // انفتح التطبيق بالضغط على إشعار شحن الساعة؟ نوديه لتبويب الساعة
+  unawaited(handleNotificationLaunch());
   // اتصال واحد دائم بالساعة طول استخدام التطبيق — يُفتح مرة وحدة هنا وكل
   // الشاشات والخدمات تستخدمه بدل ما تفتح اتصال جديد مع كل استعلام.
   unawaited(WatchLink.instance.start());
@@ -79,7 +83,12 @@ class NabeehApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nabeeh - نبيه',
       debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
       theme: _buildTheme(),
+      // بانر شحن الساعة المنخفض فوق كل الشاشات
+      builder: (context, child) => Stack(
+        children: [child ?? const SizedBox.shrink(), const WatchBatteryBanner()],
+      ),
       initialRoute: AppRoutes.splash,
       onGenerateRoute: (settings) {
         // مسار إضافة/تعديل الفئة (يحتاج arguments)
