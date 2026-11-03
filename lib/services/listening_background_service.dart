@@ -137,6 +137,7 @@ void onListeningServiceStart(ServiceInstance service) async {
   };
 
   Timer? locationTimer;
+  Timer? batteryTimer;
   bool isCheckingLocation = false;
 
   bool isListening = false;
@@ -202,6 +203,15 @@ void onListeningServiceStart(ServiceInstance service) async {
     } finally {
       isCheckingLocation = false;
     }
+  }
+
+  // البث يمنع وصول حالة الساعة، فنوقفه لحظيًا كل ٣ دقايق عشان نقرا
+  // البطارية (WatchLink يطلّع تنبيه الشحن المنخفض لما يقرا الحالة).
+  void startBatteryChecks() {
+    batteryTimer?.cancel();
+    batteryTimer = Timer.periodic(const Duration(minutes: 3), (_) {
+      if (isListening) unawaited(watchLink.pollStatusPausingAudio());
+    });
   }
 
   void startLocationChecks() {
@@ -294,6 +304,8 @@ void onListeningServiceStart(ServiceInstance service) async {
   Future<void> stopListening() async {
     locationTimer?.cancel();
     locationTimer = null;
+    batteryTimer?.cancel();
+    batteryTimer = null;
     await watchLink.stopAudio();
     await watchLink.release();
     pcmBuffer.clear();
@@ -370,6 +382,7 @@ void onListeningServiceStart(ServiceInstance service) async {
       emitUpdate();
       await setNotification('يستمع لصوت الساعة الآن');
       startLocationChecks();
+      startBatteryChecks();
     } catch (e) {
       await watchLink.stopAudio();
       await watchLink.release();

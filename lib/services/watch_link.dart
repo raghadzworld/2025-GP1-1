@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'watch_audio_socket.dart';
 import 'watch_auth.dart';
+import 'watch_battery_alert.dart';
 
 /// اسم منفذ "مالك الاتصال" الحالي بسجل IsolateNameServer — السجل مشترك بين
 /// كل العزلات بنفس العملية (الواجهة، خدمة الاستماع الخلفية، منبّه
@@ -520,6 +521,8 @@ class WatchLink {
     if (parsed != null) {
       status.value = parsed;
       _statusAt = DateTime.now();
+      // بس العزلة المالكة توصلها الحالة من الساعة مباشرة — فالتنبيه يطلع مرة وحدة
+      unawaited(WatchBatteryAlert.onBatteryReading(parsed.batteryPercent));
     }
     for (final waiter in List.of(_waiters)) {
       if (waiter.test(line) && !waiter.completer.isCompleted) {
@@ -668,6 +671,31 @@ class WatchLink {
         return _parseStatus(await reply);
       } catch (_) {
         return null;
+      }
+    });
+  }
+
+  /// أثناء البث ردّ 'I,...' يضيع بين بايتات الصوت، فـ queryStatus يرجّع آخر
+  /// حالة محفوظة (وبطاريتها قديمة). هذي توقف البث لحظيًا (نفس أسلوب
+  /// sendReminders) عشان نقرا حالة جديدة فعلًا، وترجّعه. للعزلة المالكة بس.
+  Future<WatchStatus?> pollStatusPausingAudio({
+    Duration timeout = const Duration(seconds: 3),
+  }) {
+    if (_role != _Role.owner || _onAudio == null) return queryStatus();
+    return _exclusive(() async {
+      if (!await _waitConnected(timeout)) return null;
+      _audioPaused = true;
+      _write([0x73]); // 's'
+      try {
+        _lineBuffer.clear();
+        final reply = _waitForLine((l) => l.startsWith('I,'), timeout);
+        if (!await _writeAndFlush([0x69])) return null; // 'i'
+        return _parseStatus(await reply);
+      } catch (_) {
+        return null;
+      } finally {
+        _audioPaused = false;
+        if (_onAudio != null) _write([0x72]); // 'r'
       }
     });
   }
