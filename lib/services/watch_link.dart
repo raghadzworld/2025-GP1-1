@@ -695,6 +695,8 @@ class WatchLink {
         return null;
       } finally {
         _audioPaused = false;
+        // نبدأ عدّاد "ما وصل صوت" من الحين — وقت التوقف ما ينحسب انقطاع
+        _lastRx = DateTime.now();
         if (_onAudio != null) _write([0x72]); // 'r'
       }
     });

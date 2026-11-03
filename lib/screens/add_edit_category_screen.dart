@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -5,6 +7,7 @@ import '../features/categories/data/models/category_model.dart';
 import '../features/categories/data/models/location_trigger_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
+import '../services/listening_background_service.dart';
 import 'location_picker_screen.dart';
 import 'nabeeh_colors.dart';
 
@@ -113,6 +116,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       } else {
         saved = await _service.addCategory(model);
       }
+      unawaited(notifyListeningServiceCategoriesChanged());
       if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       if (mounted) {

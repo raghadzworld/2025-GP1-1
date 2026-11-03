@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../features/categories/data/models/category_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
+import '../services/listening_background_service.dart';
 import '../services/location_category_switcher.dart';
 import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
@@ -22,15 +26,21 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  StreamSubscription<Map<String, dynamic>?>? _switchSub;
 
   @override
   void initState() {
     super.initState();
     _initialize();
+    // خدمة الاستماع فعّلت مجموعة حسب الموقع — نعيد التحميل عشان تبان فورًا
+    _switchSub = FlutterBackgroundService()
+        .on('category_switched')
+        .listen((_) => _initialize());
   }
 
   @override
   void dispose() {
+    _switchSub?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -83,6 +93,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     try {
       await _service.setActiveCategory(id, currentCategories: _categories);
       await LocationCategorySwitcher.onManualActivation();
+      unawaited(notifyListeningServiceCategoriesChanged());
       setState(() {
         final updated = _categories
             .map((c) => c.copyWith(isEnabled: c.id == id))

@@ -76,6 +76,14 @@ Future<void> initializeBackgroundService() async {
   await configureListeningService(withLocation: false);
 }
 
+/// الواجهة تبلّغ خدمة الاستماع (لو شغالة) إن المجموعات تغيّرت — حفظ مجموعة
+/// أو تفعيلها يدويًا — عشان تعيد فحص الموقع وتحمّل إعدادات الأصوات فورًا
+/// بدل ما تنتظر الدورة الجاية (دقيقة) أو تكمل بإعدادات قديمة.
+Future<void> notifyListeningServiceCategoriesChanged() async {
+  final service = FlutterBackgroundService();
+  if (await service.isRunning()) service.invoke('categories_changed');
+}
+
 /// ‏withLocation يضيف نوع "location" للخدمة، وهذا شرط بأندرويد ١٤+ عشان
 /// نقدر نقرا الموقع والتطبيق بالخلفية (لتفعيل المجموعة حسب المكان). ما
 /// نضيفه إلا لو صلاحية الموقع ممنوحة فعلاً — بدونها أندرويد يرفض تشغيل
@@ -139,6 +147,7 @@ void onListeningServiceStart(ServiceInstance service) async {
   Timer? locationTimer;
   Timer? batteryTimer;
   bool isCheckingLocation = false;
+  bool locationRecheckPending = false;
 
   bool isListening = false;
   bool isConnecting = false;
@@ -183,12 +192,16 @@ void onListeningServiceStart(ServiceInstance service) async {
 
   // تفعيل المجموعة حسب الموقع — نتحقق أول ما يبدأ الاستماع وبعدها كل دقيقة
   Future<void> checkLocationCategory({bool isNewSession = false}) async {
-    if (isCheckingLocation || !isListening) return;
+    if (!isListening) return;
+    // فحص شغّال الحين ممكن يكون قرا المجموعات قبل آخر تعديل — نعيد بعده
+    if (isCheckingLocation) {
+      locationRecheckPending = true;
+      return;
+    }
     isCheckingLocation = true;
     try {
       categoryService ??= CategoryService.withDefaults();
-      final switched =
-          await LocationCategorySwitcher.checkAndSwitch(
+      final switched = await LocationCategorySwitcher.checkAndSwitch(
         categoryService!,
         isNewListeningSession: isNewSession,
       );
@@ -199,9 +212,15 @@ void onListeningServiceStart(ServiceInstance service) async {
         statusText = 'تم تفعيل "${switched.name}" حسب موقعك';
         await setNotification('تم تفعيل مجموعة "${switched.name}" حسب موقعك');
         emitUpdate();
+        // شاشة المجموعات (لو مفتوحة) تحدّث نفسها
+        service.invoke('category_switched', {'categoryId': switched.id});
       }
     } finally {
       isCheckingLocation = false;
+      if (locationRecheckPending) {
+        locationRecheckPending = false;
+        unawaited(checkLocationCategory());
+      }
     }
   }
 
@@ -280,7 +299,9 @@ void onListeningServiceStart(ServiceInstance service) async {
   void onAudioData(Uint8List data) {
     if (!hasReceivedAudio) {
       hasReceivedAudio = true;
-      debugPrint('listening: first audio packet received (${data.length} bytes)');
+      debugPrint(
+        'listening: first audio packet received (${data.length} bytes)',
+      );
     }
     audioLevel = pcm16PeakAmplitude(data);
     // نحدّث التطبيق بمستوى الصوت كل ١٥٠ملي ثانية بس (مو كل حزمة توصل) —
@@ -399,4 +420,10 @@ void onListeningServiceStart(ServiceInstance service) async {
   service.on('stop_listening').listen((_) => stopListening());
 
   service.on('request_status').listen((_) => emitUpdate());
+
+  service.on('categories_changed').listen((_) async {
+    if (!isListening) return;
+    await checkLocationCategory();
+    await loadActiveSoundSettings();
+  });
 }
