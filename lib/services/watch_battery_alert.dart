@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,6 +35,8 @@ class WatchBatteryAlert {
   static const _kAlertedKey = 'watch_low_battery_alerted';
   static const _kChannelId = 'nabeeh_watch_battery_channel';
   static const _kNotificationId = 8920;
+  // أيقونة بيضاء بلون واحد — أندرويد يحوّل أيقونة التطبيق الملوّنة لمربع فاضي
+  static const _kIcon = '@drawable/ic_stat_nabeeh';
 
   static bool _checking = false;
   static bool _notificationsReady = false;
@@ -71,7 +74,7 @@ class WatchBatteryAlert {
     if (_notificationsReady) return;
     await _notifications.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings(_kIcon),
       ),
     );
     await _notifications
@@ -91,17 +94,23 @@ class WatchBatteryAlert {
 
   static Future<void> _show(int batteryPercent) async {
     await _ensureNotifications();
+    final body =
+        'شحن الساعة $batteryPercent٪ — اشحنيها عشان ما تفوتك التنبيهات';
     await _notifications.show(
       id: _kNotificationId,
       title: '🔋 شحن الساعة منخفض',
-      body: 'شحن الساعة $batteryPercent٪ — اشحنيها عشان ما تفوتك التنبيهات',
-      notificationDetails: const NotificationDetails(
+      body: body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _kChannelId,
           'بطارية الساعة',
           channelDescription: 'تنبيه لما شحن الساعة يصير منخفض',
           importance: Importance.high,
           priority: Priority.high,
+          icon: _kIcon,
+          color: const Color(0xFF1773CF),
+          // قابل للتوسيع: يبين اسم التطبيق (نبيه) فوق والنص كامل بدل ما ينقص
+          styleInformation: BigTextStyleInformation(body),
         ),
       ),
     );

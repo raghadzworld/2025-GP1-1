@@ -311,7 +311,8 @@ class ReminderAlarmService {
 
     await _notifications.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // أيقونة بيضاء بلون واحد — الملوّنة تطلع مربع فاضي بالإشعار
+        android: AndroidInitializationSettings('@drawable/ic_stat_nabeeh'),
       ),
     );
 
