@@ -316,10 +316,33 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Future<void> _deleteContact(int index) async {
     final contact = _contacts[index];
-    if (contact.id.isNotEmpty) {
-      await _contactsRef?.doc(contact.id).delete();
+    try {
+      if (contact.id.isNotEmpty) {
+        await _contactsRef?.doc(contact.id).delete();
+      }
+      if (!mounted) return;
+      setState(() => _contacts.removeAt(index));
+      // نفس تأكيد الحذف حق المنبهات
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.green,
+          content: Text(
+            'تم حذف جهة الاتصال بنجاح',
+            style: TextStyle(fontFamily: 'IBMPlexSansArabic'),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'حدث خطأ أثناء الحذف: $e',
+            style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+          ),
+        ),
+      );
     }
-    if (mounted) setState(() => _contacts.removeAt(index));
   }
 
   Future<void> _confirmDeleteContact(EmergencyContact contact, int index) async {
@@ -686,7 +709,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
@@ -697,28 +720,34 @@ class _ContactsScreenState extends State<ContactsScreen> {
               : null,
           textAlign: TextAlign.right,
           onChanged: onChanged,
+          style: const TextStyle(color: Color(0xFF181059), fontSize: 15),
+          // مستطيل بنفس شكل مربع البحث بصفحة جهات الاتصال
           decoration: InputDecoration(
             counterText: maxLength != null ? '' : null,
             hintText: 'اكتب هنا',
             hintStyle: const TextStyle(color: _kContactsGray, fontSize: 14),
-            enabledBorder: UnderlineInputBorder(
+            filled: true,
+            fillColor: Colors.white,
+            isDense: true,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
                 color: hasError
                     ? Colors.red.withValues(alpha: 0.5)
                     : _kContactsCardBorder,
               ),
             ),
-            focusedBorder: UnderlineInputBorder(
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
                 color: hasError
                     ? Colors.red.withValues(alpha: 0.6)
-                    : const Color(0xFF1773CF),
-                width: 2,
+                    : const Color(0xFF181059),
               ),
             ),
             contentPadding: const EdgeInsets.symmetric(
-              vertical: 8,
-              horizontal: 0,
+              vertical: 14,
+              horizontal: 16,
             ),
           ),
         ),

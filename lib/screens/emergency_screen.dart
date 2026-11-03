@@ -237,6 +237,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // ما فيها حقول كتابة — لو انفتح الكيبورد بتبويب ثاني (والشاشة باقية
+        // بالـ IndexedStack) كانت تنضغط بطوله وتطلع "bottom overflowed".
+        resizeToAvoidBottomInset: false,
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -249,8 +252,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
           child: Column(
             children: [
               _buildHeader(),
+              // تتمرّر بدل ما تفيض على الجوالات الصغيرة
               Expanded(
-                child: Padding(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 20,
