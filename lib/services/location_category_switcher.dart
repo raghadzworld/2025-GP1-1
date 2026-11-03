@@ -163,8 +163,9 @@ class LocationCategorySwitcher {
     }
   }
 
-  /// يرجّع المجموعة اللي تفعّلت (أو null لو ما تغيّر شي).
-  static Future<CategoryModel?> checkAndSwitch(
+  /// يرجّع المجموعة اللي تفعّلت (أو null لو ما تغيّر شي)، و isReturn = true
+  /// لو هي المجموعة السابقة رجعت لأن المستخدم طلع من المكان (مو وصل لمكان).
+  static Future<({CategoryModel category, bool isReturn})?> checkAndSwitch(
     CategoryService service, {
     bool isNewListeningSession = false,
   }) async {
@@ -225,9 +226,12 @@ class LocationCategorySwitcher {
       await _saveState(prefs, decision.newState);
 
       if (toActivate == null) return null;
-      return categories
-          .firstWhere((c) => c.id == toActivate)
-          .copyWith(isEnabled: true);
+      return (
+        category: categories
+            .firstWhere((c) => c.id == toActivate)
+            .copyWith(isEnabled: true),
+        isReturn: decision.newState.autoCategoryId != toActivate,
+      );
     } catch (e) {
       // فشل الـ GPS أو الشبكة — نحاول بالدورة الجاية
       debugPrint('LocationSwitch: check failed — $e');

@@ -459,7 +459,7 @@ class _ListeningScreenState extends State<ListeningScreen>
                     detectedSound,
                     style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
-                      fontSize: isListening ? 22 : 18,
+                      fontSize: isListening ? 19 : 18,
                       fontWeight: FontWeight.bold,
                       color: isListening
                           ? NabeehColors.darkBlue

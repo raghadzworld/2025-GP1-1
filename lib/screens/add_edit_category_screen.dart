@@ -530,17 +530,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'تتفعّل هذي المجموعة تلقائياً لما توصل المكان أثناء الاستماع، '
-            'وترجع المجموعة السابقة لما تطلع منه.',
-            style: TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              fontSize: 13,
-              color: NabeehColors.slate500,
-              height: 1.5,
-            ),
-          ),
           if (isOn && trigger != null) ...[
             const SizedBox(height: 16),
             ClipRRect(

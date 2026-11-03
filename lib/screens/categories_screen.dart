@@ -624,13 +624,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       const Row(
                         children: [
                           Icon(LucideIcons.mapPin,
-                              size: 14, color: NabeehColors.green),
+                              size: 14, color: NabeehColors.lightBlue),
                           SizedBox(width: 4),
                           Text(
-                            'تتفعّل حسب الموقع',
+                            'تتفعل حسب الموقع',
                             style: TextStyle(
                               fontSize: 13,
-                              color: NabeehColors.green,
+                              color: NabeehColors.lightBlue,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -645,17 +645,17 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: category.isEnabled
-                      ? const Color(0xFFFFD350).withValues(alpha: 0.2)
+                      ? NabeehColors.green.withValues(alpha: 0.12)
                       : NabeehColors.slate100,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  category.isEnabled ? 'نشط' : 'غير نشط',
+                  category.isEnabled ? 'مفعل' : 'غير مفعل',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: category.isEnabled
-                        ? NabeehColors.accent
+                        ? NabeehColors.green
                         : NabeehColors.slate400,
                   ),
                 ),

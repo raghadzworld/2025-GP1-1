@@ -206,14 +206,22 @@ void onListeningServiceStart(ServiceInstance service) async {
         isNewListeningSession: isNewSession,
       );
       if (switched != null && isListening) {
+        final category = switched.category;
         activeSoundSettings = {
-          for (final sound in switched.sounds) sound.soundId: sound,
+          for (final sound in category.sounds) sound.soundId: sound,
         };
-        statusText = 'تم تفعيل "${switched.name}" حسب موقعك';
-        await setNotification('تم تفعيل مجموعة "${switched.name}" حسب موقعك');
+        if (switched.isReturn) {
+          statusText = 'تمت العودة لمجموعة "${category.name}"';
+          await setNotification(
+            'غادرت موقع المجموعة، فتمت العودة لمجموعة "${category.name}"',
+          );
+        } else {
+          statusText = 'تم تفعيل "${category.name}" حسب موقعك';
+          await setNotification('تم تفعيل مجموعة "${category.name}" حسب موقعك');
+        }
         emitUpdate();
         // شاشة المجموعات (لو مفتوحة) تحدّث نفسها
-        service.invoke('category_switched', {'categoryId': switched.id});
+        service.invoke('category_switched', {'categoryId': category.id});
       }
     } finally {
       isCheckingLocation = false;
