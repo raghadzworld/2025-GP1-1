@@ -155,12 +155,20 @@ class _BannerCard extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton(
+              const SizedBox(width: 8),
+              // بوكس بإطار وخلفية خفيفة عشان يبان إنه زر، مو مجرد كلمة
+              OutlinedButton(
                 onPressed: onDismiss,
-                style: TextButton.styleFrom(
+                style: OutlinedButton.styleFrom(
                   foregroundColor: critical ? red : NabeehColors.darkBlue,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  minimumSize: const Size(0, 40),
+                  backgroundColor: accent.withValues(alpha: 0.08),
+                  side: BorderSide(color: accent.withValues(alpha: 0.6)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text(
                   'إغلاق',
