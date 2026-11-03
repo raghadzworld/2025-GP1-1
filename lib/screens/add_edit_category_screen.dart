@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../features/categories/data/models/category_model.dart';
+import '../features/categories/data/models/location_trigger_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
+import 'location_picker_screen.dart';
 import 'nabeeh_colors.dart';
 
 class AddEditCategoryScreen extends StatefulWidget {
@@ -25,6 +28,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   late final CategoryService _service;
   late TextEditingController _nameController;
   late List<SoundSettingModel> _sounds;
+  LocationTriggerModel? _locationTrigger;
   bool _isSaving = false;
   String? _nameError;
 
@@ -49,6 +53,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     final cat = widget.category;
     if (cat != null) {
       _nameController = TextEditingController(text: cat.name);
+      _locationTrigger = cat.locationTrigger;
       final soundMap = {for (final s in cat.sounds) s.soundId: s};
       _sounds = _newCategoryDefaults.map((def) {
         return soundMap[def.soundId] ??
@@ -94,6 +99,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       name: trimmedName,
       isEnabled: cat?.isEnabled ?? false,
       sounds: _sounds,
+      locationTrigger: _locationTrigger,
     );
 
     try {
@@ -207,6 +213,7 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                         _buildNameInput(),
                         const SizedBox(height: 32),
                         _buildSoundsSection(),
+                        _buildLocationBox(),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -403,6 +410,176 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           itemBuilder: (_, i) => _buildSoundItem(i),
         ),
       ],
+    );
+  }
+
+  // ─── تفعيل المجموعة حسب الموقع ─────────────────────────────────────────────
+
+  bool get _isLocationOn => _locationTrigger?.isEnabled ?? false;
+
+  /// يطلب صلاحية الموقع — بدونها التفعيل التلقائي ما يقدر يشتغل
+  Future<bool> _ensureLocationPermission() async {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always) {
+      return true;
+    }
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('لازم تسمح للتطبيق بالوصول للموقع'),
+        action: permission == LocationPermission.deniedForever
+            ? SnackBarAction(
+                label: 'الإعدادات',
+                onPressed: Geolocator.openAppSettings,
+              )
+            : null,
+      ),
+    );
+    return false;
+  }
+
+  Future<void> _pickLocation() async {
+    if (!await _ensureLocationPermission() || !mounted) return;
+    final picked = await Navigator.push<LocationTriggerModel>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(initial: _locationTrigger),
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() => _locationTrigger = picked);
+    }
+  }
+
+  Future<void> _toggleLocation(bool on) async {
+    if (!on) {
+      setState(() => _locationTrigger = _locationTrigger?.copyWith(isEnabled: false));
+      return;
+    }
+    // أول مرة: لازم يختار المكان. بعدها نرجّع آخر مكان محفوظ مباشرة.
+    if (_locationTrigger == null) {
+      await _pickLocation();
+    } else if (await _ensureLocationPermission()) {
+      setState(() => _locationTrigger = _locationTrigger!.copyWith(isEnabled: true));
+    }
+  }
+
+  Widget _buildLocationBox() {
+    final isOn = _isLocationOn;
+    final trigger = _locationTrigger;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isOn ? NabeehColors.darkBlue : NabeehColors.slate100,
+          width: isOn ? 1.8 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isOn
+                      ? NabeehColors.darkBlue.withValues(alpha: 0.12)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  LucideIcons.mapPin,
+                  size: 18,
+                  color: isOn ? NabeehColors.darkBlue : NabeehColors.slate400,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'التفعيل حسب الموقع',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: isOn ? NabeehColors.dark : NabeehColors.slate500,
+                  ),
+                ),
+              ),
+              Switch(
+                value: isOn,
+                onChanged: _toggleLocation,
+                activeThumbColor: NabeehColors.background,
+                activeTrackColor: NabeehColors.darkBlue,
+                inactiveThumbColor: NabeehColors.slate400,
+                inactiveTrackColor: NabeehColors.slate200,
+                trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'تتفعّل هذي المجموعة تلقائياً لما توصل المكان أثناء الاستماع، '
+            'وترجع المجموعة السابقة لما تطلع منه.',
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 13,
+              color: NabeehColors.slate500,
+              height: 1.5,
+            ),
+          ),
+          if (isOn && trigger != null) ...[
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: SizedBox(
+                height: 150,
+                child: LocationPreviewMap(trigger: trigger),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(LucideIcons.radar,
+                    size: 16, color: NabeehColors.slate500),
+                const SizedBox(width: 6),
+                Text(
+                  'النطاق: ${trigger.radiusMeters.round()} م',
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 14,
+                    color: NabeehColors.slate600,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _pickLocation,
+                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  label: const Text(
+                    'تغيير الموقع',
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: NabeehColors.darkBlue,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 

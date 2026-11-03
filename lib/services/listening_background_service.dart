@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -10,6 +11,7 @@ import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
 import 'audio_utils.dart';
 import 'event_classifier_service.dart';
+import 'location_category_switcher.dart';
 import 'watch_audio_socket.dart';
 import 'watch_auth.dart';
 import 'watch_link.dart';
@@ -71,6 +73,15 @@ Future<void> initializeBackgroundService() async {
       >()
       ?.createNotificationChannel(channel);
 
+  await configureListeningService(withLocation: false);
+}
+
+/// ‏withLocation يضيف نوع "location" للخدمة، وهذا شرط بأندرويد ١٤+ عشان
+/// نقدر نقرا الموقع والتطبيق بالخلفية (لتفعيل المجموعة حسب المكان). ما
+/// نضيفه إلا لو صلاحية الموقع ممنوحة فعلاً — بدونها أندرويد يرفض تشغيل
+/// الخدمة كلها بـ SecurityException ويوقف الاستماع. لذلك شاشة الاستماع
+/// تعيد استدعاء هذي الدالة قبل كل تشغيل حسب حالة الصلاحية وقتها.
+Future<void> configureListeningService({required bool withLocation}) async {
   final service = FlutterBackgroundService();
   await service.configure(
     iosConfiguration: IosConfiguration(autoStart: false),
@@ -87,7 +98,10 @@ Future<void> initializeBackgroundService() async {
       // (Android يرفضه بـ SecurityException بدونها) — اتصالنا بالساعة واي
       // فاي/TCP عادي وما له علاقة بالبلوتوث، فـ dataSync وحده يوصف حالتنا صح
       // بدون هذا الشرط الإضافي.
-      foregroundServiceTypes: [AndroidForegroundType.dataSync],
+      foregroundServiceTypes: [
+        AndroidForegroundType.dataSync,
+        if (withLocation) AndroidForegroundType.location,
+      ],
     ),
   );
 }
@@ -121,6 +135,9 @@ void onListeningServiceStart(ServiceInstance service) async {
   Map<String, SoundSettingModel> activeSoundSettings = {
     for (final sound in CategoryService.defaultSounds) sound.soundId: sound,
   };
+
+  Timer? locationTimer;
+  bool isCheckingLocation = false;
 
   bool isListening = false;
   bool isConnecting = false;
@@ -161,6 +178,39 @@ void onListeningServiceStart(ServiceInstance service) async {
     } catch (_) {
       // نكمل بالإعدادات الافتراضية لو تعذر التحميل
     }
+  }
+
+  // تفعيل المجموعة حسب الموقع — نتحقق أول ما يبدأ الاستماع وبعدها كل دقيقة
+  Future<void> checkLocationCategory({bool isNewSession = false}) async {
+    if (isCheckingLocation || !isListening) return;
+    isCheckingLocation = true;
+    try {
+      categoryService ??= CategoryService.withDefaults();
+      final switched =
+          await LocationCategorySwitcher.checkAndSwitch(
+        categoryService!,
+        isNewListeningSession: isNewSession,
+      );
+      if (switched != null && isListening) {
+        activeSoundSettings = {
+          for (final sound in switched.sounds) sound.soundId: sound,
+        };
+        statusText = 'تم تفعيل "${switched.name}" حسب موقعك';
+        await setNotification('تم تفعيل مجموعة "${switched.name}" حسب موقعك');
+        emitUpdate();
+      }
+    } finally {
+      isCheckingLocation = false;
+    }
+  }
+
+  void startLocationChecks() {
+    locationTimer?.cancel();
+    unawaited(checkLocationCategory(isNewSession: true));
+    locationTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => checkLocationCategory(),
+    );
   }
 
   Future<void> classifyChunk(Uint8List pcmChunk) async {
@@ -242,6 +292,8 @@ void onListeningServiceStart(ServiceInstance service) async {
   }
 
   Future<void> stopListening() async {
+    locationTimer?.cancel();
+    locationTimer = null;
     await watchLink.stopAudio();
     await watchLink.release();
     pcmBuffer.clear();
@@ -317,6 +369,7 @@ void onListeningServiceStart(ServiceInstance service) async {
       statusText = 'جاري الاستماع من الساعة...';
       emitUpdate();
       await setNotification('يستمع لصوت الساعة الآن');
+      startLocationChecks();
     } catch (e) {
       await watchLink.stopAudio();
       await watchLink.release();

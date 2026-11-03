@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/category_model.dart';
+import '../models/location_trigger_model.dart';
 import '../models/sound_setting_model.dart';
 
 class FirebaseDataSource {
@@ -51,6 +52,7 @@ class FirebaseDataSource {
         name: data['name'] as String? ?? '',
         isEnabled: data['isEnabled'] as bool? ?? false,
         sounds: sounds,
+        locationTrigger: LocationTriggerModel.fromMap(data['locationTrigger']),
       ));
     }
     return categories;
@@ -65,6 +67,8 @@ class FirebaseDataSource {
     batch.set(catRef, {
       'name': category.name,
       'isEnabled': category.isEnabled,
+      if (category.locationTrigger != null)
+        'locationTrigger': category.locationTrigger!.toMap(),
     });
 
     for (final sound in category.sounds) {

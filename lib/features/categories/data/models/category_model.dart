@@ -1,3 +1,4 @@
+import 'location_trigger_model.dart';
 import 'sound_setting_model.dart';
 
 class CategoryModel {
@@ -5,12 +6,14 @@ class CategoryModel {
   final String name;
   final bool isEnabled;
   final List<SoundSettingModel> sounds;
+  final LocationTriggerModel? locationTrigger;
 
   const CategoryModel({
     required this.id,
     required this.name,
     required this.isEnabled,
     required this.sounds,
+    this.locationTrigger,
   });
 
   CategoryModel copyWith({
@@ -18,12 +21,14 @@ class CategoryModel {
     String? name,
     bool? isEnabled,
     List<SoundSettingModel>? sounds,
+    LocationTriggerModel? locationTrigger,
   }) {
     return CategoryModel(
       id: id ?? this.id,
       name: name ?? this.name,
       isEnabled: isEnabled ?? this.isEnabled,
       sounds: sounds ?? this.sounds,
+      locationTrigger: locationTrigger ?? this.locationTrigger,
     );
   }
 
@@ -32,6 +37,7 @@ class CategoryModel {
         'name': name,
         'isEnabled': isEnabled,
         'sounds': sounds.map((s) => s.toMap()).toList(),
+        if (locationTrigger != null) 'locationTrigger': locationTrigger!.toMap(),
       };
 
   factory CategoryModel.fromMap(Map<String, dynamic> map) {
@@ -44,6 +50,7 @@ class CategoryModel {
                 Map<String, dynamic>.from(s as Map),
               ))
           .toList(),
+      locationTrigger: LocationTriggerModel.fromMap(map['locationTrigger']),
     );
   }
 }

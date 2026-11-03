@@ -5,6 +5,8 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'nabeeh_colors.dart';
+import '../services/listening_background_service.dart';
+import '../services/location_category_switcher.dart';
 import '../services/sign_language_mode.dart';
 import '../services/watch_audio_socket.dart';
 import '../services/watch_link.dart';
@@ -127,6 +129,13 @@ class _ListeningScreenState extends State<ListeningScreen>
       detectedSound = 'جاري البحث عن الساعة...';
     });
 
+    // نوع الخدمة يتحدد حسب صلاحية الموقع وقت التشغيل (شوفي
+    // configureListeningService) — لو الخدمة شغالة أصلاً نتركها زي ما هي.
+    if (!await FlutterBackgroundService().isRunning()) {
+      await configureListeningService(
+        withLocation: await LocationCategorySwitcher.hasPermission(),
+      );
+    }
     await FlutterBackgroundService().startService();
 
     // بدء تشغيل الـ isolate الخلفي ما يعني إنه جاهز يستقبل أوامرنا فورًا —

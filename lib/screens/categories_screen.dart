@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../features/categories/data/models/category_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
+import '../services/location_category_switcher.dart';
 import '../widgets/custom_widgets.dart';
 import 'nabeeh_colors.dart';
 import 'add_edit_category_screen.dart';
@@ -81,6 +82,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Future<void> _setActiveCategory(String id) async {
     try {
       await _service.setActiveCategory(id, currentCategories: _categories);
+      await LocationCategorySwitcher.onManualActivation();
       setState(() {
         final updated = _categories
             .map((c) => c.copyWith(isEnabled: c.id == id))
@@ -606,6 +608,24 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (category.locationTrigger?.isEnabled ?? false) ...[
+                      const SizedBox(height: 4),
+                      const Row(
+                        children: [
+                          Icon(LucideIcons.mapPin,
+                              size: 14, color: NabeehColors.green),
+                          SizedBox(width: 4),
+                          Text(
+                            'تتفعّل حسب الموقع',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: NabeehColors.green,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

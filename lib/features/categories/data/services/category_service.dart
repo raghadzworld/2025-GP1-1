@@ -81,6 +81,7 @@ class CategoryService {
       name: category.name,
       isEnabled: category.isEnabled,
       sounds: _enforceFireAlarmInList(category.sounds),
+      locationTrigger: category.locationTrigger,
     );
     await _firebase.saveCategory(model);
     return model;
@@ -92,6 +93,7 @@ class CategoryService {
       name: category.name,
       isEnabled: category.isEnabled,
       sounds: _enforceFireAlarmInList(category.sounds),
+      locationTrigger: category.locationTrigger,
     );
     await _firebase.saveCategory(validated);
   }
