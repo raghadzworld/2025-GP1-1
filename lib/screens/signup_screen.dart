@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../main.dart';
 import '../services/email_service.dart';
+import '../services/sign_language_mode.dart';
+import '../widgets/sign_video_card.dart';
 import 'verify_email_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -421,35 +423,49 @@ class _SignupScreenState extends State<SignupScreen>
                     height: 50,
                     child: Stack(
                       children: [
+                        // أيقونة لغة الإشارة: تبدّل الوضع وتتحول للأخضر عند التفعيل
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF181059),
-                                  Color(0xFF181059),
-                                  Color(0xFF1773CF),
-                                ],
-                                stops: [0.0, 0.30, 1.0],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Image.asset(
-                                'assets/images/icon_signLan.png',
-                                color: Colors.white,
-                                colorBlendMode: BlendMode.srcIn,
-                                fit: BoxFit.contain,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: signLanguageModeNotifier,
+                            builder: (context, isActive, _) => GestureDetector(
+                              onTap: () =>
+                                  signLanguageModeNotifier.value = !isActive,
+                              child: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: isActive
+                                        ? const [
+                                            Color(0xFF0B4D2C),
+                                            Color(0xFF0B4D2C),
+                                            Color(0xFF00AA5B),
+                                          ]
+                                        : const [
+                                            Color(0xFF181059),
+                                            Color(0xFF181059),
+                                            Color(0xFF1773CF),
+                                          ],
+                                    stops: const [0.0, 0.30, 1.0],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Image.asset(
+                                    'assets/images/icon_signLan.png',
+                                    color: Colors.white,
+                                    colorBlendMode: BlendMode.srcIn,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -515,6 +531,36 @@ class _SignupScreenState extends State<SignupScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                // بوكس فيديو لغة الإشارة (يظهر فقط عند تفعيل الوضع)
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: signLanguageModeNotifier,
+                                  builder: (context, isActive, _) =>
+                                      AnimatedSize(
+                                    duration: const Duration(milliseconds: 350),
+                                    curve: Curves.easeInOut,
+                                    alignment: Alignment.topCenter,
+                                    child: isActive
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 16,
+                                            ),
+                                            child: SignVideoCard(
+                                              key: const ValueKey(
+                                                'sign_signup_card',
+                                              ),
+                                              videoAsset:
+                                                  'assets/videos/sign_signup.mp4',
+                                              onClose: () =>
+                                                  signLanguageModeNotifier
+                                                      .value = false,
+                                            ),
+                                          )
+                                        : const SizedBox(
+                                            width: double.infinity,
+                                          ),
+                                  ),
+                                ),
+
                                 const Text(
                                   'إنشـاء حسـاب',
                                   style: TextStyle(
