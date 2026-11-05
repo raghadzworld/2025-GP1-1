@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/sign_video_card.dart';
 import 'listening_screen.dart';
 import 'reminders_screen.dart';
 import 'stt_tts_screen.dart';
@@ -130,7 +131,30 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 12),
-                    _buildWatchCard(),
+
+                    // بوكس الساعة: عادي ⇄ وضع لغة الإشارة (فيديو + سوايب)
+                    ValueListenableBuilder<bool>(
+                      valueListenable: signLanguageModeNotifier,
+                      builder: (context, isActive, _) => AnimatedSize(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeInOut,
+                        alignment: Alignment.topCenter,
+                        child: isActive
+                            ? _SignWatchCard(
+                                key: const ValueKey('sign_watch_card'),
+                                isConnected: _isWatchConnected,
+                                videoAsset: 'assets/videos/sign_watch_info.mp4',
+                                onClose: () =>
+                                    signLanguageModeNotifier.value = false,
+                                // الفيديو معروض داخل البوكس أصلًا،
+                                // فنروح للصفحة مباشرة بدون ديالوق
+                                onMoreInfo: () =>
+                                    widget.onMoreInfoPressed?.call(),
+                              )
+                            : _buildWatchCard(),
+                      ),
+                    ),
+
                     const SizedBox(height: 14),
                     _buildFeaturesSection(),
                     const SizedBox(height: 12),
@@ -214,8 +238,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── البوكس الأصلي (الوضع العادي) ───────────────────────────────────────────
   Widget _buildWatchCard() {
     return Container(
+      key: const ValueKey('normal_watch_card'),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -432,6 +458,264 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.bold,
                     color: titleColor,
                     height: 1.3,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  بوكس الساعة في وضع لغة الإشارة
+//  الصفحة 1: فيديو لغة الإشارة (مع زر تكبير)  |  الصفحة 2 (سوايب): حالة الساعة
+//  زر X يرجّعه للبوكس الأصلي
+// ═════════════════════════════════════════════════════════════════════════════
+class _SignWatchCard extends StatefulWidget {
+  final bool isConnected;
+  final String videoAsset;
+  final VoidCallback onClose;
+  final VoidCallback onMoreInfo;
+
+  const _SignWatchCard({
+    super.key,
+    required this.isConnected,
+    required this.videoAsset,
+    required this.onClose,
+    required this.onMoreInfo,
+  });
+
+  @override
+  State<_SignWatchCard> createState() => _SignWatchCardState();
+}
+
+class _SignWatchCardState extends State<_SignWatchCard> {
+  final PageController _pageController = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // ─── الصفحة 1: الفيديو ─────────────────────────────────────────────────────
+  Widget _buildVideoPage() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        SignVideoView(videoAsset: widget.videoAsset),
+
+        // تلميح السوايب
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 30,
+          child: IgnorePointer(
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.swipe_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 6),
+                    Text(
+                      'اسحب لعرض حالة الساعة',
+                      style: TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── الصفحة 2: حالة الساعة ─────────────────────────────────────────────────
+  Widget _buildStatusPage() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // العنوان (نترك مساحة لزر الإغلاق)
+          Row(
+            children: const [
+              Expanded(
+                child: Text(
+                  'معلومات الساعة',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: NabeehColors.darkBlue,
+                  ),
+                ),
+              ),
+              SizedBox(width: 44, height: 34),
+            ],
+          ),
+          const Spacer(),
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF1F1F1), Color(0xFFF3F3F3)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF9F9F9F)),
+              ),
+              child: const Icon(
+                Icons.watch_rounded,
+                color: NabeehColors.darkBlue,
+                size: 38,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Center(
+            child: Text(
+              'حالة الساعة:',
+              style: TextStyle(fontSize: 17, color: Colors.black54),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Center(
+            child: Text(
+              widget.isConnected ? 'متصلة' : 'غير متصلة',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: widget.isConnected ? NabeehColors.green : Colors.red,
+              ),
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: widget.onMoreInfo,
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF181059), Color(0xFF1773CF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Center(
+                child: Text(
+                  'للمزيد من المعلومات',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDots() {
+    Widget dot(bool active) => AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: active ? 18 : 7,
+          height: 7,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: active
+                ? (_page == 0 ? Colors.white : NabeehColors.darkBlue)
+                : (_page == 0
+                    ? Colors.white.withValues(alpha: 0.45)
+                    : NabeehColors.gray),
+          ),
+        );
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [dot(_page == 0), dot(_page == 1)],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: kSignVideoCardHeight, // نفس حجم بوكس صفحة المجموعات
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: NabeehColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Stack(
+          children: [
+            PageView(
+              controller: _pageController,
+              onPageChanged: (i) => setState(() => _page = i),
+              children: [
+                _buildVideoPage(),
+                _buildStatusPage(),
+              ],
+            ),
+
+            // مؤشر الصفحات
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 10,
+              child: IgnorePointer(child: _buildDots()),
+            ),
+
+            // زر الإغلاق (X) → يرجع للبوكس الأصلي
+            PositionedDirectional(
+              top: 8,
+              end: 8,
+              child: GestureDetector(
+                onTap: widget.onClose,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: NabeehColors.darkNavy.withValues(alpha: 0.85),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
               ),
