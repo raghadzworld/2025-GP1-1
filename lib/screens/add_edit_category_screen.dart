@@ -8,8 +8,13 @@ import '../features/categories/data/models/location_trigger_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
 import '../services/listening_background_service.dart';
+import '../services/sign_language_mode.dart';
+import '../widgets/sign_video_card.dart';
 import 'location_picker_screen.dart';
 import 'nabeeh_colors.dart';
+
+/// فيديو لغة الإشارة لهذي الصفحة — غيّر الاسم لاسم ملفك
+const String _kSignVideoAsset = 'assets/videos/sign_add_edit_category.mp4';
 
 class AddEditCategoryScreen extends StatefulWidget {
   final CategoryModel? category;
@@ -34,8 +39,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   LocationTriggerModel? _locationTrigger;
   bool _isSaving = false;
   String? _nameError;
-
-  static const List<int> _patternOptions = [1, 2, 3];
 
   // مصدر واحد للأصوات — عند إنشاء فئة جديدة يُغلق كل شيء عدا fire_alarm
   static List<SoundSettingModel> get _newCategoryDefaults =>
@@ -128,71 +131,19 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     }
   }
 
-  void _showPatternSheet(int soundIndex) {
-    final current = _sounds[soundIndex].vibrationPattern;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: NabeehColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'نمط الاهتزاز',
-                style: TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: NabeehColors.dark,
-                ),
-              ),
-            ),
-            ..._patternOptions.map(
-              (opt) => ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 32),
-                title: Text(
-                  _intensityLabel(opt),
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontWeight: FontWeight.w600,
-                    color: opt == current
-                        ? NabeehColors.darkBlue
-                        : NabeehColors.dark,
-                  ),
-                ),
-                trailing: opt == current
-                    ? const Icon(LucideIcons.checkCircle2,
-                        color: NabeehColors.darkBlue)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _sounds[soundIndex] =
-                        _sounds[soundIndex].copyWith(vibrationPattern: opt);
-                  });
-                  Navigator.pop(ctx);
-                },
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final keyboardOpen = keyboardHeight > 0;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // نتحكم بمساحة الكيبورد يدويًا (padding سفلي داخل الـ scroll)
+        resizeToAvoidBottomInset: false,
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -209,25 +160,57 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 child: DefaultTextStyle.merge(
                   style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      0,
+                      20,
+                      keyboardHeight + 24,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
+                        _buildSignVideoBox(),
                         _buildNameInput(),
                         const SizedBox(height: 32),
-                        _buildSoundsSection(),
+                        // 👇 تعديل الموقع فوق الأصوات والاهتزاز
                         _buildLocationBox(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
+                        _buildSoundsSection(),
                       ],
                     ),
                   ),
                 ),
               ),
-              _buildBottomActions(),
+              // في الأفقي مع الكيبورد نخفي الأزرار السفلية عشان ما تاكل المساحة
+              if (!(isLandscape && keyboardOpen)) _buildBottomActions(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ─── بوكس فيديو لغة الإشارة (يظهر فقط لما الوضع مفعّل) ─────────────────────
+  Widget _buildSignVideoBox() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: signLanguageModeNotifier,
+      builder: (context, isActive, _) => AnimatedSize(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: Alignment.topCenter,
+        child: isActive
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: SignVideoCard(
+                  key: const ValueKey('sign_video_card'),
+                  videoAsset: _kSignVideoAsset,
+                  onClose: () => signLanguageModeNotifier.value = false,
+                ),
+              )
+            : const SizedBox(width: double.infinity),
       ),
     );
   }
@@ -269,28 +252,49 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () => signLanguageModeNotifier.value = !isActive,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            NabeehColors.darkNavy,
+                            NabeehColors.darkNavy,
+                            NabeehColors.lightBlue,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: NabeehColors.background,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -301,6 +305,9 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Widget _buildNameInput() {
+    final hasError = _nameError != null;
+    final errorBorder = const Color(0xFFE53935);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -318,11 +325,13 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
           controller: _nameController,
           textDirection: TextDirection.rtl,
           keyboardType: TextInputType.text,
+          // يخلي الحقل ظاهر فوق الكيبورد (مهم بالوضع الأفقي)
+          scrollPadding: const EdgeInsets.only(bottom: 120),
           onChanged: (_) {
             if (_nameError != null) setState(() => _nameError = null);
           },
           style: const TextStyle(fontFamily: 'IBMPlexSansArabic', fontSize: 16),
-         decoration: InputDecoration(
+          decoration: InputDecoration(
             hintText: 'مثلاً: المنزل، العمل...',
             hintTextDirection: TextDirection.rtl,
             hintStyle: const TextStyle(
@@ -331,64 +340,61 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
               fontWeight: FontWeight.w500,
               color: NabeehColors.slate400,
             ),
+            // الخلفية ثابتة — الأحمر على الحواف فقط
             filled: true,
-            fillColor: _nameError != null
-                ? Colors.red.withValues(alpha: 0.05)
-                : NabeehColors.slate50,
+            fillColor: NabeehColors.slate50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: _nameError != null
-                    ? Colors.red.withValues(alpha: 0.5)
-                    : NabeehColors.slate200,
+                color: hasError ? errorBorder : NabeehColors.slate200,
+                width: hasError ? 1.5 : 1.0,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: _nameError != null
-                    ? Colors.red.withValues(alpha: 0.5)
-                    : NabeehColors.slate200,
+                color: hasError ? errorBorder : NabeehColors.slate200,
+                width: hasError ? 1.5 : 1.0,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: _nameError != null
-                    ? Colors.red.withValues(alpha: 0.6)
-                    : NabeehColors.lightBlue,
+                color: hasError ? errorBorder : NabeehColors.lightBlue,
                 width: 2,
               ),
             ),
           ),
         ),
-        if (_nameError != null) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.alertCircle,
-                    size: 14, color: Colors.red),
-                const SizedBox(width: 8),
-                Text(
-                  _nameError!,
-                  style: const TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
+        if (hasError) ...[
+  const SizedBox(height: 10),
+  Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFEBEB),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: errorBorder, width: 1.2),
+    ),
+    child: Row(
+      children: [
+        const Icon(LucideIcons.alertCircle,
+            size: 16, color: Color(0xFFD32F2F)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            _nameError!,
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFD32F2F),
             ),
           ),
-        ],
+        ),
+      ],
+    ),
+  ),
+],
       ],
     );
   }
@@ -587,6 +593,45 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     }
   }
 
+  /// سويتش مخصص: لو إنذار الحريق يظهر القفل داخل الزر (على الـ thumb)
+/// سويتش مخصص: لو إنذار الحريق يظهر القفل واضح داخل الزر (على الـ thumb)
+/// سويتش مخصص: لو إنذار الحريق يظهر القفل داخل الزر (على الـ thumb)
+/// سويتش مخصص: لو إنذار الحريق يظهر القفل داخل الزر (على الـ thumb)
+Widget _buildSoundSwitch({
+  required bool value,
+  required bool locked,
+  required ValueChanged<bool>? onChanged,
+}) {
+  if (!locked) {
+    return Switch(
+      value: value,
+      onChanged: onChanged,
+      activeThumbColor: NabeehColors.background,
+      activeTrackColor: NabeehColors.darkBlue,
+      inactiveThumbColor: NabeehColors.slate400,
+      inactiveTrackColor: NabeehColors.slate200,
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+    );
+  }
+
+  // مقفول: اللون الرمادي الأصلي + القفل داخل الـ thumb
+  return Theme(
+    data: Theme.of(context).copyWith(
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.all(NabeehColors.slate400),
+        trackColor: WidgetStateProperty.all(NabeehColors.slate300),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+        thumbIcon: WidgetStateProperty.all(
+          const Icon(LucideIcons.lock, size: 14, color: Colors.white),
+        ),
+      ),
+    ),
+    child: const Switch(
+      value: true,
+      onChanged: null,
+    ),
+  );
+}
   Widget _buildSoundItem(int index) {
     final sound = _sounds[index];
     final isFireAlarm = sound.soundId == 'fire_alarm';
@@ -624,10 +669,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              if (isFireAlarm) ...[
-                const Icon(LucideIcons.lock, size: 16, color: NabeehColors.slate400),
-                const SizedBox(width: 6),
-              ],
               Expanded(
                 child: Text(
                   sound.name,
@@ -639,25 +680,13 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
                   ),
                 ),
               ),
-              Switch(
+              _buildSoundSwitch(
                 value: sound.isEnabled,
+                locked: isFireAlarm,
                 onChanged: isFireAlarm
                     ? null
                     : (val) => setState(
                         () => _sounds[index] = sound.copyWith(isEnabled: val)),
-                activeThumbColor: isFireAlarm
-                    ? NabeehColors.slate400
-                    : NabeehColors.background,
-                activeTrackColor: isFireAlarm
-                    ? NabeehColors.slate300
-                    : NabeehColors.darkBlue,
-                inactiveThumbColor: isFireAlarm
-                    ? NabeehColors.slate400
-                    : NabeehColors.slate400,
-                inactiveTrackColor: isFireAlarm
-                    ? NabeehColors.slate200
-                    : NabeehColors.slate200,
-                trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
               ),
             ],
           ),
@@ -666,8 +695,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
             const Divider(color: Color(0xFFDBEAFE)),
             const SizedBox(height: 16),
             _buildVibrationSlider(index),
-            const SizedBox(height: 12),
-            _buildPatternPicker(index),
           ],
         ],
       ),
@@ -755,59 +782,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     );
   }
 
-  Widget _buildPatternPicker(int soundIndex) {
-    final sound = _sounds[soundIndex];
-    return GestureDetector(
-      onTap: () => _showPatternSheet(soundIndex),
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          color: NabeehColors.slate50,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: NabeehColors.slate100),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Icon(LucideIcons.activity,
-                    color: NabeehColors.slate400, size: 18),
-                const SizedBox(width: 12),
-                const Text(
-                  'نمط الاهتزاز',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: NabeehColors.dark,
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Text(
-                  _intensityLabel(sound.vibrationPattern),
-                  style: const TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: NabeehColors.darkBlue,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    color: NabeehColors.slate300, size: 13),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -887,19 +861,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
         ],
       ),
     );
-  }
-
-  String _intensityLabel(int value) {
-    switch (value) {
-      case 1:
-        return 'خفيف';
-      case 2:
-        return 'متوسط';
-      case 3:
-        return 'قوي';
-      default:
-        return '$value';
-    }
   }
 }
 
