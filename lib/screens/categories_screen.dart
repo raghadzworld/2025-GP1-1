@@ -4,13 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../features/categories/data/models/category_model.dart';
+import '../features/categories/data/models/location_trigger_model.dart';
 import '../features/categories/data/models/sound_setting_model.dart';
 import '../features/categories/data/services/category_service.dart';
 import '../services/listening_background_service.dart';
 import '../services/location_category_switcher.dart';
+import '../services/sign_language_mode.dart';
 import '../widgets/custom_widgets.dart';
+import '../widgets/sign_video_card.dart';
 import 'nabeeh_colors.dart';
 import 'add_edit_category_screen.dart';
+
+/// فيديو لغة الإشارة لهذي الصفحة — غيّر الاسم لاسم ملفك
+const String _kSignVideoAsset = 'assets/videos/sign_categories.mp4';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -313,43 +319,66 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             ),
           ),
           child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : DefaultTextStyle.merge(
-                      style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildCategoriesCountBadge(_categories.length),
-                            const SizedBox(height: 12),
-                            _buildSearchField(),
-                            const SizedBox(height: 16),
-                            if (filteredCategories.isEmpty &&
-                                _searchQuery.trim().isNotEmpty)
-                              _buildNoSearchResults()
-                            else
-                              ...filteredCategories.map(
-                                (cat) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _buildCategoryCard(cat),
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : DefaultTextStyle.merge(
+                        style: const TextStyle(fontFamily: 'IBMPlexSansArabic'),
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSignVideoBox(),
+                              _buildCategoriesCountBadge(_categories.length),
+                              const SizedBox(height: 12),
+                              _buildSearchField(),
+                              const SizedBox(height: 16),
+                              if (filteredCategories.isEmpty &&
+                                  _searchQuery.trim().isNotEmpty)
+                                _buildNoSearchResults()
+                              else
+                                ...filteredCategories.map(
+                                  (cat) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _buildCategoryCard(cat),
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-            ),
-            _buildAddButton(),
-          ],
+              ),
+              _buildAddButton(),
+            ],
+          ),
         ),
-        ),
+      ),
+    );
+  }
+
+  // ─── بوكس فيديو لغة الإشارة (يظهر فقط لما الوضع مفعّل) ─────────────────────
+  Widget _buildSignVideoBox() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: signLanguageModeNotifier,
+      builder: (context, isActive, _) => AnimatedSize(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: Alignment.topCenter,
+        child: isActive
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: SignVideoCard(
+                  key: const ValueKey('sign_video_card'),
+                  videoAsset: _kSignVideoAsset,
+                  onClose: () => signLanguageModeNotifier.value = false,
+                ),
+              )
+            : const SizedBox(width: double.infinity),
       ),
     );
   }
@@ -553,28 +582,49 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [NabeehColors.darkNavy, NabeehColors.darkNavy, NabeehColors.lightBlue],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () => signLanguageModeNotifier.value = !isActive,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            NabeehColors.darkNavy,
+                            NabeehColors.darkNavy,
+                            NabeehColors.lightBlue,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: NabeehColors.background,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -620,22 +670,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       ),
                     ),
                     if (category.locationTrigger?.isEnabled ?? false) ...[
-                      const SizedBox(height: 4),
-                      const Row(
-                        children: [
-                          Icon(LucideIcons.mapPin,
-                              size: 14, color: NabeehColors.lightBlue),
-                          SizedBox(width: 4),
-                          Text(
-                            'تتفعل حسب الموقع',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: NabeehColors.lightBlue,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(height: 10),
+                      _buildLocationBadge(category.locationTrigger!),
                     ],
                   ],
                 ),
@@ -785,6 +821,59 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
+  // ─── شريحة "تشتغل تلقائيًا عند وصولك للمكان" ────────────────────────────────
+  // ─── شريحة التفعيل حسب الموقع (بنفس شكل شرائح الأصوات) ──────────────────────
+Widget _buildLocationBadge(LocationTriggerModel trigger) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: NabeehColors.slate50,
+      border: Border.all(color: NabeehColors.slate100),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Icon(
+          LucideIcons.mapPin,
+          size: 13,
+          color: NabeehColors.darkBlue,
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'تتفعل تلقائيًا عند وصولك للموقع',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: NabeehColors.slate500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'ضمن نطاق ${trigger.radiusMeters.round()} م',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: NabeehColors.slate300,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildSoundChip(SoundSettingModel sound) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -820,7 +909,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'اهتزاز ${_intensityLabel(sound.vibrationPower)} · ${_intensityLabel(sound.vibrationPattern)}',
+                  'اهتزاز ${_intensityLabel(sound.vibrationPower)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
