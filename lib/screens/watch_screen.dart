@@ -133,103 +133,56 @@ class _WatchScreenState extends State<WatchScreen> {
   }
 
   // ─── Custom Header ──────────────────────────────────────────────────────────
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
-      child: Row(
-        children: [
-          // العنوان
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Text(
-                ' الساعة',
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                  fontFamily: 'IBMPlexSansArabic',
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF181059),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-
-          // أيقونة لغة الإشارة
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF181059),
-                  Color(0xFF181059),
-                  Color(0xFF1773CF),
-                ],
-                stops: [0.09, 0.30, 1.0],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF1773CF).withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Image.asset(
-                'assets/images/icon_signLan.png',
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        ],
+ // ─── Custom Header ──────────────────────────────────────────────────────────
+Widget _buildHeader(BuildContext context) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.only(top: 64, bottom: 20, right: 20, left: 20),
+    child: const Text(
+      'الساعة',
+      textAlign: TextAlign.right,
+      style: TextStyle(
+        fontFamily: 'IBMPlexSansArabic',
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF181059),
       ),
-    );
-  }
-
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
+}
   Widget _buildWatchIpRow() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _needsPairing ? LucideIcons.alertTriangle : LucideIcons.watch,
-            size: 14,
-            color: _needsPairing ? Colors.redAccent : NabeehColors.gray,
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              _needsPairing
-                  ? kWatchRepairMessage
-                  : 'للاتصال بالساعة، تأكد من أن الجوال والساعة على نفس الشبكة',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'IBMPlexSansArabic',
-                fontSize: 12,
-                color: _needsPairing ? Colors.redAccent : NabeehColors.gray,
-                fontWeight: FontWeight.w600,
-              ),
+  const textColor = Color(0xFF181059);
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12, left: 20, right: 20),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          _needsPairing ? LucideIcons.alertTriangle : LucideIcons.watch,
+          size: 16,
+          color: _needsPairing ? Colors.redAccent : textColor,
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            _needsPairing
+                ? kWatchRepairMessage
+                : 'للاتصال بالساعة، تأكد من أن الجوال والساعة على نفس الشبكة',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 13,
+              color: _needsPairing ? Colors.redAccent : textColor,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildWatchHeroCard() {
     return BentoCard(
