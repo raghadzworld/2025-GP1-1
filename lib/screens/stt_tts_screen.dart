@@ -13,26 +13,31 @@ import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:web_socket_channel/io.dart';
+import '../secrets.dart';
+import '../services/sign_language_mode.dart';
+import '../widgets/sign_video_card.dart';
 import 'nabeeh_colors.dart';
 
 // =====================================================================
-// إعدادات Azure Speech Services — عدّليها بمفاتيحك من Azure Portal
+// إعدادات Azure Speech Services (للاستماع STT فقط)
+// المفتاح في lib/secrets.dart
 // =====================================================================
-const String _kAzureSpeechKey =
-    '9lz61KqwP59MlMj2RS7yTugTWEkRDXBrZ49UDKnxCPAA05XOTpNQJQQJ99CHACI8hq2XJ3w3AAAYACOGYzD0';
 const String _kAzureRegion =
     'switzerlandnorth'; // مثلاً: uaenorth, westeurope ...
 const String _kSttLanguageCode = 'ar-SA'; // أو ar-EG, ar-AE حسب اللهجة
-const String _kTtsLanguageCode = 'ar-KW';
-const String _kTtsVoiceName = 'ar-KW-FahedNeural';
+
+// =====================================================================
+// إعدادات ElevenLabs (للنطق TTS)
+// المفتاح في lib/secrets.dart
+// =====================================================================
+// خذي الـ Voice ID من elevenlabs.io > Voices (اختاري صوت يدعم العربي)
+const String _kElevenVoiceId = 'UXEyt6rtmFO9w5hBhzq9';
+// multilingual_v2 جودة أعلى للعربي، flash_v2_5 أسرع (تأخير أقل)
+const String _kElevenModel = 'eleven_multilingual_v2';
 
 // ------------------- إعدادات كشف الكلام (لعرض الويف فقط) -------------------
 const double _kSilenceDbThreshold =
     -35.0; // فوق هذا القدر = "فيه كلام"، وتحته "سكوت"
-
-// ------------------- إعدادات سرعة النطق (TTS) -------------------
-const double _kTtsMinRate = 0.93;
-const double _kTtsMaxRate = 1.02;
 
 class SttTtsScreen extends StatefulWidget {
   const SttTtsScreen({super.key});
@@ -46,9 +51,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   bool _isSttMode = true;
   bool _isRecording = false;
   bool _isSpeaking = false;
-  bool _isTtsLoading = false; // 👈 جديد (AC5): "جاري التحميل" منفصل عن "يتكلم"
+  bool _isTtsLoading = false; // "جاري التحميل" منفصل عن "يتكلم"
   String _textContent = '';
-  Timer? _speakingTimer;
   final FocusNode _textFocusNode = FocusNode();
   late TextEditingController _ttsController;
 
@@ -58,8 +62,9 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   StreamSubscription<RecordingDisposition>? _recorderSubscription;
   late AnimationController _waveController;
 
-  // ------------------- إضافات خاصة بـ Azure TTS -------------------
+  // ------------------- مشغّل الصوت (ElevenLabs) -------------------
   final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<void>? _playerCompleteSub;
 
   @override
   void initState() {
@@ -70,6 +75,11 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat();
     _initRecorder();
+
+    // نهاية التشغيل — مرة وحدة فقط
+    _playerCompleteSub = _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _isSpeaking = false);
+    });
   }
 
   Future<void> _initRecorder() async {
@@ -80,7 +90,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
 
   @override
   void dispose() {
-    _speakingTimer?.cancel();
     _sttConnectTimeoutTimer?.cancel();
     _recorderSubscription?.cancel();
     _pcmSubscription?.cancel();
@@ -88,6 +97,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     _sttSub?.cancel();
     _sttChannel?.sink.close();
     _recorder?.closeRecorder();
+    _playerCompleteSub?.cancel();
     _audioPlayer.dispose();
     _textFocusNode.dispose();
     _ttsController.dispose();
@@ -96,15 +106,16 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   void _switchMode(bool sttMode) {
+    _audioPlayer.stop();
     setState(() {
       _isSttMode = sttMode;
       _textContent = '';
       _isRecording = false;
       _isSpeaking = false;
+      _isTtsLoading = false;
       _ttsController.clear();
       _stopListening();
     });
-    _speakingTimer?.cancel();
     if (!sttMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _textFocusNode.requestFocus();
@@ -123,7 +134,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     }
     setState(() => _textContent = '');
     // ما نعرض حالة "يستمع" إلا بعد ما يتأكد فعلًا إن الاتصال بخدمة التعرّف
-    // على الكلام نجح — قبل كانت تتقلب لـ"يستمع" حتى لو ما فيه إنترنت.
+    // على الكلام نجح.
     _isStartingStt = true;
     final started = await _startListening();
     _isStartingStt = false;
@@ -206,12 +217,11 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     _sttChannel = IOWebSocketChannel.connect(
       uri,
       headers: {
-        'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
+        'Ocp-Apim-Subscription-Key': kAzureSpeechKey,
         'X-ConnectionId': connectionId,
       },
     );
-    // ننتظر لين يكتمل الاتصال فعلًا — لو فشل (ما فيه إنترنت) يطلع خطأ هنا
-    // ويوصل لـ catch في _startListening بدل ما يضيع بصمت.
+    // ننتظر لين يكتمل الاتصال فعلًا — لو فشل يطلع خطأ هنا
     await _sttChannel!.ready.timeout(const Duration(seconds: 8));
 
     _sttSub = _sttChannel!.stream.listen(
@@ -230,8 +240,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
       },
     );
 
-    // شبكة أمان: لو ما وصل أي رد من Azure خلال 8 ثواني من بدء الاتصال
-    // (سيرفر بطيء جداً أو ما يرد)، نعتبرها فشل اتصال بدل ما نعلّق للأبد.
+    // شبكة أمان: لو ما وصل أي رد من Azure خلال 8 ثواني
     _sttConnectTimeoutTimer?.cancel();
     _sttConnectTimeoutTimer = Timer(const Duration(seconds: 8), () {
       if (_isRecording && !_hasReceivedAnySttMessage) {
@@ -371,7 +380,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   void _handleSttMessage(dynamic message) {
     if (message is! String) return;
 
-    _hasReceivedAnySttMessage = true; // 👈 وصل رد فعلي، الاتصال شغّال
+    _hasReceivedAnySttMessage = true;
     _sttConnectTimeoutTimer?.cancel();
 
     final sepIndex = message.indexOf('\r\n\r\n');
@@ -424,9 +433,8 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     }
   }
 
-  /// AC6: لو انقطع اتصال WebSocket فجأة أثناء الاستماع (فشل شبكة، انقطاع
-  /// سيرفر، إلخ)، نعرض رسالة واضحة للمستخدم ونوقف الاستماع بأمان بدل ما
-  /// نسيبه بحالة معلّقة يظن فيها إنه لسا يستمع.
+  /// لو انقطع اتصال WebSocket فجأة أثناء الاستماع، نعرض رسالة واضحة
+  /// ونوقف الاستماع بأمان.
   bool _isHandlingSttFailure = false;
 
   Future<void> _handleSttConnectionFailure() async {
@@ -556,7 +564,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   }
 
   // =====================================================================
-  // Text-to-Speech (Azure Speech Services REST API)
+  // Text-to-Speech (ElevenLabs REST API)
   // =====================================================================
   void _speakText() async {
     if (_textContent.trim().isEmpty) {
@@ -566,40 +574,43 @@ class _SttTtsScreenState extends State<SttTtsScreen>
 
     if (_isSpeaking) {
       await _audioPlayer.stop();
-      _speakingTimer?.cancel();
       if (mounted) setState(() => _isSpeaking = false);
       return;
     }
 
-    // AC5: نظهر مؤشر التحميل فوراً، بدل ما نغيّر حالة "يتكلم" مباشرة
+    if (kElevenLabsKey.isEmpty) {
+      _showEmptyTextWarning('مفتاح ElevenLabs غير مضبوط');
+      return;
+    }
+
+    // نظهر مؤشر التحميل فوراً
     setState(() => _isTtsLoading = true);
 
     final url = Uri.parse(
-      'https://$_kAzureRegion.tts.speech.microsoft.com/cognitiveservices/v1',
+      'https://api.elevenlabs.io/v1/text-to-speech/$_kElevenVoiceId'
+      '?output_format=mp3_44100_128',
     );
-
-    final preparedText = _prepareTextForNaturalSpeech(_textContent);
-
-    final ssml =
-        '''<speak version='1.0' xml:lang='$_kTtsLanguageCode'>
-  <voice xml:lang='$_kTtsLanguageCode' name='$_kTtsVoiceName'>
-    ${_buildExpressiveSsml(preparedText)}
-  </voice>
-</speak>''';
 
     try {
       final response = await http
           .post(
             url,
             headers: {
-              'Ocp-Apim-Subscription-Key': _kAzureSpeechKey,
-              'Content-Type': 'application/ssml+xml',
-              'X-Microsoft-OutputFormat': 'audio-24khz-160kbitrate-mono-mp3',
+              'xi-api-key': kElevenLabsKey,
+              'Content-Type': 'application/json',
+              'Accept': 'audio/mpeg',
             },
-            body: utf8.encode(ssml),
+            body: jsonEncode({
+              'text': _prepareTextForNaturalSpeech(_textContent),
+              'model_id': _kElevenModel,
+              'voice_settings': {
+                'stability': 0.5,
+                'similarity_boost': 0.75,
+              },
+            }),
           )
           .timeout(
-            const Duration(seconds: 10),
+            const Duration(seconds: 15),
             onTimeout: () => throw TimeoutException('TTS request timed out'),
           );
 
@@ -608,7 +619,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         final file = File('${dir.path}/tts_output.mp3');
         await file.writeAsBytes(response.bodyBytes);
 
-        // AC5: نطفي مؤشر التحميل ونفعّل "يتكلم" بنفس لحظة بدء التشغيل الفعلي
+        // نطفي مؤشر التحميل ونفعّل "يتكلم" بنفس لحظة بدء التشغيل الفعلي
         if (mounted) {
           setState(() {
             _isTtsLoading = false;
@@ -617,21 +628,26 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         }
 
         await _audioPlayer.play(DeviceFileSource(file.path));
-        _audioPlayer.onPlayerComplete.listen((_) {
-          if (mounted) setState(() => _isSpeaking = false);
-        });
       } else {
-        debugPrint('Azure TTS Error: ${response.statusCode} ${response.body}');
+        debugPrint(
+          'ElevenLabs Error: ${response.statusCode} ${response.body}',
+        );
         if (mounted) {
           setState(() {
             _isTtsLoading = false;
             _isSpeaking = false;
           });
-          _showEmptyTextWarning('تعذر تحويل النص إلى صوت');
+          _showEmptyTextWarning(
+            response.statusCode == 401
+                ? 'مفتاح ElevenLabs غير صحيح'
+                : response.statusCode == 429
+                    ? 'انتهى رصيد ElevenLabs أو الطلبات كثيرة'
+                    : 'تعذر تحويل النص إلى صوت',
+          );
         }
       }
     } on TimeoutException {
-      debugPrint('Azure TTS Timeout');
+      debugPrint('ElevenLabs Timeout');
       if (mounted) {
         setState(() {
           _isTtsLoading = false;
@@ -640,7 +656,7 @@ class _SttTtsScreenState extends State<SttTtsScreen>
         _showEmptyTextWarning('الاتصال بطيء جداً، حاولي مرة أخرى');
       }
     } catch (e) {
-      debugPrint('Azure TTS Exception: $e');
+      debugPrint('ElevenLabs Exception: $e');
       if (mounted) {
         setState(() {
           _isTtsLoading = false;
@@ -657,53 +673,6 @@ class _SttTtsScreenState extends State<SttTtsScreen>
     const endings = ['.', '؟', '!', '،', '؛'];
     if (endings.any((e) => trimmed.endsWith(e))) return trimmed;
     return '$trimmed.';
-  }
-
-  String _escapeXml(String text) {
-    return text
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&apos;');
-  }
-
-  String _addNaturalPauses(String escapedText) {
-    return escapedText.replaceAll('، ', '،<break time="180ms"/> ');
-  }
-
-  String _buildExpressiveSsml(String text) {
-    final sentences = _splitIntoSentences(text);
-    if (sentences.isEmpty) {
-      return '<prosody rate="${_kTtsMinRate.toStringAsFixed(2)}" pitch="+0%">${_addNaturalPauses(_escapeXml(text))}</prosody>';
-    }
-
-    final rnd = math.Random();
-    final rateRange = _kTtsMaxRate - _kTtsMinRate;
-    final buffer = StringBuffer();
-    for (var i = 0; i < sentences.length; i++) {
-      final sentence = sentences[i].trim();
-      if (sentence.isEmpty) continue;
-
-      final pitchOffset = -3 + rnd.nextInt(7);
-      final rate = _kTtsMinRate + rnd.nextDouble() * rateRange;
-      final pitchStr = pitchOffset >= 0 ? '+$pitchOffset%' : '$pitchOffset%';
-
-      buffer.write(
-        '<prosody rate="${rate.toStringAsFixed(2)}" pitch="$pitchStr">'
-        '${_addNaturalPauses(_escapeXml(sentence))}'
-        '</prosody>',
-      );
-      if (i != sentences.length - 1) {
-        buffer.write('<break time="280ms"/>');
-      }
-    }
-    return buffer.toString();
-  }
-
-  List<String> _splitIntoSentences(String text) {
-    final pattern = RegExp(r'(?<=[.؟!؛])\s+');
-    return text.split(pattern).where((s) => s.trim().isNotEmpty).toList();
   }
 
   void _insertPhrase(String phrase) {
@@ -741,36 +710,66 @@ class _SttTtsScreenState extends State<SttTtsScreen>
   // ارتفاع محتوى كل وضع: بطاقة ٣٤٠ + مسافة ٤٠ + زر ١٢٠ + مسافة ٢٠.
   static const double _kModeContentHeight = 520;
 
+  // بوكس فيديو لغة الإشارة (يظهر فقط عند تفعيل الوضع)
+  Widget _buildSignVideoBox(bool isActive) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: isActive
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: SignVideoCard(
+                key: const ValueKey('sign_communication_card'),
+                videoAsset: 'assets/videos/sign_communication.mp4',
+                onClose: () => signLanguageModeNotifier.value = false,
+              ),
+            )
+          : const SizedBox(width: double.infinity),
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
     final content = _buildModeContent();
-    // بالوضع الأفقي الارتفاع المتاح (~٣٩٠) أقل بكثير من الهيدر + المحتوى،
-    // فنخلي الصفحة كلها تتمرر بدل ما يتبقى للمحتوى شريط صغير ويطلع overflow.
-    if (MediaQuery.orientationOf(context) == Orientation.landscape) {
-      return SingleChildScrollView(
-        child: Column(
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: signLanguageModeNotifier,
+      builder: (context, isSignActive, _) {
+        // الصفحة كلها تتمرر بالوضع الأفقي، أو لما بوكس لغة الإشارة مفتوح
+        final useScrollLayout =
+            MediaQuery.orientationOf(context) == Orientation.landscape ||
+            isSignActive;
+
+        if (useScrollLayout) {
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildHeader(context),
+                _buildSignVideoBox(isSignActive),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildModeSwitcher(),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(height: _kModeContentHeight, child: content),
+              ],
+            ),
+          );
+        }
+
+        return Column(
           children: [
             _buildHeader(context),
+            const SizedBox(height: 40),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _buildModeSwitcher(),
             ),
             const SizedBox(height: 20),
-            SizedBox(height: _kModeContentHeight, child: content),
+            Expanded(child: content),
           ],
-        ),
-      );
-    }
-    return Column(
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 40),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _buildModeSwitcher(),
-        ),
-        const SizedBox(height: 20),
-        Expanded(child: content),
-      ],
+        );
+      },
     );
   }
 
@@ -839,35 +838,51 @@ class _SttTtsScreenState extends State<SttTtsScreen>
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [
-                    NabeehColors.darkNavy,
-                    NabeehColors.darkNavy,
-                    NabeehColors.lightBlue,
-                  ],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+
+          // أيقونة لغة الإشارة: تبدّل الوضع وتتحول للأخضر عند التفعيل
+          ValueListenableBuilder<bool>(
+            valueListenable: signLanguageModeNotifier,
+            builder: (context, isActive, _) => GestureDetector(
+              onTap: () => signLanguageModeNotifier.value = !isActive,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFF0B4D2C),
+                            Color(0xFF0B4D2C),
+                            NabeehColors.green,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            NabeehColors.darkNavy,
+                            NabeehColors.darkNavy,
+                            NabeehColors.lightBlue,
+                          ],
+                          stops: [0.09, 0.30, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  width: 1.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/icon_signLan.png',
+                    color: NabeehColors.background,
+                    colorBlendMode: BlendMode.srcIn,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
