@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'nabeeh_colors.dart';
 import 'welcome_screen.dart';
 import '../services/email_service.dart';
+import '../widgets/sign_language_box.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -328,12 +329,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // بوكس لغة الإشارة (نفس شكل صفحة التواصل)
+                        const SignLanguageVideoBox(
+                          videoAsset: 'assets/videos/sign_edit_profile.mp4',
+                        ),
                         const SizedBox(height: 20),
 
                         _buildTextField(
                           controller: _nameController,
-                          label: 'الاسم الكامل',
-                          icon: LucideIcons.user,
+                          label: 'الاسم الكامل:',
+                          icon: Icons.person_outline,
                           hasError: _nameError != null,
                         ),
                         if (_nameError != null) _buildErrorRibbon(_nameError!),
@@ -343,8 +348,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         if (!_isGoogleUser) ...[
                           _buildTextField(
                             controller: _emailController,
-                            label: 'الايميل',
-                            icon: LucideIcons.mail,
+                            label: 'الايميل:',
+                            icon: Icons.email_outlined,
                             keyboardType: TextInputType.emailAddress,
                             hasError: emailHasError,
                           ),
@@ -577,44 +582,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ],
           ),
 
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF181059),
-                    Color(0xFF181059),
-                    Color(0xFF1773CF),
-                  ],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  width: 1.5,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
+          // زر لغة الإشارة (نفس صفحة التواصل)
+          const SignLanguageToggleButton(),
         ],
       ),
     );
   }
 
+  // ── خانة إدخال بنفس شكل خانات جهات الاتصال: العنوان والأيقونة فوق الخانة،
+  // والخطأ يظهر بحدود حمراء فقط (بدون تلوين الخانة) ─────────────────────────
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -623,52 +599,60 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     List<TextInputFormatter>? inputFormatters,
     bool hasError = false,
   }) {
-    final borderColor = hasError
-        ? Colors.red.withValues(alpha: 0.5)
-        : const Color.fromARGB(255, 235, 233, 229);
-    final focusedBorderColor = hasError
-        ? Colors.red.withValues(alpha: 0.6)
-        : const Color(0xFF1773CF);
-
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      style: const TextStyle(
-        fontFamily: 'IBMPlexSansArabic',
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        color: NabeehColors.darkBlue,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(
-          fontFamily: 'IBMPlexSansArabic',
-          color: hasError ? Colors.red : NabeehColors.slate500,
-          fontWeight: FontWeight.normal,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: const Color(0xFF181059)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF181059),
+              ),
+            ),
+          ],
         ),
-        prefixIcon: Icon(
-          icon,
-          color: hasError ? Colors.red : const Color(0xFF181059),
-          size: 22,
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          textAlign: TextAlign.right,
+          style: const TextStyle(color: Color(0xFF181059), fontSize: 15),
+          decoration: InputDecoration(
+            hintText: 'اكتب هنا',
+            hintStyle: const TextStyle(color: Color(0xFFA4ACB0), fontSize: 14),
+            filled: true,
+            fillColor: Colors.white,
+            isDense: true,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: hasError
+                    ? Colors.red.withValues(alpha: 0.5)
+                    : const Color(0xFFE5E7EB),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: hasError
+                    ? Colors.red.withValues(alpha: 0.6)
+                    : const Color(0xFF181059),
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 14,
+              horizontal: 16,
+            ),
+          ),
         ),
-        filled: true,
-        fillColor: hasError
-            ? Colors.red.withValues(alpha: 0.05)
-            : Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: focusedBorderColor, width: 2),
-        ),
-      ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'home_screen.dart';
 import 'emergency_screen.dart';
 import 'watch_screen.dart';   
@@ -11,12 +12,15 @@ import '../services/notification_tap_handler.dart';
 // ─── Nav Item Model ───────────────────────────────────────────────────────────
 class _NavItem {
   final String label;
-  final String selectedIcon;
-  final String unselectedIcon;
+  final String? selectedIcon;
+  final String? unselectedIcon;
+  // أيقونة جاهزة بدل الصور (تُستخدم لتبويب الإعدادات)
+  final IconData? icon;
   const _NavItem({
-    required this.label, 
-    required this.selectedIcon, 
-    required this.unselectedIcon
+    required this.label,
+    this.selectedIcon,
+    this.unselectedIcon,
+    this.icon,
   });
 }
 
@@ -101,9 +105,8 @@ class _MainScreenState extends State<MainScreen> {
       unselectedIcon: 'assets/images/icon_NotSEme.png',
     ),
     _NavItem(
-      label: 'حسابي',
-      selectedIcon: 'assets/images/icon_SlectedProfile.png',
-      unselectedIcon: 'assets/images/icon_NotSProfile.png',
+      label: 'الإعدادات',
+      icon: LucideIcons.settings,
     ),
   ];
 
@@ -190,13 +193,20 @@ class _MainScreenState extends State<MainScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (item.icon != null)
+                    Icon(
+                      item.icon,
+                      size: 24,
+                      color: isSelected ? const Color(0xFF1773CF) : Colors.grey,
+                    )
+                  else
                   Image.asset(
-                    isSelected ? item.selectedIcon : item.unselectedIcon,
+                    isSelected ? item.selectedIcon! : item.unselectedIcon!,
                     width: 24,
                     height: 24,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => Icon(
-                      index == 0 ? Icons.home : index == 1 ? Icons.watch_later : index == 2 ? Icons.notifications_active : Icons.person,
+                      index == 0 ? Icons.home : index == 1 ? Icons.watch_later : index == 2 ? Icons.notifications_active : Icons.settings,
                       color: isSelected ? const Color(0xFF1773CF) : Colors.grey,
                     ),
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'nabeeh_colors.dart';
+import '../widgets/sign_language_box.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -20,16 +21,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureRepeat = true;
   bool _isLoading = false;
 
+  // --- رسائل الخطأ: نفس أسلوب وصياغة صفحة إنشاء الحساب ---
+  String _currentPasswordError = '';
+  String _passwordError = '';
+  String _confirmPasswordStatus = ''; // '' | empty | match | nomatch
+  bool _newPasswordFocused = false;
+  bool _confirmPasswordFocused = false;
+
+  static final _upperRe = RegExp(r'[A-Z]');
+  static final _lowerRe = RegExp(r'[a-z]');
+  static final _digitRe = RegExp(r'[0-9]');
+  static final _specialRe = RegExp(r'[!@#\$&*~%^]');
+
+  void _validateCurrentPassword(String val) {
+    setState(() {
+      _currentPasswordError = val.isEmpty ? 'كلمة المرور الحالية مطلوبة' : '';
+    });
+  }
+
+  void _validatePassword(String val) {
+    setState(() {
+      _passwordError = val.isEmpty
+          ? 'كلمة المرور مطلوبة'
+          : val.length < 8
+          ? 'كلمة المرور يجب أن تكون 8 خانات على الأقل'
+          : !val.contains(_upperRe)
+          ? 'يجب أن تحتوي على حرف كبير'
+          : !val.contains(_lowerRe)
+          ? 'يجب أن تحتوي على حرف صغير'
+          : !val.contains(_digitRe)
+          ? 'يجب أن تحتوي على رقم'
+          : !val.contains(_specialRe)
+          ? 'يجب أن تحتوي على رمز'
+          : '';
+    });
+  }
+
+  void _onNewPasswordChanged(String val) {
+    _validatePassword(val);
+    // تحديث حالة التأكيد تلقائياً لما تتغير كلمة المرور الجديدة
+    if (repeatPasswordCtrl.text.isNotEmpty) {
+      setState(() {
+        _confirmPasswordStatus =
+            repeatPasswordCtrl.text == val ? 'match' : 'nomatch';
+      });
+    }
+  }
+
+  void _onConfirmPasswordChanged(String val) {
+    setState(() {
+      if (val.isEmpty) {
+        _confirmPasswordStatus = 'empty';
+      } else if (val == newPasswordCtrl.text) {
+        _confirmPasswordStatus = 'match';
+      } else {
+        _confirmPasswordStatus = 'nomatch';
+      }
+    });
+  }
+
+  /// عند الضغط على حفظ والبيانات ناقصة: نعرض كل الأخطاء مثل صفحة إنشاء الحساب
+  void _showAllErrors() {
+    _validateCurrentPassword(currentPasswordCtrl.text);
+    _validatePassword(newPasswordCtrl.text);
+    if (repeatPasswordCtrl.text.isEmpty) {
+      setState(() => _confirmPasswordStatus = 'empty');
+    } else if (repeatPasswordCtrl.text != newPasswordCtrl.text) {
+      setState(() => _confirmPasswordStatus = 'nomatch');
+    }
+  }
+
   @override
   void dispose() {
     currentPasswordCtrl.dispose();
     newPasswordCtrl.dispose();
     repeatPasswordCtrl.dispose();
     super.dispose();
-  }
-
-  void _onTextChanged(String _) {
-    setState(() {}); // Re-trigger build for validation UI updates
   }
 
   @override
@@ -39,13 +106,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final repeatPass = repeatPasswordCtrl.text;
 
     final bool hasMinLength = newPass.length >= 8;
-    final bool hasUppercase = RegExp(r'[A-Z]').hasMatch(newPass);
-    final bool hasSpecialChar = RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass);
+    final bool hasUppercase = _upperRe.hasMatch(newPass);
+    final bool hasLowercase = _lowerRe.hasMatch(newPass);
+    final bool hasDigit = _digitRe.hasMatch(newPass);
+    final bool hasSpecialChar = _specialRe.hasMatch(newPass);
     final bool passwordsMatch = newPass == repeatPass && repeatPass.isNotEmpty;
     final bool isCurrentPassFilled = currentPasswordCtrl.text.isNotEmpty;
 
     // Final check to enable Save button
-    final bool isAllValid = hasMinLength && hasUppercase && hasSpecialChar && passwordsMatch && isCurrentPassFilled;
+    final bool isAllValid = hasMinLength && hasUppercase && hasLowercase && hasDigit && hasSpecialChar && passwordsMatch && isCurrentPassFilled;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -72,24 +141,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildPasswordField('كلمة المرور الحالية', currentPasswordCtrl, obscureText: _obscureCurrent, onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent), onChanged: _onTextChanged),
+                      // بوكس لغة الإشارة (نفس شكل صفحة التواصل)
+                      const SignLanguageVideoBox(
+                        videoAsset: 'assets/videos/sign_change_password.mp4',
+                      ),
+                      Focus(
+                        onFocusChange: (hasFocus) {
+                          if (!hasFocus) _validateCurrentPassword(currentPasswordCtrl.text);
+                        },
+                        child: _buildPasswordField('كلمة المرور الحالية', currentPasswordCtrl, obscureText: _obscureCurrent, onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent), onChanged: (val) {
+                          if (_currentPasswordError.isNotEmpty) _validateCurrentPassword(val);
+                          setState(() {});
+                        }),
+                      ),
+                      _buildErrorText(_currentPasswordError),
                       const SizedBox(height: 20),
 
-                      _buildPasswordField('كلمة المرور الجديدة', newPasswordCtrl, obscureText: _obscureNew, onToggle: () => setState(() => _obscureNew = !_obscureNew), onChanged: _onTextChanged),
-                      const SizedBox(height: 16),
-                      
-                      // 👇 Live Rule Indicators
-                      _buildValidationRow('8 أحرف أو أكثر', hasMinLength),
-                      _buildValidationRow('حرف إنجليزي كبير واحد على الأقل', hasUppercase),
-                      _buildValidationRow('رمز خاص واحد على الأقل (!@#...)', hasSpecialChar),
-                      
+                      Focus(
+                        onFocusChange: (hasFocus) {
+                          setState(() => _newPasswordFocused = hasFocus);
+                          if (!hasFocus) _validatePassword(newPasswordCtrl.text);
+                        },
+                        child: _buildPasswordField('كلمة المرور الجديدة', newPasswordCtrl, obscureText: _obscureNew, onToggle: () => setState(() => _obscureNew = !_obscureNew), onChanged: _onNewPasswordChanged),
+                      ),
+
+                      // 👇 شروط كلمة المرور (نفس صفحة إنشاء الحساب)
+                      if (_newPasswordFocused || newPass.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, right: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildRequirement('8 خانات على الأقل', hasMinLength),
+                              _buildRequirement('حرف كبير (A-Z)', hasUppercase),
+                              _buildRequirement('حرف صغير (a-z)', hasLowercase),
+                              _buildRequirement('رقم (0-9)', hasDigit),
+                              _buildRequirement('رمز (!@#\$&*~%^)', hasSpecialChar),
+                            ],
+                          ),
+                        ),
+                      _buildErrorText(_passwordError),
                       const SizedBox(height: 20),
-                      _buildPasswordField('تأكيد كلمة المرور الجديدة', repeatPasswordCtrl, obscureText: _obscureRepeat, onToggle: () => setState(() => _obscureRepeat = !_obscureRepeat), onChanged: _onTextChanged),
-                      const SizedBox(height: 16),
-                      
-                      // 👇 Password Match Indicator
-                      _buildValidationRow('تطابق كلمة المرور', passwordsMatch),
-                      
+
+                      Focus(
+                        onFocusChange: (hasFocus) {
+                          setState(() {
+                            _confirmPasswordFocused = hasFocus;
+                            if (!hasFocus && repeatPasswordCtrl.text.isEmpty) {
+                              _confirmPasswordStatus = 'empty';
+                            }
+                          });
+                        },
+                        child: _buildPasswordField('تأكيد كلمة المرور الجديدة', repeatPasswordCtrl, obscureText: _obscureRepeat, onToggle: () => setState(() => _obscureRepeat = !_obscureRepeat), onChanged: _onConfirmPasswordChanged),
+                      ),
+
+                      // 👇 حالة تطابق كلمة المرور (نفس صفحة إنشاء الحساب)
+                      if (_confirmPasswordStatus == 'match' && _confirmPasswordFocused)
+                        _buildStatusRow('كلمة المرور متطابقة', ok: true),
+                      if (_confirmPasswordStatus == 'nomatch')
+                        _buildStatusRow('كلمة المرور غير متطابقة', ok: false),
+                      if (_confirmPasswordStatus == 'empty')
+                        _buildStatusRow('تأكيد كلمة المرور مطلوب', ok: false),
+
                       const SizedBox(height: 60),
 
                       // Full Width Save Button (No Cancel)
@@ -108,7 +221,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: isAllValid ? null : NabeehColors.slate300,
                         ),
                         child: ElevatedButton(
-                          onPressed: (isAllValid && !_isLoading) ? () async {
+                          onPressed: _isLoading ? null : () async {
+                            if (!isAllValid) {
+                              _showAllErrors();
+                              return;
+                            }
                             setState(() => _isLoading = true);
                             try {
                               final user = FirebaseAuth.instance.currentUser;
@@ -133,7 +250,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             } on FirebaseAuthException catch (e) {
                               String message = 'حدث خطأ أثناء التغيير. الرجاء المحاولة لاحقاً.';
                               if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-                                message = 'كلمة المرور الحالية غير صحيحة.';
+                                if (mounted) {
+                                  setState(() => _currentPasswordError = 'كلمة المرور الحالية غير صحيحة');
+                                }
+                                return;
                               } else if (e.code == 'network-request-failed') {
                                 message = 'تأكد من اتصالك بالإنترنت.';
                               }
@@ -150,7 +270,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             } finally {
                               if (mounted) setState(() => _isLoading = false);
                             }
-                          } : null,
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.transparent, 
                             shadowColor: Colors.transparent, 
@@ -243,29 +363,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
 
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF181059), Color(0xFF181059), Color(0xFF1773CF)],
-                  stops: [0.09, 0.30, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  'assets/images/icon_signLan.png',
-                  color: NabeehColors.background,
-                  colorBlendMode: BlendMode.srcIn,
-                  fit: BoxFit.contain,
-                ),
+          // زر لغة الإشارة (نفس صفحة التواصل)
+          const SignLanguageToggleButton(),
+        ],
+      ),
+    );
+  }
+
+  // ── نفس عناصر الخطأ في صفحة إنشاء الحساب ───────────────────────────────
+  Widget _buildErrorText(String error) {
+    if (error.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, right: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.cancel_rounded, size: 16, color: Colors.red),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              error,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 12,
+                color: Colors.red,
               ),
             ),
           ),
@@ -274,24 +394,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildValidationRow(String text, bool isValid) {
+  Widget _buildRequirement(String text, bool met) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
           Icon(
-            isValid ? LucideIcons.checkCircle2 : LucideIcons.xCircle,
-            color: isValid ? Colors.green : Colors.red,
-            size: 18,
+            met ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 16,
+            color: met ? Colors.green : Colors.red,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 6),
           Text(
             text,
             style: TextStyle(
               fontFamily: 'IBMPlexSansArabic',
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: isValid ? Colors.green : Colors.red,
+              fontSize: 12,
+              color: met ? Colors.green : Colors.red,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(String text, {required bool ok}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, right: 4),
+      child: Row(
+        children: [
+          Icon(
+            ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 16,
+            color: ok ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 12,
+              color: ok ? Colors.green : Colors.red,
             ),
           ),
         ],

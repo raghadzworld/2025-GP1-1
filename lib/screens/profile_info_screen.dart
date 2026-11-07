@@ -6,7 +6,7 @@ import 'nabeeh_colors.dart';
 import '../features/categories/data/services/category_service.dart';
 import 'settings_screen.dart';
 import '../services/sign_language_mode.dart';
-import 'sign_language_player_screen.dart';
+import '../widgets/sign_language_box.dart';
 
 class ProfileInfoScreen extends StatelessWidget {
   final VoidCallback onEdit;
@@ -336,22 +336,6 @@ class ProfileInfoScreen extends StatelessWidget {
     );
   }
 
-  // --- Sign Language Helper ---
-  void _handleTap(BuildContext context, String videoAsset, VoidCallback action) {
-    if (signLanguageModeNotifier.value) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => SignLanguagePlayerScreen(
-          videoAsset: videoAsset,
-          onFinished: action,
-        ),
-      );
-    } else {
-      action();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     // Check if the current user logged in with Google
@@ -374,28 +358,24 @@ class ProfileInfoScreen extends StatelessWidget {
           ),
           child: SafeArea(
             top: false,
-            child: Column(
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 30),
-
-                _buildSettingsTile(
-                  icon: LucideIcons.edit2,
-                  title: 'تعديل الملف الشخصي',
-                  borderColor: const Color(0xFF181059),
-                  onTap: () => _handleTap(context, 'assets/videos/sign_edit_profile.mp4', onEdit),
-                ),
-                
-                // Conditionally display the change password tile
-                if (!isGoogleUser)
+            child: ValueListenableBuilder<bool>(
+              valueListenable: signLanguageModeNotifier,
+              builder: (context, isSignActive, _) {
+                final tiles = <Widget>[
                   _buildSettingsTile(
-                    icon: LucideIcons.lock,
-                    title: 'تغيير كلمة المرور',
+                    icon: LucideIcons.edit2,
+                    title: 'تعديل الملف الشخصي',
                     borderColor: const Color(0xFF181059),
-                    onTap: () => _handleTap(
-                      context, 
-                      'assets/videos/sign_change_password.mp4',
-                      () {
+                    onTap: onEdit,
+                  ),
+
+                  // Conditionally display the change password tile
+                  if (!isGoogleUser)
+                    _buildSettingsTile(
+                      icon: LucideIcons.lock,
+                      title: 'تغيير كلمة المرور',
+                      borderColor: const Color(0xFF181059),
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -404,24 +384,18 @@ class ProfileInfoScreen extends StatelessWidget {
                         );
                       },
                     ),
+
+                  _buildSettingsTile(
+                    icon: LucideIcons.trash2,
+                    title: 'حذف الحساب',
+                    titleColor: Colors.red,
+                    iconColor: Colors.red,
+                    borderColor: Colors.red,
+                    onTap: () => _confirmDeleteAccount(context),
                   ),
+                ];
 
-                _buildSettingsTile(
-                  icon: LucideIcons.trash2,
-                  title: 'حذف الحساب',
-                  titleColor: Colors.red,
-                  iconColor: Colors.red,
-                  borderColor: Colors.red,
-                  onTap: () => _handleTap(
-                    context, 
-                    'assets/videos/sign_delete_account.mp4', 
-                    () => _confirmDeleteAccount(context),
-                  ),
-                ),
-
-                const Spacer(),
-
-                Padding(
+                final logoutButton = Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Container(
                     height: 60,
@@ -434,11 +408,7 @@ class ProfileInfoScreen extends StatelessWidget {
                       ),
                     ),
                     child: ElevatedButton.icon(
-                      onPressed: () => _handleTap(
-                        context, 
-                        'assets/videos/sign_logout.mp4', 
-                        () => _confirmLogout(context),
-                      ),
+                      onPressed: () => _confirmLogout(context),
                       icon: const Icon(
                         LucideIcons.logOut,
                         color: Colors.white,
@@ -463,9 +433,38 @@ class ProfileInfoScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 40),
-              ],
+                );
+
+                // لما بوكس لغة الإشارة مفتوح الصفحة كلها تتمرر (نفس صفحة التواصل)
+                if (isSignActive) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildHeader(context),
+                        const SignLanguageVideoBox(
+                          videoAsset: 'assets/videos/sign_settings.mp4',
+                          padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                        ),
+                        ...tiles,
+                        const SizedBox(height: 30),
+                        logoutButton,
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    _buildHeader(context),
+                    const SizedBox(height: 30),
+                    ...tiles,
+                    const Spacer(),
+                    logoutButton,
+                    const SizedBox(height: 40),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -482,7 +481,7 @@ class ProfileInfoScreen extends StatelessWidget {
         children: [
           const Expanded(
             child: Text(
-              'حسابي',
+              'الإعدادات',
               style: TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
                 fontSize: 24,

@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
 // 👇 Added Sign Language Imports
 import '../services/sign_language_mode.dart';
-import 'sign_language_player_screen.dart';
+import '../widgets/sign_language_box.dart';
 import '../services/reminder_alarm_service.dart';
 
 class AddReminderScreen extends StatefulWidget {
@@ -29,10 +29,13 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
   List<String> selectedDays = []; 
   
-  String label = "منبه";
+  // العنوان الافتراضي — يظهر كنص توضيحي بالخانة، ويُستخدم لو ما كتب المستخدم شي
+  static const String _kDefaultLabel = "منبه";
+  String label = _kDefaultLabel;
   String repeat = "مطلقاً";
   double vibrationPowerValue = 1.0;
-  String vibrationPattern = "متصل";
+  // أنماط الاهتزاز أُلغيت — يبقى نمط ثابت واحد وتتحكم المستخدمة بالقوة فقط
+  static const int _kFixedVibrationPattern = 1;
 
   bool _isLoading = false;
 
@@ -43,7 +46,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
     if (widget.existingData != null) {
       final data = widget.existingData!;
-      label = data['label'] ?? "منبه";
+      final savedLabel = (data['label'] as String?)?.trim() ?? '';
+      label = savedLabel.isEmpty ? _kDefaultLabel : savedLabel;
 
       List<dynamic> daysArray = data['daysActive'] ?? [];
       selectedDays = List<String>.from(daysArray);
@@ -58,12 +62,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
       int vp = data['vibrationPower'] ?? 2;
       vibrationPowerValue = (vp - 1).clamp(0, 2).toDouble();
-
-      int vpat = data['vibrationPattern'] ?? 1;
-      List<String> patterns = ['متصل', 'نبضات', 'متقطع', 'تصاعدي'];
-      vibrationPattern = (vpat >= 1 && vpat <= patterns.length)
-          ? patterns[vpat - 1]
-          : "متصل";
 
       String timeStr = data['time'] ?? "12:00 ص";
       isAm = timeStr.contains('ص');
@@ -88,22 +86,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     _amPmController = FixedExtentScrollController(initialItem: isAm ? 0 : 1);
   }
 
-  // 👇 Added Sign Language Helper
-  void _handleTap(String videoAsset, VoidCallback action) {
-    if (signLanguageModeNotifier.value) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => SignLanguagePlayerScreen(
-          videoAsset: videoAsset,
-          onFinished: action,
-        ),
-      );
-    } else {
-      action();
-    }
-  }
-
   Future<void> _saveReminder() async {
     setState(() => _isLoading = true);
     try {
@@ -114,9 +96,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')} ${isAm ? 'ص' : 'م'}';
 
       int powerInt = vibrationPowerValue.toInt() + 1;
-      int patternInt =
-          ['متصل', 'نبضات', 'متقطع', 'تصاعدي'].indexOf(vibrationPattern) + 1;
-      if (patternInt == 0) patternInt = 1;
+      const int patternInt = _kFixedVibrationPattern;
 
       final reminderData = {
         'label': label,
@@ -218,6 +198,12 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // بوكس لغة الإشارة (نفس شكل صفحة التواصل)
+                        SignLanguageVideoBox(
+                          videoAsset: widget.reminderId == null
+                              ? 'assets/videos/sign_add_reminder.mp4'
+                              : 'assets/videos/sign_edit_reminder.mp4',
+                        ),
                         _buildCustomTimePicker(),
                         const SizedBox(height: 32),
                         _buildSettingCard(
@@ -232,20 +218,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           title: 'العنوان',
                           value: label,
                           onTap: _showLabelDialog,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildSettingCard(
-                          icon: LucideIcons.activity,
-                          title: 'نمط الاهتزاز',
-                          value: vibrationPattern,
-                          onTap: () {
-                            _showOptionsSheet(
-                              'نمط الاهتزاز',
-                              ['متصل', 'نبضات', 'متقطع', 'تصاعدي'],
-                              vibrationPattern,
-                              (val) => setState(() => vibrationPattern = val),
-                            );
-                          },
                         ),
                         const SizedBox(height: 12),
                         _buildSliderCard(),
@@ -733,7 +705,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   void _showLabelDialog() {
-    TextEditingController controller = TextEditingController(text: label);
+    // لو العنوان هو الافتراضي تبدأ الخانة فاضية (والافتراضي يظهر كنص توضيحي)،
+    // فالمستخدم يكتب مباشرة بدون ما يمسح "منبه" بنفسه
+    TextEditingController controller = TextEditingController(
+      text: label == _kDefaultLabel ? '' : label,
+    );
     showDialog(
       context: context,
       builder: (context) => Directionality(
@@ -759,6 +735,12 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               fontWeight: FontWeight.w600,
             ),
             decoration: InputDecoration(
+              hintText: _kDefaultLabel,
+              hintStyle: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontWeight: FontWeight.w600,
+                color: NabeehColors.slate400,
+              ),
               filled: true,
               fillColor: NabeehColors.slate50,
               contentPadding: const EdgeInsets.symmetric(
@@ -795,7 +777,10 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                     ),
                     child: ElevatedButton(
                       onPressed: () {
-                        setState(() => label = controller.text);
+                        final typed = controller.text.trim();
+                        setState(
+                          () => label = typed.isEmpty ? _kDefaultLabel : typed,
+                        );
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
@@ -874,69 +859,6 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     );
   }
 
-  void _showOptionsSheet(
-    String title,
-    List<String> options,
-    String currentValue,
-    Function(String) onSelect,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: NabeehColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: NabeehColors.dark,
-                  ),
-                ),
-              ),
-              ...options.map(
-                (opt) => ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 32),
-                  title: Text(
-                    opt,
-                    style: TextStyle(
-                      fontFamily: 'IBMPlexSansArabic',
-                      fontWeight: FontWeight.w600,
-                      color: opt == currentValue
-                          ? NabeehColors.darkBlue
-                          : NabeehColors.dark,
-                    ),
-                  ),
-                  trailing: opt == currentValue
-                      ? const Icon(
-                          LucideIcons.checkCircle2,
-                          color: NabeehColors.darkBlue,
-                        )
-                      : null,
-                  onTap: () {
-                    onSelect(opt);
-                    Navigator.pop(context);
-                  },
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.all(32),
@@ -962,10 +884,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 ),
               ),
               child: TextButton(
-                // 👇 Wrapped Save action with Sign Language
                 onPressed: _isLoading 
                     ? null 
-                    : () => _handleTap('assets/videos/sign_save_reminder.mp4', _saveReminder),
+                    : _saveReminder,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(

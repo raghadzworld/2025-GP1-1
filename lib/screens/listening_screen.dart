@@ -10,7 +10,7 @@ import '../services/location_category_switcher.dart';
 import '../services/sign_language_mode.dart';
 import '../services/watch_audio_socket.dart';
 import '../services/watch_link.dart';
-import 'sign_language_player_screen.dart';
+import '../widgets/sign_language_box.dart';
 
 class ListeningScreen extends StatefulWidget {
   const ListeningScreen({super.key});
@@ -94,21 +94,6 @@ class _ListeningScreenState extends State<ListeningScreen>
     setState(() => _watchIp = host);
   }
 
-  void _handleTap(String videoAsset, VoidCallback action) {
-    if (signLanguageModeNotifier.value) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => SignLanguagePlayerScreen(
-          videoAsset: videoAsset,
-          onFinished: action,
-        ),
-      );
-    } else {
-      action();
-    }
-  }
-
   @override
   void dispose() {
     _waveController.dispose();
@@ -179,6 +164,11 @@ class _ListeningScreenState extends State<ListeningScreen>
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
+                        // بوكس لغة الإشارة (نفس شكل صفحة التواصل)
+                        const SignLanguageVideoBox(
+                          videoAsset: 'assets/videos/sign_listening.mp4',
+                          padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+                        ),
                         if (_isConnecting) _buildWatchIpRow(),
                         const SizedBox(height: 40),
                         _buildMicAndWaves(),
@@ -319,10 +309,7 @@ class _ListeningScreenState extends State<ListeningScreen>
         GestureDetector(
           onTap: _isConnecting
               ? null
-              : () => _handleTap(
-                  'assets/videos/sign_start_listening.mp4',
-                  () => _toggleListening(),
-                ),
+              : () => _toggleListening(),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: 120,

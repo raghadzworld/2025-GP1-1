@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../screens/Nabeeh_Colors.dart';
+import '../screens/nabeeh_colors.dart';
 
 /// خلفية الفقاعات المتحركة المستخدمة في شاشات الترحيب/الانترو —
 /// كحلية غامقة مع دوائر متوهجة تتموّج ببطء. مشتركة بين أكثر من شاشة

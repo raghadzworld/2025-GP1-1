@@ -6,7 +6,7 @@ import 'add_reminder_screen.dart';
 import 'nabeeh_colors.dart';
 // 👇 Added Sign Language Imports
 import '../services/sign_language_mode.dart';
-import 'sign_language_player_screen.dart';
+import '../widgets/sign_language_box.dart';
 import '../services/reminder_alarm_service.dart';
 
 /// يحوّل نص الوقت المخزّن ("hh:mm ص/م") لساعة بصيغة ٢٤ ساعة + دقيقة —
@@ -38,7 +38,7 @@ Future<void> _syncReminderAlarm(
       hour24: parsed.hour24,
       minute: parsed.minute,
       daysActive: List<String>.from(data['daysActive'] ?? const []),
-      vibrationPattern: data['vibrationPattern'] ?? 1,
+      vibrationPattern: 1, // أنماط الاهتزاز أُلغيت — نمط ثابت
       vibrationPower: data['vibrationPower'] ?? 2,
     );
   } catch (e) {
@@ -83,22 +83,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
           _syncReminderAlarm(doc.id, doc.data());
         }
       }).catchError((e) => debugPrint('Initial reminder alarm sync failed: $e'));
-    }
-  }
-
-  // 👇 Added Sign Language Helper
-  void _handleTap(String videoAsset, VoidCallback action) {
-    if (signLanguageModeNotifier.value) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => SignLanguagePlayerScreen(
-          videoAsset: videoAsset,
-          onFinished: action,
-        ),
-      );
-    } else {
-      action();
     }
   }
 
@@ -357,6 +341,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // بوكس لغة الإشارة (نفس شكل صفحة التواصل)
+                                  const SignLanguageVideoBox(
+                                    videoAsset: 'assets/videos/sign_reminders.mp4',
+                                  ),
                                   _buildRemindersCountBadge(allReminders.length),
                                   const SizedBox(height: 12),
                                   _buildSearchField(),
@@ -514,7 +502,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
+          const SignLanguageVideoBox(
+            videoAsset: 'assets/videos/sign_reminders.mp4',
+          ),
+          const SizedBox(height: 20),
           Icon(LucideIcons.bellOff, size: 80, color: NabeehColors.slate300),
           const SizedBox(height: 20),
           const Text(
@@ -782,8 +774,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  // 👇 Wrapped Edit action with Sign Language
-                  onTap: () => _handleTap('assets/videos/sign_edit_reminder.mp4', () => _editAlarm(reminderId, alarm)),
+                  onTap: () => _editAlarm(reminderId, alarm),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -820,8 +811,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  // 👇 Wrapped Delete action with Sign Language
-                  onTap: () => _handleTap('assets/videos/sign_delete_reminder.mp4', () => _confirmDelete(reminderId, label)), 
+                  onTap: () => _confirmDelete(reminderId, label),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -884,16 +874,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ),
       ),
       child: TextButton.icon(
-        // 👇 Wrapped Add New Reminder action with Sign Language
-        onPressed: () => _handleTap(
-          'assets/videos/sign_add_reminder.mp4', 
-          () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AddReminderScreen()),
-            );
-          },
-        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddReminderScreen()),
+          );
+        },
         icon: const Icon(LucideIcons.plus, color: Colors.white),
         label: const Text(
           'إضافة منبه جديد',
