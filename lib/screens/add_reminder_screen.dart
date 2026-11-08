@@ -8,6 +8,35 @@ import '../services/sign_language_mode.dart';
 import '../widgets/sign_language_box.dart';
 import '../services/reminder_alarm_service.dart';
 
+/// أيام الأسبوع بنفس ترتيب وكتابة اختيار "التكرار".
+const List<String> kReminderWeekDays = [
+  'الأحد',
+  'الاثنين',
+  'الثلاثاء',
+  'الأربعاء',
+  'الخميس',
+  'الجمعة',
+  'السبت',
+];
+
+/// نص التكرار المختصر (يُستخدم هنا وبقائمة المنبهات) — عشان ما يطلع النص
+/// برا حدود الخانة لما تنختار أيام كثيرة: ٦ أيام تظهر "كل يوم عدا ..."
+/// بدل قائمة طويلة.
+String reminderRepeatText(List<dynamic> days) {
+  final selected = days.map((d) => d.toString()).toSet();
+  if (selected.isEmpty) return 'مطلقاً';
+  if (selected.length == 7) return 'يوميًا';
+  if (selected.length == 6) {
+    final missing = kReminderWeekDays.where((d) => !selected.contains(d));
+    if (missing.length == 1) return 'كل يوم عدا ${missing.first}';
+  }
+  final ordered = [
+    ...kReminderWeekDays.where(selected.contains),
+    ...selected.where((d) => !kReminderWeekDays.contains(d)),
+  ];
+  return ordered.join('، ');
+}
+
 class AddReminderScreen extends StatefulWidget {
   final String? reminderId;
   final Map<String, dynamic>? existingData;
@@ -51,14 +80,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
       List<dynamic> daysArray = data['daysActive'] ?? [];
       selectedDays = List<String>.from(daysArray);
-
-      if (selectedDays.isEmpty) {
-        repeat = "مطلقاً";
-      } else if (selectedDays.length == 7) {
-        repeat = "يوميًا";
-      } else {
-        repeat = selectedDays.join('، ');
-      }
+      repeat = reminderRepeatText(selectedDays);
 
       int vp = data['vibrationPower'] ?? 2;
       vibrationPowerValue = (vp - 1).clamp(0, 2).toDouble();
@@ -494,41 +516,47 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           border: Border.all(color: NabeehColors.slate100),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(icon, color: NabeehColors.slate400, size: 20),
-                const SizedBox(width: 16),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: NabeehColors.dark,
-                  ),
-                ),
-              ],
+            Icon(icon, color: NabeehColors.slate400, size: 20),
+            const SizedBox(width: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: NabeehColors.dark,
+              ),
             ),
-            Row(
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: NabeehColors.darkBlue,
+            const SizedBox(width: 16),
+            // القيمة تاخذ المساحة الباقية فقط، والنص الطويل يلتف لسطرين
+            // ثم يختصر بـ "..." بدل ما يطلع برا الخانة
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: NabeehColors.darkBlue,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: NabeehColors.slate300,
-                  size: 14,
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: NabeehColors.slate300,
+                    size: 14,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -682,13 +710,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                               selectedDays.sort((a, b) => days.indexOf(a).compareTo(days.indexOf(b)));
                             });
                             setState(() {
-                              if (selectedDays.isEmpty) {
-                                repeat = "مطلقاً";
-                              } else if (selectedDays.length == 7) {
-                                repeat = "يوميًا";
-                              } else {
-                                repeat = selectedDays.join('، ');
-                              }
+                              repeat = reminderRepeatText(selectedDays);
                             });
                           },
                         );
@@ -715,6 +737,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          scrollable: true,
           backgroundColor: NabeehColors.background,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -730,6 +753,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           content: TextField(
             controller: controller,
             autofocus: true,
+            maxLength: 30,
             style: const TextStyle(
               fontFamily: 'IBMPlexSansArabic',
               fontWeight: FontWeight.w600,

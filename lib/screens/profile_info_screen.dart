@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nabeeh_colors.dart';
 import '../features/categories/data/services/category_service.dart';
 import 'settings_screen.dart';
+import 'faq_screen.dart';
 import '../services/sign_language_mode.dart';
 import '../widgets/sign_language_box.dart';
 
@@ -386,6 +387,20 @@ class ProfileInfoScreen extends StatelessWidget {
                     ),
 
                   _buildSettingsTile(
+                    icon: LucideIcons.helpCircle,
+                    title: 'الأسئلة الشائعة',
+                    borderColor: const Color(0xFF181059),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FaqScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildSettingsTile(
                     icon: LucideIcons.trash2,
                     title: 'حذف الحساب',
                     titleColor: Colors.red,
@@ -454,15 +469,27 @@ class ProfileInfoScreen extends StatelessWidget {
                   );
                 }
 
-                return Column(
-                  children: [
-                    _buildHeader(context),
-                    const SizedBox(height: 30),
-                    ...tiles,
-                    const Spacer(),
-                    logoutButton,
-                    const SizedBox(height: 40),
-                  ],
+                return LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          children: [
+                            _buildHeader(context),
+                            const SizedBox(height: 30),
+                            ...tiles,
+                            const Spacer(),
+                            const SizedBox(height: 30),
+                            logoutButton,
+                            const SizedBox(height: 40),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 );
               },
             ),

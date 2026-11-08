@@ -629,12 +629,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
     final List<dynamic> daysArray = alarm['daysActive'] ?? [];
 
-    String daysText = '';
-    if (daysArray.length == 7) {
-      daysText = 'يوميًا';
-    } else if (daysArray.isNotEmpty) {
-      daysText = daysArray.join('، ');
-    }
+    final String daysText =
+        daysArray.isEmpty ? '' : reminderRepeatText(daysArray);
 
     final bool isAm = timeString.contains('ص');
 
@@ -666,11 +662,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Column(
+              Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: 20, 
@@ -713,7 +712,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ],
                   ),
                 ],
+                ),
               ),
+              const SizedBox(width: 12),
               Switch(
                 value: isActive,
                 activeColor: NabeehColors.background,
@@ -754,15 +755,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           : NabeehColors.slate500,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      daysText,
-                      style: TextStyle(
-                        fontFamily: 'IBMPlexSansArabic',
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isActive
-                            ? const Color(0xFF181059)
-                            : NabeehColors.slate500,
+                    Flexible(
+                      child: Text(
+                        daysText,
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isActive
+                              ? const Color(0xFF181059)
+                              : NabeehColors.slate500,
+                        ),
                       ),
                     ),
                   ],
