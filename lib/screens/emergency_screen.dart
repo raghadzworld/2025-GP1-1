@@ -7,8 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'contacts_screen.dart';
-import 'sign_language_player_screen.dart';
-import '../services/sign_language_mode.dart';
+import '../widgets/sign_language_box.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 class NabeehColors {
@@ -96,21 +95,6 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     _sosTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
-  }
-
-  void _handleTap(String videoAsset, VoidCallback action) {
-    if (signLanguageModeNotifier.value) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => SignLanguagePlayerScreen(
-          videoAsset: videoAsset,
-          onFinished: action,
-        ),
-      );
-    } else {
-      action();
-    }
   }
 
   // ── SOS Logic ──────────────────────────────────────────────────────────────
@@ -262,7 +246,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 12),
+                      // بوكس لغة الإشارة (نفس شكل باقي الصفحات)
+                      const SignLanguageVideoBox(
+                        videoAsset: 'assets/videos/sign_emergency.mp4',
+                      ),
                       _buildContactsButton(),
                       const SizedBox(height: 40),
                       const Align(
@@ -305,55 +292,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               color: Color(0xFF181059),
             ),
           ),
-          ValueListenableBuilder<bool>(
-            valueListenable: signLanguageModeNotifier,
-            builder: (context, isActive, _) => GestureDetector(
-              onTap: () {
-                signLanguageModeNotifier.value = !isActive;
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: isActive
-                      ? const LinearGradient(
-                          colors: [
-                            Color(0xFF0B4D2C),
-                            Color(0xFF0B4D2C),
-                            NabeehColors.green,
-                          ],
-                          stops: [0.09, 0.30, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        )
-                      : const LinearGradient(
-                          colors: [
-                            Color(0xFF181059),
-                            Color(0xFF181059),
-                            Color(0xFF1773CF),
-                          ],
-                          stops: [0.09, 0.30, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Image.asset(
-                    'assets/images/icon_signLan.png',
-                    color: Colors.white,
-                    colorBlendMode: BlendMode.srcIn,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const SignLanguageToggleButton(),
         ],
       ),
     );
@@ -364,12 +303,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
-        onTap: () => _handleTap(
-          'assets/videos/sign_contacts.mp4',
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ContactsScreen()),
-          ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ContactsScreen()),
         ),
         borderRadius: BorderRadius.circular(20),
         child: Container(
@@ -484,12 +420,14 @@ class _EmergencyScreenState extends State<EmergencyScreen>
                           ],
                         )
                       : const Text(
-                          'SOS',
+                          'إرسال\nالمساعدة',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
+                            fontFamily: 'IBMPlexSansArabic',
                             color: Colors.white,
-                            fontSize: 36,
+                            fontSize: 22,
+                            height: 1.3,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
                           ),
                         ),
                 ),

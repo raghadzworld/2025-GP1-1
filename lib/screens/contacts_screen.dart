@@ -4,8 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'emergency_screen.dart' show EmergencyContact;
-import 'sign_language_player_screen.dart';
-import '../services/sign_language_mode.dart';
+import '../widgets/sign_language_box.dart';
 
 const _kContactsGray = Color(0xFFA4ACB0);
 const _kContactsCardBorder = Color(0xFFE5E7EB);
@@ -35,21 +34,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
     _searchCtrl.dispose();
     _searchFocusNode.dispose();
     super.dispose();
-  }
-
-  void _handleTap(String videoAsset, VoidCallback action) {
-    if (signLanguageModeNotifier.value) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => SignLanguagePlayerScreen(
-          videoAsset: videoAsset,
-          onFinished: action,
-        ),
-      );
-    } else {
-      action();
-    }
   }
 
   CollectionReference<Map<String, dynamic>>? get _contactsRef {
@@ -814,6 +798,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // بوكس لغة الإشارة (نفس شكل باقي الصفحات)
+                        const SignLanguageVideoBox(
+                          videoAsset: 'assets/videos/sign_contacts.mp4',
+                        ),
                         _buildContactsCountBadge(),
                         const SizedBox(height: 12),
                         _buildSearchField(),
@@ -883,55 +871,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               ),
             ],
           ),
-          ValueListenableBuilder<bool>(
-            valueListenable: signLanguageModeNotifier,
-            builder: (context, isActive, _) => GestureDetector(
-              onTap: () {
-                signLanguageModeNotifier.value = !isActive;
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: isActive
-                      ? const LinearGradient(
-                          colors: [
-                            Color(0xFF0B4D2C),
-                            Color(0xFF0B4D2C),
-                            Color(0xFF00AA5B),
-                          ],
-                          stops: [0.09, 0.30, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        )
-                      : const LinearGradient(
-                          colors: [
-                            Color(0xFF181059),
-                            Color(0xFF181059),
-                            Color(0xFF1773CF),
-                          ],
-                          stops: [0.09, 0.30, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Image.asset(
-                    'assets/images/icon_signLan.png',
-                    color: Colors.white,
-                    colorBlendMode: BlendMode.srcIn,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const SignLanguageToggleButton(),
         ],
       ),
     );
@@ -1035,10 +975,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _handleTap(
-                    'assets/videos/sign_edit_contact.mp4',
-                    () => _showEditContactSheet(contact, index),
-                  ),
+                  onTap: () => _showEditContactSheet(contact, index),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -1075,10 +1012,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _handleTap(
-                    'assets/videos/sign_delete_contact.mp4',
-                    () => _confirmDeleteContact(contact, index),
-                  ),
+                  onTap: () => _confirmDeleteContact(contact, index),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -1137,10 +1071,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ),
         ),
         child: TextButton.icon(
-          onPressed: () => _handleTap(
-            'assets/videos/sign_add_contact.mp4',
-            _showAddContactSheet,
-          ),
+          onPressed: _showAddContactSheet,
           icon: const Icon(LucideIcons.plus, color: Colors.white),
           label: const Text(
             'إضافة جهة اتصال جديدة',
